@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SME Valença do Piauí - Ficha de Encaminhamento</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        /* =========================================
+           ESTILOS DO PDF (MODELO)
+           ========================================= */
+        #pdf-content {
+            display: none;
+            width: 190mm; /* Largura segura para A4 */
+            margin: 0 auto;
+            padding: 5mm;
+            font-family: 'Times New Roman', serif;
+            background: white;
+            color: #000;
+            font-size: 11pt;
+            line-height: 1.2;
+        }
+
+        /* Tabelas estruturais */
+        .pdf-table { width: 100%; border-collapse: collapse; margin-bottom: 5px; }
+        .pdf-table td { padding: 3px; vertical-align: bottom; }
+        
+        .pdf-header { text-align: center; margin-bottom: 10px; border-bottom: 2px solid black; padding-bottom: 5px; }
+        
+        .pdf-section-title { 
+            background: #e5e5e5; 
+            border: 1px solid #000; 
+            padding: 4px; 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            font-size: 10pt;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            -webkit-print-color-adjust: exact; 
+        }
+        
+        .field-label { font-weight: bold; font-size: 10pt; margin-right: 5px; white-space: nowrap;}
+        .input-group { display: flex; align-items: baseline; }
+        .input-group span.val { 
+            flex-grow: 1; 
+            border-bottom: 1px dashed #000; 
+            margin-left: 5px; 
+            font-weight: normal; 
+            padding-left: 5px;
+            min-height: 16px;
+            display: inline-block;
+        }
+
+        /* Loading Overlay */
+        #loading {
+            display: none;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 9999;
+            align-items: center; justify-content: center; color: white; font-size: 20px; flex-direction: column;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans transition-colors duration-200 dark:bg-gray-900 dark:text-gray-100">
+
+    <div id="loading">
+        <svg class="animate-spin h-10 w-10 text-white mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Gerando PDF...</span>
+    </div>
+
+    <header class="bg-blue-900 text-white shadow-md p-4 mb-8 dark:bg-blue-950">
+        <div class="max-w-5xl mx-auto flex items-center justify-between">
+            <div>
+                <h1 class="text-xl font-bold uppercase">SME - Valença do Piauí</h1>
+                <p class="text-xs opacity-80 dark:text-gray-300">Sistema de Lotação e Gestão de Pessoal</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="toggleDarkMode()" class="p-2 rounded-lg text-white/80 hover:bg-white/10 transition-colors" title="Alternar Tema">
+                    <i id="theme-icon" class="ph ph-moon text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto p-4 md:p-6 bg-white rounded-lg shadow-lg mb-12 dark:bg-gray-800 dark:shadow-none">
+        <h2 class="text-2xl font-bold text-gray-700 mb-6 border-b pb-2 dark:text-white dark:border-gray-700">Preenchimento de Dados Funcionais</h2>
+        
+        <form id="employeeForm" class="space-y-6">
+            <div>
+                <h3 class="text-lg font-semibold text-blue-800 mb-4 dark:text-blue-400">Dados Pessoais</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-3">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nome Completo*</label>
+                        <input type="text" id="nome" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nº do Vínculo*</label>
+                        <input type="text" id="num_vinculo" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">CPF</label>
+                        <input type="text" id="cpf" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">RG</label>
+                        <input type="text" id="rg" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data de Nascimento</label>
+                        <input type="date" id="data_nasc" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">PIS/PASEP</label>
+                        <input type="text" id="pis" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nº Título de Eleitor</label>
+                        <input type="text" id="titulo_eleitor" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Zona Eleitoral</label>
+                        <input type="text" id="zona_eleitoral" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Seção Eleitoral</label>
+                        <input type="text" id="secao_eleitoral" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nome da Mãe</label>
+                        <input type="text" id="mae" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nacionalidade</label>
+                        <input type="text" id="nacionalidade" value="Brasileira" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Estado Civil</label>
+                        <select id="estado_civil" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                            <option value="">Selecione</option>
+                            <option value="Solteiro(a)">Solteiro(a)</option>
+                            <option value="Casado(a)">Casado(a)</option>
+                            <option value="Divorciado(a)">Divorciado(a)</option>
+                            <option value="Viúvo(a)">Viúvo(a)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Telefone</label>
+                        <input type="text" id="telefone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div class="md:col-span-3">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">E-mail</label>
+                        <input type="email" id="email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div class="md:col-span-4">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Endereço Completo</label>
+                        <input type="text" id="endereco" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-gray-200 dark:border-gray-700">
+
+            <div>
+                <h3 class="text-lg font-semibold text-blue-800 mb-4 dark:text-blue-400">Dados Profissionais</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Função</label>
+                        <input type="text" id="funcao" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Lotação</label>
+                        <input type="text" id="lotacao" value="Secretaria Mun. de Educação" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Local de Trabalho</label>
+                        <input type="text" id="local_trabalho" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Vínculo</label>
+                        <select id="tipo_vinculo" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                            <option value="">-- Selecione --</option>
+                            <option value="Servidor Efetivo">Servidor Efetivo</option>
+                            <option value="Comissionado">Comissionado</option>
+                            <option value="Terceirizado">Terceirizado</option>
+                            <option value="Outros">Outros</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Classe / Nível</label>
+                        <input type="text" id="classe" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nº Contracheque</label>
+                        <input type="text" id="contracheque" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-gray-200 dark:border-gray-700">
+
+            <div>
+                <h3 class="text-lg font-semibold text-blue-800 mb-4 dark:text-blue-400">Dados Financeiros</h3>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Remuneração (R$)</label>
+                        <input type="text" id="remuneracao" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data Início</label>
+                        <input type="date" id="dt_inicio" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Data Término</label>
+                        <input type="date" id="dt_termino" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                     <div class="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-4 border-t pt-4 mt-2 dark:border-gray-700">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Banco</label>
+                            <input type="text" id="banco" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Agência</label>
+                            <input type="text" id="agencia" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Conta</label>
+                            <input type="text" id="conta" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo (CC/CP)</label>
+                            <input type="text" id="tipo_conta" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                     </div>
+                </div>
+            </div>
+
+            <div class="pt-6 flex justify-end">
+                <button type="button" onclick="gerarPDF()" class="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded shadow flex items-center transition duration-150">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Gerar Ficha de Lotação
+                </button>
+            </div>
+        </form>
+    </main>
+
+    <div id="pdf-content">
+        <div class="pdf-header">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/1/11/Bras%C3%A3o_do_Piau%C3%AD.svg" alt="Brasão" style="height: 50px; margin-bottom: 5px;">
+            <h2 style="margin: 0; font-size: 14pt; font-weight: bold;">ESTADO DO PIAUÍ</h2>
+            <h2 style="margin: 0; font-size: 14pt; font-weight: bold;">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h2>
+            <h3 style="margin: 5px 0; font-size: 12pt;">SECRETARIA MUNICIPAL DE EDUCAÇÃO</h3>
+            <h4 style="margin-top: 10px; text-decoration: underline;">FICHA DE ENCAMINHAMENTO E CADASTRO</h4>
+        </div>
+
+        <div class="pdf-section-title">DADOS PESSOAIS</div>
+        <table class="pdf-table">
+            <tr>
+                <td width="70%">
+                    <div class="input-group"><span class="field-label">Nome:</span> <span id="p_nome" class="val"></span></div>
+                </td>
+                <td width="30%">
+                    <div class="input-group"><span class="field-label">Vínculo:</span> <span id="p_vinculo" class="val"></span></div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td width="25%"><div class="input-group"><span class="field-label">CPF:</span> <span id="p_cpf" class="val"></span></div></td>
+                            <td width="25%"><div class="input-group"><span class="field-label">RG:</span> <span id="p_rg" class="val"></span></div></td>
+                            <td width="25%"><div class="input-group"><span class="field-label">Nasc:</span> <span id="p_nasc" class="val"></span></div></td>
+                            <td width="25%"><div class="input-group"><span class="field-label">PIS:</span> <span id="p_pis" class="val"></span></div></td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td width="40%"><div class="input-group"><span class="field-label">Título Eleitor:</span> <span id="p_titulo" class="val"></span></div></td>
+                            <td width="30%"><div class="input-group"><span class="field-label">Zona:</span> <span id="p_zona" class="val"></span></div></td>
+                            <td width="30%"><div class="input-group"><span class="field-label">Seção:</span> <span id="p_secao" class="val"></span></div></td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+            
+            <tr>
+                <td width="60%">
+                    <div class="input-group"><span class="field-label">Mãe:</span> <span id="p_mae" class="val"></span></div>
+                </td>
+                <td width="40%">
+                    <div class="input-group"><span class="field-label">Est. Civil:</span> <span id="p_civil" class="val"></span></div>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <div class="input-group"><span class="field-label">Endereço:</span> <span id="p_endereco" class="val"></span></div>
+                </td>
+            </tr>
+            <tr>
+                <td width="50%">
+                    <div class="input-group"><span class="field-label">Email:</span> <span id="p_email" class="val"></span></div>
+                </td>
+                <td width="50%">
+                    <div class="input-group"><span class="field-label">Telefone:</span> <span id="p_tel" class="val"></span></div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="pdf-section-title">DADOS PROFISSIONAIS E VÍNCULO</div>
+        <table class="pdf-table">
+            <tr>
+                <td width="50%">
+                    <div class="input-group"><span class="field-label">Função:</span> <span id="p_funcao" class="val"></span></div>
+                </td>
+                <td width="50%">
+                    <div class="input-group"><span class="field-label">Lotação:</span> <span id="p_lotacao" class="val"></span></div>
+                </td>
+            </tr>
+            <tr>
+                <td width="60%">
+                    <div class="input-group"><span class="field-label">Local de Trabalho:</span> <span id="p_local" class="val"></span></div>
+                </td>
+                <td width="40%">
+                    <div class="input-group"><span class="field-label">Tipo Vínculo:</span> <span id="p_tipo_vinculo" class="val"></span></div>
+                </td>
+            </tr>
+            <tr>
+                <td width="50%">
+                    <div class="input-group"><span class="field-label">Classe/Nível:</span> <span id="p_classe" class="val"></span></div>
+                </td>
+                <td width="50%">
+                    <div class="input-group"><span class="field-label">Nº Contracheque:</span> <span id="p_contracheque" class="val"></span></div>
+                </td>
+            </tr>
+        </table>
+
+        <div class="pdf-section-title">DADOS FINANCEIROS E CONTRATUAIS</div>
+        <table class="pdf-table">
+            <tr>
+                <td width="33%">
+                    <div class="input-group"><span class="field-label">Remuneração:</span> <span id="p_remuneracao" class="val"></span></div>
+                </td>
+                <td width="33%">
+                    <div class="input-group"><span class="field-label">Início:</span> <span id="p_inicio" class="val"></span></div>
+                </td>
+                <td width="33%">
+                    <div class="input-group"><span class="field-label">Término:</span> <span id="p_termino" class="val"></span></div>
+                </td>
+            </tr>
+        </table>
+        
+        <table class="pdf-table" style="margin-top: 5px; border-top: 1px dotted #999;">
+            <tr>
+                <td width="30%">
+                    <div class="input-group"><span class="field-label">Banco:</span> <span id="p_banco" class="val"></span></div>
+                </td>
+                <td width="20%">
+                    <div class="input-group"><span class="field-label">Ag:</span> <span id="p_agencia" class="val"></span></div>
+                </td>
+                <td width="30%">
+                    <div class="input-group"><span class="field-label">Conta:</span> <span id="p_conta" class="val"></span></div>
+                </td>
+                <td width="20%">
+                    <div class="input-group"><span class="field-label">Tipo:</span> <span id="p_tipo_conta" class="val"></span></div>
+                </td>
+            </tr>
+        </table>
+
+        <div style="margin-top: 20px;">
+            <p style="text-align: right; margin-bottom: 30px;">
+                Valença do Piauí - PI, <span id="data_emissao"></span>
+            </p>
+            
+            <table style="width: 100%; border: none;">
+                <tr>
+                    <td style="width: 50%; padding: 10px; text-align: center; vertical-align: top;">
+                        <div style="border-top: 1px solid black; width: 90%; margin: 0 auto; padding-top: 5px;">
+                            <strong>Responsável RH</strong><br>
+                            <span style="font-size: 9pt;">Secretaria Municipal de Educação</span>
+                        </div>
+                    </td>
+                    <td style="width: 50%; padding: 10px; text-align: center; vertical-align: top;">
+                        <div style="border-top: 1px solid black; width: 90%; margin: 0 auto; padding-top: 5px;">
+                            <strong>Prefeito Municipal</strong><br>
+                            <span style="font-size: 9pt;">Valença do Piauí</span>
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" style="text-align: center; padding-top: 40px;">
+                        <div style="border-top: 1px solid black; width: 60%; margin: 0 auto; padding-top: 5px;">
+                            <strong>Assinatura do Servidor</strong>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) { html.classList.remove('dark'); localStorage.setItem('theme', 'light'); icon.classList.replace('ph-sun', 'ph-moon'); } 
+            else { html.classList.add('dark'); localStorage.setItem('theme', 'dark'); icon.classList.replace('ph-moon', 'ph-sun'); }
+        }
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            document.getElementById('theme-icon').classList.replace('ph-moon', 'ph-sun');
+        }
+
+        function gerarPDF() {
+            document.getElementById('loading').style.display = 'flex';
+
+            const map = {
+                'nome': 'p_nome', 'num_vinculo': 'p_vinculo', 'cpf': 'p_cpf', 'rg': 'p_rg',
+                'data_nasc': 'p_nasc', 'pis': 'p_pis', 
+                // Novos campos mapeados:
+                'titulo_eleitor': 'p_titulo', 'zona_eleitoral': 'p_zona', 'secao_eleitoral': 'p_secao',
+                
+                'mae': 'p_mae', 'estado_civil': 'p_civil',
+                'telefone': 'p_tel', 'email': 'p_email', 'endereco': 'p_endereco',
+                'funcao': 'p_funcao', 'lotacao': 'p_lotacao', 'local_trabalho': 'p_local',
+                'tipo_vinculo': 'p_tipo_vinculo', 'classe': 'p_classe', 'contracheque': 'p_contracheque',
+                'remuneracao': 'p_remuneracao', 'dt_inicio': 'p_inicio', 'dt_termino': 'p_termino',
+                'banco': 'p_banco', 'agencia': 'p_agencia', 'conta': 'p_conta', 'tipo_conta': 'p_tipo_conta'
+            };
+
+            for (let idInput in map) {
+                const input = document.getElementById(idInput);
+                const target = document.getElementById(map[idInput]);
+                if (input && target) {
+                    let val = input.value;
+                    if (input.type === 'date' && val) val = val.split('-').reverse().join('/');
+                    target.innerText = val;
+                }
+            }
+            
+            document.getElementById('data_emissao').innerText = new Date().toLocaleDateString('pt-BR');
+
+            const element = document.getElementById('pdf-content');
+            element.style.display = 'block';
+
+            const opt = {
+                margin:       10,
+                filename:     'ficha_encaminhamento.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, scrollY: 0, useCORS: true }, 
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).save().then(() => {
+                element.style.display = 'none';
+                document.getElementById('loading').style.display = 'none';
+            }).catch(err => {
+                alert("Erro ao gerar PDF");
+                element.style.display = 'none';
+                document.getElementById('loading').style.display = 'none';
+            });
+        }
+    </script>
+</body>
+</html>

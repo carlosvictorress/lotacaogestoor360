@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Validação de Cadastros - Valença do Piauí</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700 transition-colors">
+        <div>
+            <div class="p-6 flex items-center gap-3">
+                <div class="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white font-bold">V</div>
+                <div><h1 class="text-sm font-bold text-gray-900 dark:text-white">Gestão RH</h1><p class="text-[10px] text-gray-500 uppercase dark:text-gray-400">Valença do Piauí</p></div>
+            </div>
+            <nav class="px-4 space-y-1">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-chart-pie-slice text-lg"></i> Dashboard</a>
+                <a href="#" class="nav-item active w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium bg-gray-900 text-white rounded-lg transition-colors dark:bg-gray-700">
+                    <div class="flex items-center gap-3"><i class="ph ph-check-circle text-lg"></i> Validar Cadastros</div>
+                    {% if pending_count > 0 %}<span class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{{ pending_count }}</span>{% endif %}
+                </a>
+            </nav>
+        </div>
+        <div class="p-4 border-t border-gray-100 dark:border-gray-700">
+            <a href="{{ url_for('sistema') }}" class="flex items-center gap-3 px-4 py-2 text-sm font-medium text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"><i class="ph ph-file-plus"></i> Novo Cadastro</a>
+            <button onclick="window.location.href='{{ url_for('logout') }}'" class="w-full flex items-center gap-3 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-left"><i class="ph ph-sign-out"></i> Sair</button>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm z-20 dark:bg-gray-800 dark:border-gray-700 transition-colors">
+            <h2 class="text-lg font-bold text-gray-800 dark:text-white">Validação de Cadastros</h2>
+            <div class="flex items-center gap-4">
+                <!-- Notifications -->
+                <div class="relative">
+                    <button id="notificationBtn" onclick="document.getElementById('notificationDropdown').classList.toggle('hidden')" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors relative">
+                        <i class="ph ph-bell text-xl"></i>
+                        {% if notifications %}
+                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+                        {% endif %}
+                    </button>
+                    <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
+                        <div class="p-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center"><span class="font-bold text-xs text-gray-700 dark:text-gray-200 uppercase">Últimas Ações</span><span class="text-[10px] text-gray-400">Recentes</span></div>
+                        <div class="max-h-64 overflow-y-auto">
+                            {% for notif in notifications %}
+                            <div class="p-3 border-b border-gray-50 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors">
+                                <div class="flex justify-between items-start"><p class="text-xs font-bold text-gray-800 dark:text-white">{{ notif.acao }}</p><span class="text-[10px] text-gray-400">{{ notif.data_hora.strftime('%H:%M') }}</span></div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ notif.alvo }}</p>
+                                <p class="text-[10px] text-blue-500 mt-1"><i class="ph ph-user"></i> {{ notif.usuario.username if notif.usuario else 'Sistema' }}</p>
+                            </div>
+                            {% else %}<div class="p-6 text-center text-gray-400 text-xs">Nenhuma notificação.</div>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <button onclick="toggleDarkMode()" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors" title="Alternar Tema">
+                    <i id="theme-icon" class="ph ph-moon text-xl"></i>
+                </button>
+                <div class="text-right"><p class="text-sm font-bold text-gray-900 dark:text-white">Administrador</p><p class="text-xs text-green-600 dark:text-green-400">● Online</p></div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-8 relative">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="mb-6 p-4 rounded-xl text-sm font-medium shadow-sm {{ 'bg-green-100 text-green-800' if category == 'success' else 'bg-red-100 text-red-800' }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6 dark:bg-gray-800 dark:border-gray-700">
+                <form method="GET" class="flex flex-col md:flex-row gap-4 items-end">
+                    <div class="flex-1 w-full">
+                        <label class="text-xs font-bold text-gray-500 uppercase">Buscar por Nome ou CPF</label>
+                        <input type="text" name="busca" value="{{ request.args.get('busca', '') }}" placeholder="Digite o nome ou CPF..." class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div class="flex-1 w-full">
+                        <label class="text-xs font-bold text-gray-500 uppercase">Filtrar por Secretaria</label>
+                        <select name="secretaria_id" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                            <option value="">Todas as Secretarias</option>
+                            {% for sec in secretarias %}
+                            <option value="{{ sec.id }}" {{ 'selected' if request.args.get('secretaria_id') == sec.id|string }}>{{ sec.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button class="bg-black text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition dark:bg-blue-600 dark:hover:bg-blue-700 h-10"><i class="ph ph-magnifying-glass"></i> Filtrar</button>
+                    <a href="{{ url_for('exportar_pendentes', secretaria_id=request.args.get('secretaria_id'), busca=request.args.get('busca')) }}" class="bg-green-100 text-green-700 px-6 py-2 rounded-lg text-sm font-bold hover:bg-green-200 transition dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 h-10 flex items-center gap-2 whitespace-nowrap">
+                        <i class="ph ph-file-csv text-lg"></i> Exportar Pendentes
+                    </a>
+                </form>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+                <table class="w-full text-sm text-left text-gray-600">
+                    <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                        <tr>
+                            <th class="px-6 py-4">Servidor / CPF</th>
+                            <th class="px-6 py-4">Lotação / Cargo</th>
+                            <th class="px-6 py-4 text-center">Status</th>
+                            <th class="px-6 py-4 text-center">Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        {% for f in funcionarios %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                            <td class="px-6 py-4">
+                                <span class="block font-bold text-gray-900 dark:text-white">{{ f.nome }}</span>
+                                <span class="text-xs text-gray-400">{{ f.cpf }}</span>
+                            </td>
+                            <td class="px-6 py-4">
+                                <span class="block text-gray-900 font-medium dark:text-gray-200">{{ f.secretaria.nome }}</span>
+                                <span class="text-xs dark:text-gray-400">{{ f.funcao }}</span>
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                {% if f.validado %}
+                                <span class="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1"><i class="ph ph-check-circle-fill"></i> Apto</span>
+                                {% else %}
+                                <span class="bg-yellow-100 text-yellow-700 px-3 py-1 rounded-full text-xs font-bold inline-flex items-center gap-1"><i class="ph ph-clock-fill"></i> Pendente</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                {% if not f.validado %}
+                                <a href="{{ url_for('aprovar_cadastro', id=f.id) }}" class="bg-black text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-gray-800 transition dark:bg-blue-600 dark:hover:bg-blue-700 shadow-lg shadow-gray-200 dark:shadow-none inline-flex items-center gap-2">
+                                    <i class="ph ph-check"></i> VALIDAR
+                                </a>
+                                {% else %}
+                                <button onclick="confirmAction('{{ url_for('revogar_validacao', id=f.id) }}', 'Revogar Validação', 'Tem certeza que deseja revogar a validação de {{ f.nome }}? O servidor voltará para o status pendente.')" class="bg-red-100 text-red-700 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-200 transition dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 inline-flex items-center gap-2" title="Revogar Validação">
+                                    <i class="ph ph-x-circle"></i> REVOGAR
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="4" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">Nenhum cadastro encontrado.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if pagination.pages > 1 %}
+            <div class="flex flex-col md:flex-row justify-between items-center mt-6 gap-4">
+                <span class="text-sm text-gray-500 dark:text-gray-400">
+                    Página {{ pagination.page }} de {{ pagination.pages }} (Total: {{ pagination.total }})
+                </span>
+                <div class="flex gap-2">
+                    {% if pagination.has_prev %}
+                    <a href="{{ url_for('validar_cadastros', page=pagination.prev_num, secretaria_id=request.args.get('secretaria_id'), busca=request.args.get('busca')) }}" class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors">
+                        <i class="ph ph-caret-left"></i> Anterior
+                    </a>
+                    {% else %}
+                    <span class="px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-600"><i class="ph ph-caret-left"></i> Anterior</span>
+                    {% endif %}
+
+                    {% if pagination.has_next %}
+                    <a href="{{ url_for('validar_cadastros', page=pagination.next_num, secretaria_id=request.args.get('secretaria_id'), busca=request.args.get('busca')) }}" class="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors">
+                        Próximo <i class="ph ph-caret-right"></i>
+                    </a>
+                    {% else %}
+                    <span class="px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg text-sm font-medium text-gray-400 cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-600">Próximo <i class="ph ph-caret-right"></i></span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <!-- MODAL DE CONFIRMAÇÃO -->
+    <div id="modalConfirm" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl transform scale-100 transition-transform duration-300 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+            <div class="text-center">
+                <div class="w-14 h-14 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-red-900/30 dark:text-red-400"><i class="ph ph-warning text-3xl"></i></div>
+                <h3 id="modalConfirmTitle" class="text-lg font-bold text-gray-900 dark:text-white mb-2">Confirmação</h3>
+                <p id="modalConfirmMessage" class="text-sm text-gray-500 dark:text-gray-400 mb-6">Tem certeza que deseja realizar esta ação?</p>
+                <div class="flex gap-3 justify-center">
+                    <button onclick="closeConfirmModal()" class="flex-1 py-2.5 px-4 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Cancelar</button>
+                    <button onclick="executeConfirmAction()" class="flex-1 py-2.5 px-4 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200 dark:shadow-none transition">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) { html.classList.remove('dark'); localStorage.setItem('theme', 'light'); if(icon) icon.classList.replace('ph-sun', 'ph-moon'); } 
+            else { html.classList.add('dark'); localStorage.setItem('theme', 'dark'); if(icon) icon.classList.replace('ph-moon', 'ph-sun'); }
+        }
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            const icon = document.getElementById('theme-icon');
+            if(icon) icon.classList.replace('ph-moon', 'ph-sun');
+        }
+
+        // --- CONFIRMATION MODAL LOGIC ---
+        let confirmUrl = "";
+        function confirmAction(url, title, msg) {
+            confirmUrl = url; document.getElementById('modalConfirmTitle').innerText = title; document.getElementById('modalConfirmMessage').innerText = msg; document.getElementById('modalConfirm').classList.remove('hidden');
+        }
+        function closeConfirmModal() { document.getElementById('modalConfirm').classList.add('hidden'); confirmUrl = ""; }
+        function executeConfirmAction() { if(confirmUrl) window.location.href = confirmUrl; }
+        window.addEventListener('click', function(e){ const d = document.getElementById('notificationDropdown'); const b = document.getElementById('notificationBtn'); if(d && !d.classList.contains('hidden') && !d.contains(e.target) && !b.contains(e.target)) d.classList.add('hidden'); });
+    </script>
+</body>
+</html>

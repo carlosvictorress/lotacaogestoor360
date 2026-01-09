@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validação de Documento - SME</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F5F5F7; }
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4 transition-colors duration-200 dark:bg-gray-900">
+
+    <button onclick="toggleDarkMode()" class="absolute top-6 right-6 p-2 rounded-full bg-white/50 hover:bg-white/80 dark:bg-gray-800/50 dark:hover:bg-gray-800 dark:text-white transition-all backdrop-blur-sm z-50">
+        <i id="theme-icon" class="ph ph-moon text-xl"></i>
+    </button>
+
+    <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 max-w-md w-full transition-all hover:shadow-2xl dark:bg-gray-800 dark:border-gray-700">
+        
+        <div class="text-center mb-8">
+            <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão" class="h-20 mx-auto mb-4 object-contain dark:invert">
+            <h2 class="text-xl font-bold text-gray-900 tracking-tight dark:text-white">Validador Oficial</h2>
+            <p class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold mt-1 dark:text-gray-400">Prefeitura Municipal de Valença do Piauí</p>
+        </div>
+
+        <form action="{{ url_for('validar_documento') }}" method="GET" class="mb-8">
+            <label class="block text-xs font-bold text-gray-500 uppercase mb-2 ml-1 dark:text-gray-400">Código de Autenticação</label>
+            <div class="flex gap-2">
+                <input type="text" name="codigo" value="{{ codigo_digitado or '' }}" required placeholder="Ex: 550e8400..." 
+                    class="w-full border border-gray-200 bg-gray-50 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-black focus:ring-1 focus:ring-black font-mono transition-all dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:placeholder-gray-500">
+                <button type="submit" class="bg-black text-white px-5 py-3 rounded-xl hover:bg-gray-800 transition active:scale-95 shadow-md dark:bg-blue-600 dark:hover:bg-blue-700">
+                    <i class="ph ph-magnifying-glass text-xl"></i>
+                </button>
+            </div>
+        </form>
+
+        <hr class="border-gray-100 mb-8 dark:border-gray-700">
+
+        {% if funcionario %}
+        {% if funcionario.validado %}
+        <div class="bg-green-50 border border-green-200 rounded-2xl p-6 text-center animate-fade-in shadow-sm dark:bg-green-900/20 dark:border-green-800">
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <i class="ph ph-check-circle text-3xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-green-800 mb-1 dark:text-green-400">Documento Autêntico</h3>
+            <p class="text-xs text-green-700 mb-6 font-medium dark:text-green-300">Emitido oficialmente pelo sistema SME.</p>
+            
+            <div class="text-left space-y-3 bg-white/60 rounded-xl p-4 border border-green-100 text-sm dark:bg-gray-800/50 dark:border-green-800">
+                <div>
+                    <span class="text-[10px] text-green-600 font-bold uppercase block tracking-wider">Servidor</span>
+                    <span class="text-gray-900 font-bold text-base dark:text-white">{{ funcionario.nome }}</span>
+                </div>
+                <div class="flex justify-between items-end border-t border-green-100 pt-2 mt-2 dark:border-green-800/50">
+                    <div>
+                        <span class="text-[10px] text-green-600 font-bold uppercase block tracking-wider">CPF</span>
+                        <span class="text-gray-700 font-mono text-xs dark:text-gray-300">{{ funcionario.cpf }}</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-green-600 font-bold uppercase block tracking-wider">Emissão</span>
+                        <span class="text-gray-700 font-mono text-xs dark:text-gray-300">{{ funcionario.data_criacao.strftime('%d/%m/%Y') }}</span>
+                    </div>
+                </div>
+                <div class="border-t border-green-100 pt-2 mt-2 dark:border-green-800/50">
+                    <span class="text-[10px] text-green-600 font-bold uppercase block tracking-wider">Lotação</span>
+                    <span class="text-gray-800 font-medium dark:text-gray-200">{{ funcionario.lotacao }}</span>
+                </div>
+                <div class="border-t border-green-100 pt-2 mt-2 dark:border-green-800/50">
+                    <span class="text-[10px] text-green-600 font-bold uppercase block tracking-wider">Função</span>
+                    <span class="text-gray-800 font-medium dark:text-gray-200">{{ funcionario.funcao }}</span>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 text-center animate-fade-in shadow-sm dark:bg-yellow-900/20 dark:border-yellow-800">
+            <div class="w-16 h-16 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <i class="ph ph-clock-user text-3xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-yellow-800 mb-1 dark:text-yellow-400">Pendente de Validação</h3>
+            <p class="text-xs text-yellow-700 mb-6 font-medium dark:text-yellow-300">O cadastro existe, mas aguarda liberação do Administrador.</p>
+            
+            <div class="text-left space-y-3 bg-white/60 rounded-xl p-4 border border-yellow-100 text-sm dark:bg-gray-800/50 dark:border-yellow-800">
+                <div>
+                    <span class="text-[10px] text-yellow-600 font-bold uppercase block tracking-wider">Servidor</span>
+                    <span class="text-gray-900 font-bold text-base dark:text-white">{{ funcionario.nome }}</span>
+                </div>
+                <div class="flex justify-between items-end border-t border-yellow-100 pt-2 mt-2 dark:border-yellow-800/50">
+                    <div>
+                        <span class="text-[10px] text-yellow-600 font-bold uppercase block tracking-wider">CPF</span>
+                        <span class="text-gray-700 font-mono text-xs dark:text-gray-300">{{ funcionario.cpf }}</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-yellow-600 font-bold uppercase block tracking-wider">Status</span>
+                        <span class="text-yellow-700 font-bold text-xs dark:text-yellow-400">EM ANÁLISE</span>
+                    </div>
+                </div>
+                <div class="border-t border-yellow-100 pt-2 mt-2 dark:border-yellow-800/50">
+                    <span class="text-[10px] text-yellow-600 font-bold uppercase block tracking-wider">Lotação</span>
+                    <span class="text-gray-800 font-medium dark:text-gray-200">{{ funcionario.lotacao }}</span>
+                </div>
+                <div class="border-t border-yellow-100 pt-2 mt-2 dark:border-yellow-800/50">
+                    <span class="text-[10px] text-yellow-600 font-bold uppercase block tracking-wider">Função</span>
+                    <span class="text-gray-800 font-medium dark:text-gray-200">{{ funcionario.funcao }}</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% elif erro %}
+        <div class="bg-red-50 border border-red-200 rounded-2xl p-6 text-center animate-shake shadow-sm dark:bg-red-900/20 dark:border-red-800">
+            <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <i class="ph ph-x-circle text-3xl"></i>
+            </div>
+            <h3 class="text-lg font-bold text-red-800 mb-1 dark:text-red-400">Documento Inválido</h3>
+            <p class="text-sm text-red-600 font-medium dark:text-red-300">{{ erro }}</p>
+            <p class="text-xs text-red-400 mt-4 px-4 leading-relaxed dark:text-red-500">O código informado não existe na base de dados. Verifique a digitação ou contate o setor de RH.</p>
+        </div>
+        
+        {% else %}
+        <div class="text-center text-gray-400 py-4 dark:text-gray-500">
+            <i class="ph ph-qr-code text-4xl mb-2 opacity-50"></i>
+            <p class="text-xs">Digite o código acima ou escaneie o QR Code do documento impresso.</p>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <footer class="fixed bottom-4 text-center w-full">
+        <p class="text-[10px] text-gray-400 font-medium dark:text-gray-600">SME Valença do Piauí &copy; {{ now.year if now else '2025' }}</p>
+    </footer>
+
+    <script>
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) { html.classList.remove('dark'); localStorage.setItem('theme', 'light'); icon.classList.replace('ph-sun', 'ph-moon'); } 
+            else { html.classList.add('dark'); localStorage.setItem('theme', 'dark'); icon.classList.replace('ph-moon', 'ph-sun'); }
+        }
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            document.getElementById('theme-icon').classList.replace('ph-moon', 'ph-sun');
+        }
+    </script>
+</body>
+</html>

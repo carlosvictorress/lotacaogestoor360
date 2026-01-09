@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard Executivo - Valença do Piauí</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .nav-item.active { background-color: #1F2937; color: white; } .dark .nav-item.active { background-color: #374151; }
+
+        #pdf-report { display: none; width: 275mm; padding: 10mm; background: white; font-family: 'Times New Roman', serif; color: black; box-sizing: border-box; }
+        .pdf-header { text-align: center; border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 15px; }
+        .pdf-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+        .pdf-table th { background-color: #e5e5e5; border: 1px solid #000; padding: 4px; text-transform: uppercase; font-weight: bold; }
+        .pdf-table td { border: 1px solid #000; padding: 4px; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
+
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700 transition-colors">
+        <div>
+            <div class="p-6 flex items-center gap-3">
+                <div class="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white font-bold">V</div>
+                <div><h1 class="text-sm font-bold text-gray-900 dark:text-white">Gestão RH</h1><p class="text-[10px] text-gray-500 uppercase dark:text-gray-400">Valença do Piauí</p></div>
+            </div>
+            <nav class="px-4 space-y-1">
+                <button onclick="switchTab('dashboard', this)" class="nav-item active w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-chart-pie-slice text-lg"></i> Dashboard</button>
+                {% if role == 'admin' or is_admin %}
+                <button onclick="switchTab('dados', this)" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-table text-lg"></i> Base de Dados</button>
+                <button onclick="switchTab('auditoria', this)" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-fingerprint text-lg"></i> Auditoria</button>
+                <button onclick="switchTab('config', this)" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-gear text-lg"></i> Configurações</button>
+                {% endif %}
+            </nav>
+        </div>
+        <div class="p-4 border-t border-gray-100 dark:border-gray-700">
+            <a href="{{ url_for('sistema') }}" class="flex items-center gap-3 px-4 py-2 text-sm font-medium text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"><i class="ph ph-file-plus"></i> Novo Cadastro</a>
+            {% if role == 'admin' or is_admin %}
+            <a href="{{ url_for('validar_cadastros') }}" class="flex items-center justify-between px-4 py-2 text-sm font-medium text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white">
+                <div class="flex items-center gap-3"><i class="ph ph-check-circle"></i> Validar Cadastros</div>
+                {% if pending_count > 0 %}<span class="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">{{ pending_count }}</span>{% endif %}
+            </a>
+            <a href="{{ url_for('validar_documento') }}" class="flex items-center gap-3 px-4 py-2 text-sm font-medium text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"><i class="ph ph-qr-code"></i> Validar Documento</a>
+            {% endif %}
+            <button onclick="confirmAction('{{ url_for('logout') }}', 'Sair do Sistema', 'Tem certeza que deseja encerrar sua sessão?')" class="w-full flex items-center gap-3 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-left"><i class="ph ph-sign-out"></i> Sair</button>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm z-20 dark:bg-gray-800 dark:border-gray-700 transition-colors">
+            <h2 id="page-title" class="text-lg font-bold text-gray-800 dark:text-white">Visão Geral</h2>
+            <div class="flex items-center gap-4">
+                <!-- Notifications -->
+                <div class="relative">
+                    <button id="notificationBtn" onclick="document.getElementById('notificationDropdown').classList.toggle('hidden')" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors relative">
+                        <i class="ph ph-bell text-xl"></i>
+                        {% if notifications %}
+                        <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+                        {% endif %}
+                    </button>
+                    <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
+                        <div class="p-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center"><span class="font-bold text-xs text-gray-700 dark:text-gray-200 uppercase">Últimas Ações</span><span class="text-[10px] text-gray-400">Recentes</span></div>
+                        <div class="max-h-64 overflow-y-auto">
+                            {% for notif in notifications %}
+                            <div class="p-3 border-b border-gray-50 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors">
+                                <div class="flex justify-between items-start"><p class="text-xs font-bold text-gray-800 dark:text-white">{{ notif.acao }}</p><span class="text-[10px] text-gray-400">{{ notif.data_hora.strftime('%H:%M') }}</span></div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ notif.alvo }}</p>
+                                <p class="text-[10px] text-blue-500 mt-1"><i class="ph ph-user"></i> {{ notif.usuario.username if notif.usuario else 'Sistema' }}</p>
+                            </div>
+                            {% else %}<div class="p-6 text-center text-gray-400 text-xs">Nenhuma notificação.</div>{% endfor %}
+                        </div>
+                    </div>
+                </div>
+                <button onclick="toggleDarkMode()" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors" title="Alternar Tema">
+                    <i id="theme-icon" class="ph ph-moon text-xl"></i>
+                </button>
+                <div class="text-right"><p class="text-sm font-bold text-gray-900 dark:text-white">{% if role == 'admin' or is_admin %}Administrador{% else %}Supervisor{% endif %}</p><p class="text-xs text-green-600 dark:text-green-400">● Online</p></div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-8 relative">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="mb-6 p-4 rounded-xl text-sm font-medium shadow-sm {{ 'bg-green-100 text-green-800' if category == 'success' else 'bg-red-100 text-red-800' }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <div id="dashboard" class="tab-content active">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 transform hover:scale-105 transition duration-300 dark:bg-gray-800 dark:border-gray-700">
+                        <p class="text-xs font-bold text-gray-400 uppercase">Total de Servidores</p><h3 class="text-3xl font-bold text-gray-900 mt-1 dark:text-white">{{ total_geral }}</h3>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 transform hover:scale-105 transition duration-300 dark:bg-gray-800 dark:border-gray-700">
+                        <p class="text-xs font-bold text-gray-400 uppercase">Secretarias Ativas</p><h3 class="text-3xl font-bold text-gray-900 mt-1 dark:text-white">{{ secretarias|length }}</h3>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 transform hover:scale-105 transition duration-300 dark:bg-gray-800 dark:border-gray-700">
+                        <p class="text-xs font-bold text-gray-400 uppercase">Locais de Trabalho</p><h3 class="text-3xl font-bold text-gray-900 mt-1 dark:text-white">{{ locais_stats|length }}</h3>
+                    </div>
+                    <div class="bg-gradient-to-br from-gray-900 to-black text-white p-5 rounded-2xl shadow-lg transform hover:scale-105 transition duration-300 dark:from-blue-900 dark:to-blue-950">
+                        <p class="text-xs font-bold text-gray-400 uppercase">Ação Rápida</p><a href="{{ url_for('sistema') }}" class="mt-2 block text-sm hover:underline flex items-center gap-2"><i class="ph ph-plus-circle"></i> Adicionar Servidor</a>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        <h4 class="font-bold text-gray-800 mb-4 dark:text-white">Vínculos</h4><div class="h-64 flex justify-center bg-white rounded-xl p-2 dark:bg-gray-200"><canvas id="chartVinculo"></canvas></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        <h4 class="font-bold text-gray-800 mb-4 dark:text-white">Status Validação</h4><div class="h-64 flex justify-center bg-white rounded-xl p-2 dark:bg-gray-200"><canvas id="chartValidacao"></canvas></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 lg:col-span-2 dark:bg-gray-800 dark:border-gray-700">
+                        <h4 class="font-bold text-gray-800 mb-4 dark:text-white">Servidores por Secretaria</h4><div class="h-64 bg-white rounded-xl p-2 dark:bg-gray-200"><canvas id="chartSecretaria"></canvas></div>
+                    </div>
+                </div>
+                <div class="mb-8">
+                    <h4 class="font-bold text-gray-800 mb-4 flex items-center gap-2 dark:text-white"><i class="ph ph-buildings"></i> Detalhamento por Local de Trabalho</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        {% for local, qtd in locais_stats %}
+                        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500 hover:shadow-md transition dark:bg-gray-800 dark:border-gray-700"><h5 class="text-xs font-bold text-gray-500 uppercase truncate dark:text-gray-400" title="{{ local }}">{{ local }}</h5><p class="text-xl font-bold text-gray-900 dark:text-white">{{ qtd }} <span class="text-xs font-normal text-gray-400">servidores</span></p></div>
+                        {% else %}<p class="text-sm text-gray-500 col-span-5">Nenhum dado para exibir.</p>{% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {% if role == 'admin' or is_admin %}
+            <div id="dados" class="tab-content">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6 dark:bg-gray-800 dark:border-gray-700">
+                    <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-4 dark:border-gray-700">
+                        <h3 class="font-bold text-gray-800 flex items-center gap-2 dark:text-white"><i class="ph ph-funnel"></i> Filtros e Relatórios</h3>
+                        <div class="flex gap-2">
+                            <a href="{{ url_for('exportar_excel', secretaria_id=filtros.sec) }}" class="text-xs bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition"><i class="ph ph-file-xls text-lg"></i> Excel</a>
+                            <button onclick="generateReportPDF()" class="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition"><i class="ph ph-file-pdf text-lg"></i> Baixar PDF</button>
+                        </div>
+                    </div>
+                    <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                        <div class="col-span-2">
+                            <label class="text-xs font-bold text-gray-500 uppercase">Secretaria</label>
+                            <select name="secretaria_id" id="filter_sec" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white"><option value="">Todas</option>{% for sec in secretarias %}<option value="{{ sec.id }}" {{ 'selected' if filtros.sec == sec.id|string }}>{{ sec.nome }}</option>{% endfor %}</select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase">Vínculo</label>
+                            <select name="tipo_vinculo" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white"><option value="">Todos</option><option value="Servidor Efetivo" {{ 'selected' if filtros.vinculo == 'Servidor Efetivo' }}>Efetivo</option><option value="Comissionado" {{ 'selected' if filtros.vinculo == 'Comissionado' }}>Comissionado</option><option value="Terceirizado" {{ 'selected' if filtros.vinculo == 'Terceirizado' }}>Terceirizado</option></select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase text-blue-600">Quem Indicou</label>
+                            <select name="quem_indicou" class="w-full mt-1 border border-blue-200 bg-blue-50 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:bg-blue-900/30 dark:border-blue-800 dark:text-white"><option value="">Todos</option>{% for ind in lista_indicadores %}<option value="{{ ind }}" {{ 'selected' if filtros.indicacao == ind }}>{{ ind }}</option>{% endfor %}</select>
+                        </div>
+                        <button class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition dark:bg-blue-600 dark:hover:bg-blue-700"><i class="ph ph-magnifying-glass"></i> Filtrar</button>
+                    </form>
+                </div>
+
+                {% if filtros.indicacao %}
+                <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 mb-6 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 dark:bg-yellow-900/20 dark:border-yellow-800">
+                    <div><p class="text-xs font-bold text-yellow-600 uppercase mb-1 dark:text-yellow-500">RELATÓRIO DE INDICAÇÃO</p><h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ filtros.indicacao }}</h2><p class="text-sm text-gray-600 mt-1 dark:text-gray-300">Este padrinho indicou <strong>{{ total_geral }}</strong> servidores.</p></div>
+                    <div class="flex gap-4"><div class="bg-white p-3 rounded-xl border border-yellow-100 text-center"><span class="block text-xl font-bold text-gray-800">{{ total_geral }}</span><span class="text-[10px] text-gray-500 uppercase">Total</span></div></div>
+                </div>
+                {% endif %}
+
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+                    <table class="w-full text-sm text-left text-gray-600" id="mainTable">
+                        <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                            <tr><th class="px-6 py-4">Nome / CPF</th><th class="px-6 py-4">Lotação / Local</th><th class="px-6 py-4">Função / Vínculo</th><th class="px-6 py-4 text-center">Indicação</th><th class="px-6 py-4">Quem Indicou</th><th class="px-6 py-4 text-center">Histórico</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            {% for f in funcionarios %}
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                <td class="px-6 py-4"><span class="block font-bold text-gray-900 dark:text-white">{{ f.nome }}</span><span class="text-xs text-gray-400">{{ f.cpf }}</span></td>
+                                <td class="px-6 py-4"><span class="block text-gray-900 font-medium dark:text-gray-200">{{ f.secretaria.nome }}</span><span class="text-xs dark:text-gray-400">{{ f.local_trabalho }}</span></td>
+                                <td class="px-6 py-4"><span class="block dark:text-gray-300">{{ f.funcao }}</span><span class="text-xs bg-gray-100 px-1 rounded dark:bg-gray-600 dark:text-gray-200">{{ f.tipo_vinculo }}</span></td>
+                                <td class="px-6 py-4 text-center">{% if f.foi_indicacao %}<span class="w-2 h-2 bg-red-500 rounded-full inline-block" title="Sim"></span>{% else %}<span class="w-2 h-2 bg-gray-200 rounded-full inline-block" title="Não"></span>{% endif %}</td>
+                                <td class="px-6 py-4 text-xs font-bold text-blue-800 uppercase dark:text-blue-400">{{ f.quem_indicou if f.quem_indicou else '-' }}</td>
+                                <td class="px-6 py-4 text-center"><button onclick="abrirHistorico({{ f.id }}, '{{ f.nome }}')" class="text-gray-500 hover:text-black border border-gray-200 p-2 rounded-lg dark:border-gray-600 dark:text-gray-400 dark:hover:text-white" title="Ver Histórico"><i class="ph ph-clock-counter-clockwise text-lg"></i></button></td>
+                            </tr>
+                            {% else %}<tr class="bg-white border-b hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700"><td colspan="6" class="px-6 py-4 text-center dark:text-gray-400">Nenhum registro encontrado.</td></tr>{% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="auditoria" class="tab-content">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+                    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center dark:border-gray-700">
+                        <h3 class="font-bold text-gray-800 flex items-center gap-2 dark:text-white"><i class="ph ph-clock-counter-clockwise text-xl"></i> Histórico de Ações</h3>
+                        <span class="text-xs bg-gray-100 text-gray-500 px-3 py-1 rounded-full dark:bg-gray-700 dark:text-gray-300">Últimos 100 registros</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-gray-600">
+                            <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                                <tr><th class="px-6 py-4">Data/Hora</th><th class="px-6 py-4">Usuário</th><th class="px-6 py-4">Ação</th><th class="px-6 py-4">Alvo (Detalhes)</th></tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                                {% for log in logs %}
+                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                    <td class="px-6 py-4 font-mono text-xs text-gray-500">{{ log.data_hora.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                                    <td class="px-6 py-4 font-bold text-gray-900 dark:text-white">{{ log.usuario.username if log.usuario else 'Sistema' }}</td>
+                                    <td class="px-6 py-4">
+                                        {% if 'CRIOU' in log.acao %}<span class="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold">{{ log.acao }}</span>
+                                        {% elif 'EXCLUIU' in log.acao %}<span class="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">{{ log.acao }}</span>
+                                        {% else %}<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-bold">{{ log.acao }}</span>{% endif %}
+                                    </td>
+                                    <td class="px-6 py-4 text-gray-800 dark:text-gray-300">{{ log.alvo }}</td>
+                                </tr>
+                                {% else %}<tr class="bg-white border-b hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700"><td colspan="4" class="px-6 py-4 text-center dark:text-gray-400">Nenhum log encontrado.</td></tr>{% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="config" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-gray-800 dark:text-white">Secretarias</h3><button onclick="document.getElementById('formSec').classList.toggle('hidden')" class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Nova</button></div>
+                        <form method="POST" id="formSec" class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700"><input type="hidden" name="create_secretaria" value="1"><input type="text" name="nome_secretaria" class="w-full border p-2 rounded mb-2 uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" placeholder="Nome da Secretaria" required><button class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Salvar</button></form>
+                        <ul class="space-y-2 max-h-60 overflow-y-auto">{% for sec in secretarias %}<li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700"><span>{{ sec.nome }}</span><button onclick="confirmAction('{{ url_for('delete_secretaria', sec_id=sec.id) }}', 'Excluir Secretaria', 'Tem certeza? Isso pode afetar usuários vinculados.')" class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{% endfor %}</ul>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-gray-800 dark:text-white">Usuários</h3><button onclick="document.getElementById('formUser').classList.toggle('hidden')" class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Novo</button></div>
+                        
+                        <form method="POST" id="formUser" class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700">
+                            <input type="hidden" name="create_user" value="1">
+                            <input type="text" name="username" class="w-full border p-2 rounded mb-2 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" placeholder="Login" required>
+                            <input type="password" name="password" class="w-full border p-2 rounded mb-2 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" placeholder="Senha" required>
+                            
+                            <select name="secretaria_id" class="w-full border p-2 rounded mb-2 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" required>
+                                <option value="" disabled selected>Selecione a Secretaria...</option>
+                                {% for sec in secretarias %}
+                                    <option value="{{ sec.id }}">{{ sec.nome }}</option>
+                                {% endfor %}
+                            </select>
+                            
+                            <select name="role" class="w-full border p-2 rounded mb-2 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" required>
+                                <option value="" disabled selected>Selecione a Permissão...</option>
+                                <option value="rh_secretaria">RH Secretaria (Operador)</option>
+                                <option value="rh_supervisor">Supervisor (Visualizador)</option>
+                                <option value="admin">Administrador (Total)</option>
+                            </select>
+                            
+                            <button class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Criar</button>
+                        </form>
+
+                        <ul class="space-y-2 max-h-60 overflow-y-auto">{% for u in users %}{% if not u.is_admin %}<li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700"><div><span class="font-bold block">{{ u.username }}</span><span class="text-xs text-gray-500 dark:text-gray-400">{{ u.secretaria.nome }}</span></div><button onclick="confirmAction('{{ url_for('delete_user', user_id=u.id) }}', 'Excluir Usuário', 'Tem certeza que deseja excluir este usuário?')" class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{% endif %}{% endfor %}</ul>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </main>
+    </div>
+
+    <div id="pdf-report"><div class="pdf-header"><img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão" style="height: 60px; margin-bottom: 10px;"><h2 style="margin: 0; font-size: 14pt; font-weight: bold;">ESTADO DO PIAUÍ</h2><h2 style="margin: 0; font-size: 14pt; font-weight: bold;">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h2><h3 style="margin: 10px 0; font-size: 12pt; text-decoration: underline;">RELATÓRIO GERENCIAL DE PESSOAL</h3><p id="report-subtitle" style="font-size: 10pt; font-weight: bold;">FILTRO: GERAL</p></div><div id="pdf-table-container"></div><div style="margin-top: 20px; font-size: 10pt; text-align: right;">Gerado em: <span id="report-date"></span></div></div>
+    <div id="loading" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white"><i class="ph ph-spinner-gap animate-spin text-4xl mb-3"></i><span>Gerando Relatório...</span></div>
+
+    <!-- MODAL DE CONFIRMAÇÃO GENÉRICO -->
+    <div id="modalConfirm" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm transition-opacity duration-300">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl transform scale-100 transition-transform duration-300 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+            <div class="text-center">
+                <div class="w-14 h-14 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-red-900/30 dark:text-red-400"><i class="ph ph-warning text-3xl"></i></div>
+                <h3 id="modalConfirmTitle" class="text-lg font-bold text-gray-900 dark:text-white mb-2">Confirmação</h3>
+                <p id="modalConfirmMessage" class="text-sm text-gray-500 dark:text-gray-400 mb-6">Tem certeza que deseja realizar esta ação?</p>
+                <div class="flex gap-3 justify-center">
+                    <button onclick="closeConfirmModal()" class="flex-1 py-2.5 px-4 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600">Cancelar</button>
+                    <button onclick="executeConfirmAction()" class="flex-1 py-2.5 px-4 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200 dark:shadow-none transition">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalHistorico" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b pb-4"><div><h3 class="text-lg font-bold text-gray-900">Histórico de Lotação</h3><p class="text-xs text-gray-500" id="histNomeFuncionario">Carregando...</p></div><button onclick="document.getElementById('modalHistorico').classList.add('hidden')" class="text-gray-400 hover:text-black"><i class="ph ph-x text-xl"></i></button></div>
+            <div class="overflow-y-auto max-h-96"><table class="w-full text-left"><thead class="bg-gray-50 text-xs text-gray-500 uppercase"><tr><th class="p-3">Data Saída</th><th class="p-3">Onde Estava</th><th class="p-3">Função</th><th class="p-3">Quem Mudou</th></tr></thead><tbody id="conteudoHistorico" class="text-sm"></tbody></table></div>
+        </div>
+    </div>
+
+    <script>
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) { html.classList.remove('dark'); localStorage.setItem('theme', 'light'); if(icon) icon.classList.replace('ph-sun', 'ph-moon'); } 
+            else { html.classList.add('dark'); localStorage.setItem('theme', 'dark'); if(icon) icon.classList.replace('ph-moon', 'ph-sun'); }
+        }
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            const icon = document.getElementById('theme-icon');
+            if(icon) icon.classList.replace('ph-moon', 'ph-sun');
+        }
+
+        // --- CONFIRMATION MODAL LOGIC ---
+        let confirmUrl = "";
+        function confirmAction(url, title, msg) {
+            confirmUrl = url; document.getElementById('modalConfirmTitle').innerText = title; document.getElementById('modalConfirmMessage').innerText = msg; document.getElementById('modalConfirm').classList.remove('hidden');
+        }
+        function closeConfirmModal() { document.getElementById('modalConfirm').classList.add('hidden'); confirmUrl = ""; }
+        function executeConfirmAction() { if(confirmUrl) window.location.href = confirmUrl; }
+
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active'); el.classList.remove('text-white'); el.classList.add('text-gray-600'); });
+            document.getElementById(tabId).classList.add('active'); btn.classList.add('active'); btn.classList.remove('text-gray-600'); btn.classList.add('text-white');
+        }
+        function abrirHistorico(id, nome) {
+            document.getElementById('modalHistorico').classList.remove('hidden');
+            document.getElementById('histNomeFuncionario').innerText = nome;
+            document.getElementById('conteudoHistorico').innerHTML = '<tr><td colspan="4" class="p-4 text-center">Carregando...</td></tr>';
+            fetch(`/get_historico/${id}`).then(r => r.text()).then(html => { document.getElementById('conteudoHistorico').innerHTML = html; });
+        }
+        function generateReportPDF() {
+            document.getElementById('loading').style.display = 'flex';
+            const selectSec = document.getElementById('filter_sec');
+            const selectedText = selectSec.options[selectSec.selectedIndex].text;
+            const subtitle = (selectSec.value === "") ? "FILTRO: GERAL (TODAS AS SECRETARIAS)" : "FILTRO: " + selectedText;
+            document.getElementById('report-subtitle').innerText = subtitle;
+            document.getElementById('report-date').innerText = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR');
+            const originalTable = document.getElementById('mainTable');
+            const cloneTable = originalTable.cloneNode(true);
+            cloneTable.classList.add('pdf-table'); cloneTable.classList.remove('w-full', 'text-sm', 'text-left', 'text-gray-600');
+            const rows = cloneTable.querySelectorAll('tr'); rows.forEach(row => { if(row.cells.length > 0) row.deleteCell(-1); });
+            const container = document.getElementById('pdf-table-container'); container.innerHTML = ''; container.appendChild(cloneTable);
+            const element = document.getElementById('pdf-report'); element.style.display = 'block';
+            const opt = { margin: 5, filename: 'relatorio_servidores.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } };
+            html2pdf().set(opt).from(element).save().then(() => { element.style.display = 'none'; document.getElementById('loading').style.display = 'none'; });
+        }
+        const dataVinculo = {{ stats_vinculo|tojson }};
+        const dataSecretaria = {{ stats_secretaria|tojson }};
+        const dataValidacao = {{ stats_validacao|tojson }};
+        new Chart(document.getElementById('chartVinculo'), { type: 'doughnut', data: { labels: Object.keys(dataVinculo), datasets: [{ data: Object.values(dataVinculo), backgroundColor: ['#10B981', '#3B82F6', '#F59E0B', '#EF4444', '#6366F1'], borderWidth: 0 }] }, options: { responsive: true, plugins: { legend: { position: 'bottom' } } } });
+        new Chart(document.getElementById('chartSecretaria'), { type: 'bar', data: { labels: Object.keys(dataSecretaria), datasets: [{ label: 'Servidores', data: Object.values(dataSecretaria), backgroundColor: '#1F2937', borderRadius: 4 }] }, options: { responsive: true, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } });
+        new Chart(document.getElementById('chartValidacao'), { type: 'pie', data: { labels: Object.keys(dataValidacao), datasets: [{ data: Object.values(dataValidacao), backgroundColor: ['#10B981', '#F59E0B'], borderWidth: 0 }] }, options: { responsive: true, plugins: { legend: { position: 'bottom' } } } });
+        window.addEventListener('click', function(e){ const d = document.getElementById('notificationDropdown'); const b = document.getElementById('notificationBtn'); if(d && !d.classList.contains('hidden') && !d.contains(e.target) && !b.contains(e.target)) d.classList.add('hidden'); });
+    </script>
+</body>
+</html>
