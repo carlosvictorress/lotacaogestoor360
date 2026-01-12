@@ -124,7 +124,6 @@
                 <div><h1 class="text-sm font-bold text-gray-900 leading-tight">Sistema de Lotação</h1><p class="text-[10px] font-medium text-gray-500 uppercase tracking-wider">{{ nome_secretaria }}</p></div>
             </div>
             <div class="flex items-center gap-4">
-                <!-- Notifications -->
                 <div class="relative">
                     <button id="notificationBtn" onclick="document.getElementById('notificationDropdown').classList.toggle('hidden')" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors relative">
                         <i class="ph ph-bell text-xl"></i>
@@ -277,7 +276,6 @@
         </div>
     </div>
 
-    <!-- MODAL DE CONFIRMAÇÃO GENÉRICO -->
     <div id="modalConfirm" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm transition-opacity duration-300">
         <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl transform scale-100 transition-transform duration-300 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
             <div class="text-center">
@@ -293,7 +291,6 @@
     </div>
 
     <div id="pdf-content">
-        <!-- Marca D'água -->
         <img src="{{ url_for('static', filename='logo.jpg') }}" class="pdf-watermark">
         
         <div class="pdf-container">
@@ -494,8 +491,6 @@
             // Extrai o objeto JSON da string do onclick
             const jsonStr = onclickStr.substring(onclickStr.indexOf('{'), onclickStr.lastIndexOf('}') + 1);
             // Avalia a string para obter o objeto (seguro aqui pois vem do nosso próprio template)
-            // Nota: Em produção ideal, usar JSON.parse, mas o formato do template não é JSON estrito (chaves sem aspas)
-            // Então usamos uma função construtora simples ou eval controlado
             const data = eval('(' + jsonStr + ')');
             imprimirHistorico(data);
         }
@@ -504,7 +499,6 @@
         function imprimirHistorico(data) {
             document.getElementById('loading').style.display = 'flex';
             
-
             // 1. Mapeia dados direto para o PDF oculto (sem mexer no formulário)
             // Função auxiliar para setar texto com segurança
             const setTxt = (id, val) => {
@@ -512,12 +506,41 @@
                 if (el) el.innerText = val ? val.toString().toUpperCase() : '';
             };
 
+            // Função robusta de formatação de data para PT-BR
+            const fmtDate = (d) => {
+                if (!d || d === 'None') return '---';
+                
+                // Se vier como YYYY-MM-DD (comum do input type="date")
+                if (d.indexOf('-') > -1) {
+                    let partes = d.split('-');
+                    if (partes.length === 3) {
+                        // Verifica se é YYYY-MM-DD
+                        if (partes[0].length === 4) {
+                            return partes[2] + '/' + partes[1] + '/' + partes[0];
+                        }
+                    }
+                }
+                
+                // Tentativa de Date Object caso não seja string simples
+                // UTC methods para evitar mudanças de timezone (ex: 2023-05-20 virar 19/05)
+                let dataObj = new Date(d);
+                if (!isNaN(dataObj.getTime())) {
+                    // Se for string YYYY-MM-DD, o new Date cria UTC, então getUTCDate é seguro
+                    // Se a string já tiver timezone, getUTCDate também é consistente
+                    const dia = String(dataObj.getUTCDate()).padStart(2, '0');
+                    const mes = String(dataObj.getUTCMonth() + 1).padStart(2, '0');
+                    const ano = dataObj.getUTCFullYear();
+                    return `${dia}/${mes}/${ano}`;
+                }
+                
+                return d; // Retorna original se falhar tudo
+            };
+
             setTxt('p_nome', data.nome);
             setTxt('p_vinculo', data.num_vinculo);
             setTxt('p_cpf', data.cpf);
             setTxt('p_rg', data.rg);
             
-            const fmtDate = (d) => d && d !== 'None' ? d.split('-').reverse().join('/') : '';
             setTxt('p_nasc', fmtDate(data.data_nasc));
             
             setTxt('p_pis', data.pis);
@@ -551,7 +574,17 @@
             setTxt('pdf_nome_secretaria', data.lotacao);
             setTxt('pdf_assinatura_1', data.lotacao);
             setTxt('pdf_assinatura_2', data.lotacao);
-            document.getElementById('data_emissao').innerText = new Date().toLocaleDateString('pt-BR');
+
+            // Data de Emissão Formatada em Português Extenso ou DD/MM/AAAA
+            const dataHoje = new Date();
+            const diaHoje = String(dataHoje.getDate()).padStart(2, '0');
+            const mesHoje = String(dataHoje.getMonth() + 1).padStart(2, '0');
+            const anoHoje = dataHoje.getFullYear();
+            // Opção 1: Simples
+            document.getElementById('data_emissao').innerText = `${diaHoje}/${mesHoje}/${anoHoje}`;
+            // Se preferir extenso descomente abaixo:
+            // const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            // document.getElementById('data_emissao').innerText = `${diaHoje} de ${meses[dataHoje.getMonth()]} de ${anoHoje}`;
 
             // 3. Gera QR Code
             const containerQR = document.getElementById('qrcode_container');
@@ -584,10 +617,9 @@
         function prepararCracha(nome, funcao, lotacao, token) {
             currentName = nome; currentRole = funcao; currentSec = lotacao; currentToken = token;
             
-            document.getElementById('badge_nome_preview').innerText = nome;
-            document.getElementById('badge-name').innerText = nome;
-            document.getElementById('badge-role').innerText = funcao;
-            document.getElementById('badge-sec').innerText = lotacao;
+            document.getElementById('badge-name-preview').innerText = nome;
+            document.getElementById('badge-role-preview').innerText = funcao;
+            document.getElementById('badge-sec-preview').innerText = lotacao;
             
             document.getElementById('print-badge-name').innerText = nome;
             document.getElementById('print-badge-role').innerText = funcao;
