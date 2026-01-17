@@ -251,7 +251,22 @@
                             <button class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Criar</button>
                         </form>
 
-                        <ul class="space-y-2 max-h-60 overflow-y-auto">{% for u in users %}{% if not u.is_admin %}<li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700"><div><span class="font-bold block">{{ u.username }}</span><span class="text-xs text-gray-500 dark:text-gray-400">{{ u.secretaria.nome }}</span></div><button onclick="confirmAction('{{ url_for('delete_user', user_id=u.id) }}', 'Excluir Usuário', 'Tem certeza que deseja excluir este usuário?')" class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{% endif %}{% endfor %}</ul>
+                        <ul class="space-y-2 max-h-60 overflow-y-auto">
+                            {% for u in users %}
+                            <li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
+                                <div>
+                                    <span class="font-bold block">{{ u.username }}</span>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ u.secretaria.nome if u.secretaria else 'ADMINISTRAÇÃO' }} {% if u.is_admin %}<span class="text-blue-500 font-bold">(Admin)</span>{% endif %}</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="openEditUserModal('{{ u.id }}', '{{ u.username }}', '{{ u.role }}', '{{ u.secretaria_id }}')" class="text-blue-500 hover:text-blue-700" title="Editar"><i class="ph ph-pencil-simple"></i></button>
+                                    {% if u.username != 'admin' %}
+                                    <button onclick="confirmAction('{{ url_for('delete_user', user_id=u.id) }}', 'Excluir Usuário', 'Tem certeza que deseja excluir este usuário?')" class="text-red-500 hover:text-red-700" title="Excluir"><i class="ph ph-trash"></i></button>
+                                    {% endif %}
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -275,6 +290,32 @@
                     <button onclick="executeConfirmAction()" class="flex-1 py-2.5 px-4 bg-red-600 text-white font-semibold rounded-xl hover:bg-red-700 shadow-lg shadow-red-200 dark:shadow-none transition">Confirmar</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR USUÁRIO -->
+    <div id="modalEditUser" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Editar Usuário</h3>
+                <button onclick="document.getElementById('modalEditUser').classList.add('hidden')" class="text-gray-400 hover:text-black dark:hover:text-white"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            <form action="{{ url_for('update_user') }}" method="POST">
+                <input type="hidden" name="user_id" id="edit_user_id">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Usuário</label>
+                <input type="text" name="username" id="edit_username" class="w-full border p-2 rounded mb-3 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" required>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Nova Senha (Opcional)</label>
+                <input type="password" name="password" class="w-full border p-2 rounded mb-3 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" placeholder="Deixe em branco para manter">
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Secretaria</label>
+                <select name="secretaria_id" id="edit_secretaria_id" class="w-full border p-2 rounded mb-3 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                    {% for sec in secretarias %}<option value="{{ sec.id }}">{{ sec.nome }}</option>{% endfor %}
+                </select>
+                <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Permissão</label>
+                <select name="role" id="edit_role" class="w-full border p-2 rounded mb-6 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                    <option value="rh_secretaria">RH Secretaria</option><option value="rh_supervisor">Supervisor</option><option value="admin">Administrador</option>
+                </select>
+                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition">Salvar Alterações</button>
+            </form>
         </div>
     </div>
 
@@ -316,6 +357,13 @@
             document.getElementById('histNomeFuncionario').innerText = nome;
             document.getElementById('conteudoHistorico').innerHTML = '<tr><td colspan="4" class="p-4 text-center">Carregando...</td></tr>';
             fetch(`/get_historico/${id}`).then(r => r.text()).then(html => { document.getElementById('conteudoHistorico').innerHTML = html; });
+        }
+        function openEditUserModal(id, username, role, secId) {
+            document.getElementById('edit_user_id').value = id;
+            document.getElementById('edit_username').value = username;
+            document.getElementById('edit_role').value = role;
+            document.getElementById('edit_secretaria_id').value = secId;
+            document.getElementById('modalEditUser').classList.remove('hidden');
         }
         function generateReportPDF() {
             document.getElementById('loading').style.display = 'flex';

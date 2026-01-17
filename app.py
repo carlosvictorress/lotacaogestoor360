@@ -331,7 +331,7 @@ def admin_dashboard():
 
     logs = LogAuditoria.query.order_by(LogAuditoria.data_hora.desc()).limit(100).all()
     secretarias = Secretaria.query.all()
-    users = User.query.all()
+    users = User.query.order_by(User.username).all()
 
     return render_template('admin.html', secretarias=secretarias, users=users, funcionarios=funcionarios_filtrados, total_geral=total_filtrado, stats_secretaria=stats_secretaria, stats_vinculo=stats_vinculo, stats_validacao=stats_validacao, locais_stats=locais_stats, lista_indicadores=lista_indicadores, logs=logs, filtros={'sec': filtro_secretaria, 'vinculo': filtro_vinculo, 'funcao': filtro_funcao, 'indicacao': filtro_indicacao, 'cpf': busca_cpf}, role=current_user.role, is_admin=current_user.is_admin)
 
@@ -535,18 +535,21 @@ def create_admin():
         db.create_all()
         user = User.query.filter_by(username='admin').first()
         if not user:
-            sec_adm = Secretaria(nome="PREFEITURA MUNICIPAL")
-            db.session.add(sec_adm)
-            db.session.commit()
+            # Verifica se a secretaria já existe para não duplicar
+            sec_adm = Secretaria.query.filter_by(nome="PREFEITURA MUNICIPAL").first()
+            if not sec_adm:
+                sec_adm = Secretaria(nome="PREFEITURA MUNICIPAL")
+                db.session.add(sec_adm)
+                db.session.commit()
+            
+            # Pega a senha de uma variável de ambiente ou usa uma padrão apenas na primeira vez
+            senha_inicial = os.getenv('ADMIN_INITIAL_PASSWORD', 'Mudar123@')
+            
             user = User(username='admin', is_admin=True, role='admin', secretaria_id=sec_adm.id)
-            user.set_password('@@CVtorres123321@')
+            user.set_password(senha_inicial)
             db.session.add(user)
             db.session.commit()
-            print("ADMINISTRADOR CRIADO")
-        else:
-            user.set_password('@@CVtorres123321@')
-            db.session.commit()
-            print("SENHA DE ADMIN ATUALIZADA")
+            print(f"ADMINISTRADOR CRIADO COM SENHA INICIAL: {senha_inicial}")
 
 def atualizar_schema():
     """Função auxiliar para adicionar colunas novas em bancos existentes"""
