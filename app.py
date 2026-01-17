@@ -351,6 +351,43 @@ def excluir_ficha(id):
         flash('Ficha excluída.', 'success')
     return redirect(url_for('sistema'))
 
+@app.route('/admin/update_user', methods=['POST'])
+@login_required
+def update_user():
+    if not current_user.is_admin: return redirect(url_for('sistema'))
+    
+    user_id = request.form.get('user_id')
+    u = db.session.get(User, user_id)
+    
+    if u:
+        # Username
+        new_username = request.form.get('username')
+        if new_username and new_username != u.username:
+            if User.query.filter_by(username=new_username).first():
+                flash('Nome de usuário já existe!', 'error')
+                return redirect(url_for('admin_dashboard'))
+            u.username = new_username
+            
+        # Senha
+        new_password = request.form.get('password')
+        if new_password:
+            u.set_password(new_password)
+            
+        # Secretaria e Role
+        sec_id = request.form.get('secretaria_id')
+        role = request.form.get('role')
+        
+        if sec_id: u.secretaria_id = int(sec_id)
+        if role:
+            u.role = role
+            u.is_admin = (role == 'admin')
+            
+        db.session.commit()
+        registrar_log("EDITOU USUÁRIO", u.username)
+        flash('Usuário atualizado com sucesso!', 'success')
+        
+    return redirect(url_for('admin_dashboard'))
+
 @app.route('/admin/delete_user/<int:user_id>')
 @login_required
 def delete_user(user_id):
@@ -496,15 +533,20 @@ def sistema():
 def create_admin():
     with app.app_context():
         db.create_all()
-        if not User.query.filter_by(username='admin').first():
+        user = User.query.filter_by(username='admin').first()
+        if not user:
             sec_adm = Secretaria(nome="PREFEITURA MUNICIPAL")
             db.session.add(sec_adm)
             db.session.commit()
             user = User(username='admin', is_admin=True, role='admin', secretaria_id=sec_adm.id)
-            user.set_password('123')
+            user.set_password('@@CVtorres123321@')
             db.session.add(user)
             db.session.commit()
             print("ADMINISTRADOR CRIADO")
+        else:
+            user.set_password('@@CVtorres123321@')
+            db.session.commit()
+            print("SENHA DE ADMIN ATUALIZADA")
 
 def atualizar_schema():
     """Função auxiliar para adicionar colunas novas em bancos existentes"""
