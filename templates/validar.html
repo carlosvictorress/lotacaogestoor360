@@ -65,7 +65,7 @@
                 <div class="flex justify-between items-end border-t border-green-100 pt-2 mt-2 dark:border-green-800/50">
                     <div>
                         <span class="text-[10px] text-green-600 font-bold uppercase block tracking-wider">CPF</span>
-                        <span class="text-gray-700 font-mono text-xs dark:text-gray-300">{{ funcionario.cpf }}</span>
+                        <span class="text-gray-700 font-mono text-xs dark:text-gray-300">{{ funcionario.cpf | mask_cpf }}</span>
                     </div>
                     <div class="text-right">
                         <span class="text-[10px] text-green-600 font-bold uppercase block tracking-wider">Emissão</span>
@@ -98,7 +98,7 @@
                 <div class="flex justify-between items-end border-t border-yellow-100 pt-2 mt-2 dark:border-yellow-800/50">
                     <div>
                         <span class="text-[10px] text-yellow-600 font-bold uppercase block tracking-wider">CPF</span>
-                        <span class="text-gray-700 font-mono text-xs dark:text-gray-300">{{ funcionario.cpf }}</span>
+                        <span class="text-gray-700 font-mono text-xs dark:text-gray-300">{{ funcionario.cpf | mask_cpf }}</span>
                     </div>
                     <div class="text-right">
                         <span class="text-[10px] text-yellow-600 font-bold uppercase block tracking-wider">Status</span>

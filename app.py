@@ -109,6 +109,15 @@ def parse_date(date_str):
     try: return datetime.strptime(date_str, '%Y-%m-%d').date()
     except ValueError: return None
 
+@app.template_filter('mask_cpf')
+def mask_cpf(value):
+    if not value: return ""
+    # Remove tudo que não for dígito para garantir a contagem correta
+    digits = ''.join(filter(str.isdigit, value))
+    if len(digits) == 11:
+        return f"***.{digits[3:6]}.{digits[6:9]}-**"
+    return value
+
 def registrar_log(acao, alvo):
     try:
         user_id = current_user.id if current_user.is_authenticated else None
