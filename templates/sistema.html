@@ -382,7 +382,7 @@
             <div id="qrcode_container" style="width: 20mm; height: 20mm;"></div>
             <div style="text-align: left;">
                 <p style="font-size: 8pt; font-weight: bold; text-transform: uppercase;">Validação de Autenticidade</p>
-                <p style="font-size: 7pt;">Acesse: <strong>sme-valenca.com/validar</strong></p>
+                <p style="font-size: 7pt;">Acesse: <strong>pmvpi.gestoor360.com.br/validar</strong></p>
                 <p style="font-size: 7pt;">Código: <span id="pdf_token_texto" style="font-family: monospace; font-weight: bold;"></span></p>
             </div>
         </div>
@@ -589,7 +589,8 @@
             // 3. Gera QR Code
             const containerQR = document.getElementById('qrcode_container');
             containerQR.innerHTML = "";
-            const validationUrl = window.location.origin + "/validar?codigo=" + data.token_validacao;
+            // Alterado para usar o domínio fixo no QR Code também
+            const validationUrl = "https://pmvpi.gestoor360.com.br/validar?codigo=" + data.token_validacao;
             new QRCode(containerQR, { text: validationUrl, width: 80, height: 80 });
             document.getElementById('pdf_token_texto').innerText = data.token_validacao;
 
