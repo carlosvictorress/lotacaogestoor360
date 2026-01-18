@@ -32,8 +32,7 @@
     <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700 transition-colors">
         <div>
             <div class="p-6 flex items-center gap-3">
-                <div class="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white font-bold">V</div>
-                <div><h1 class="text-sm font-bold text-gray-900 dark:text-white">Gestão RH</h1><p class="text-[10px] text-gray-500 uppercase dark:text-gray-400">Valença do Piauí</p></div>
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="h-10 w-auto object-contain dark:invert">
             </div>
             <nav class="px-4 space-y-1">
                 <button onclick="switchTab('dashboard', this)" class="nav-item active w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-chart-pie-slice text-lg"></i> Dashboard</button>
@@ -275,7 +274,7 @@
         </main>
     </div>
 
-    <div id="pdf-report"><div class="pdf-header"><img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão" style="height: 60px; margin-bottom: 10px;"><h2 style="margin: 0; font-size: 14pt; font-weight: bold;">ESTADO DO PIAUÍ</h2><h2 style="margin: 0; font-size: 14pt; font-weight: bold;">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h2><h3 style="margin: 10px 0; font-size: 12pt; text-decoration: underline;">RELATÓRIO GERENCIAL DE PESSOAL</h3><p id="report-subtitle" style="font-size: 10pt; font-weight: bold;">FILTRO: GERAL</p></div><div id="pdf-table-container"></div><div style="margin-top: 20px; font-size: 10pt; text-align: right;">Gerado em: <span id="report-date"></span></div></div>
+    <div id="pdf-report"><div class="pdf-header"><img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão" style="height: 60px; margin-bottom: 10px;"><h2 style="margin: 0; font-size: 14pt; font-weight: bold;">ESTADO DO PIAUÍ</h2><h2 style="margin: 0; font-size: 14pt; font-weight: bold;">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h2><h3 style="margin: 10px 0; font-size: 12pt; text-decoration: underline;">RELATÓRIO GERENCIAL DE PESSOAL</h3><p id="report-subtitle" style="font-size: 10pt; font-weight: bold;">FILTRO: GERAL</p></div><div id="pdf-table-container"></div><div style="margin-top: 15px; padding-top: 8px; border-top: 0.5px solid #eee; display: flex; align-items: center; justify-content: center; gap: 3px; text-align: center; font-size: 6pt;"><span style="color: #999;">Gerado por</span><img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 5mm; width: auto; display: inline-block; opacity: 0.7;"><span style="color: #999;">no dia</span><span id="report-date" style="color: #888;"></span></div></div>
     <div id="loading" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white"><i class="ph ph-spinner-gap animate-spin text-4xl mb-3"></i><span>Gerando Relatório...</span></div>
 
     <!-- MODAL DE CONFIRMAÇÃO GENÉRICO -->
@@ -371,7 +370,11 @@
             const selectedText = selectSec.options[selectSec.selectedIndex].text;
             const subtitle = (selectSec.value === "") ? "FILTRO: GERAL (TODAS AS SECRETARIAS)" : "FILTRO: " + selectedText;
             document.getElementById('report-subtitle').innerText = subtitle;
-            document.getElementById('report-date').innerText = new Date().toLocaleDateString('pt-BR') + ' às ' + new Date().toLocaleTimeString('pt-BR');
+            const dataHoje = new Date();
+            const diaHoje = String(dataHoje.getDate()).padStart(2, '0');
+            const mesHoje = String(dataHoje.getMonth() + 1).padStart(2, '0');
+            const anoHoje = dataHoje.getFullYear();
+            document.getElementById('report-date').innerText = `${diaHoje}/${mesHoje}/${anoHoje}`;
             const originalTable = document.getElementById('mainTable');
             const cloneTable = originalTable.cloneNode(true);
             cloneTable.classList.add('pdf-table'); cloneTable.classList.remove('w-full', 'text-sm', 'text-left', 'text-gray-600');

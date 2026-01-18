@@ -20,8 +20,7 @@
     <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700 transition-colors">
         <div>
             <div class="p-6 flex items-center gap-3">
-                <div class="w-8 h-8 bg-black rounded-lg flex items-center justify-center text-white font-bold">V</div>
-                <div><h1 class="text-sm font-bold text-gray-900 dark:text-white">Gestão RH</h1><p class="text-[10px] text-gray-500 uppercase dark:text-gray-400">Valença do Piauí</p></div>
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="h-10 w-auto object-contain dark:invert">
             </div>
             <nav class="px-4 space-y-1">
                 <a href="{{ url_for('admin_dashboard') }}" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-chart-pie-slice text-lg"></i> Dashboard</a>
