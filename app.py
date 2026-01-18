@@ -109,6 +109,11 @@ def parse_date(date_str):
     try: return datetime.strptime(date_str, '%Y-%m-%d').date()
     except ValueError: return None
 
+def normalizar_cpf(cpf):
+    """Remove caracteres especiais do CPF deixando apenas números"""
+    if not cpf: return ""
+    return ''.join(filter(str.isdigit, cpf))
+
 @app.template_filter('mask_cpf')
 def mask_cpf(value):
     if not value: return ""
@@ -498,6 +503,24 @@ def sistema():
 
         func_id = request.form.get('id')
         
+        # Validação de CPF duplicado
+        cpf_normalizado = normalizar_cpf(dados_form['cpf'])
+        cpf_duplicado = False
+        if cpf_normalizado and len(cpf_normalizado) == 11:  # CPF válido tem 11 dígitos
+            # Busca funcionários com o mesmo CPF
+            funcionarios_com_mesmo_cpf = Funcionario.query.filter_by(cpf=dados_form['cpf']).all()
+            
+            # Se for edição, remove o próprio funcionário da lista
+            if func_id:
+                funcionarios_com_mesmo_cpf = [f for f in funcionarios_com_mesmo_cpf if f.id != int(func_id)]
+            
+            # Se encontrou duplicados, mostra alerta
+            if funcionarios_com_mesmo_cpf:
+                cpf_duplicado = True
+                nomes_duplicados = [f.nome for f in funcionarios_com_mesmo_cpf]
+                flash(f'⚠️ ATENÇÃO: Este CPF já está cadastrado para: {", ".join(nomes_duplicados)}. Verifique se não está duplicando o cadastro.', 'error')
+                # Continua o processo mas alerta o usuário
+        
         if func_id:
             funcionario = db.session.get(Funcionario, func_id)
             if funcionario:
@@ -521,14 +544,16 @@ def sistema():
                     setattr(funcionario, key, value)
                 
                 db.session.commit()
-                flash('Dados atualizados com sucesso!', 'success')
+                if not cpf_duplicado:
+                    flash('Dados atualizados com sucesso!', 'success')
         else:
             novo_func = Funcionario(**dados_form)
             novo_func.criado_por = current_user.id
             db.session.add(novo_func)
             db.session.commit()
             registrar_log("CRIOU FICHA", f"{novo_func.nome} ({lotacao_texto})")
-            flash('Ficha criada com sucesso!', 'success')
+            if not cpf_duplicado:
+                flash('Ficha criada com sucesso!', 'success')
 
         return redirect(url_for('sistema'))
 
