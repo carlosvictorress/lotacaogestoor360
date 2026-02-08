@@ -204,66 +204,100 @@
     </main>
 
     <section class="max-w-5xl mx-auto px-4 mt-8 mb-16">
-        <div class="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden dark:bg-gray-800 dark:border-gray-700 transition-colors duration-200">
-            <div class="px-8 py-6 border-b border-gray-100 dark:border-gray-700"><h3 class="text-lg font-bold text-gray-900 dark:text-white">Histórico de Fichas</h3></div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm text-left">
-                    <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400"><tr><th class="px-6 py-4">Nome</th><th class="px-6 py-4">CPF</th><th class="px-6 py-4">Função</th><th class="px-6 py-4 text-center">Ações</th></tr></thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                        {% for f in lista_funcionarios %}
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                            <td class="px-6 py-4 font-bold dark:text-white">{{ f.nome }}</td>
-                            <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ f.cpf }}</td>
-                            <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ f.funcao }}</td>
-                            <td class="px-6 py-4 flex justify-center gap-2">
-                                <button type="button" onclick='carregarDados({
-                                    id: {{ f.id }},
-                                    nome: {{ f.nome|tojson }},
-                                    num_vinculo: {{ f.num_vinculo|tojson }},
-                                    cpf: {{ f.cpf|tojson }},
-                                    rg: {{ f.rg|tojson }},
-                                    data_nasc: {{ f.data_nasc|tojson }},
-                                    pis: {{ f.pis|tojson }},
-                                    titulo_eleitor: {{ f.titulo_eleitor|tojson }},
-                                    zona_eleitoral: {{ f.zona_eleitoral|tojson }},
-                                    secao_eleitoral: {{ f.secao_eleitoral|tojson }},
-                                    mae: {{ f.mae|tojson }},
-                                    nacionalidade: {{ f.nacionalidade|tojson }},
-                                    estado_civil: {{ f.estado_civil|tojson }},
-                                    telefone: {{ f.telefone|tojson }},
-                                    email: {{ f.email|tojson }},
-                                    endereco: {{ f.endereco|tojson }},
-                                    funcao: {{ f.funcao|tojson }},
-                                    secretaria_id: {{ f.secretaria_id }},
-                                    lotacao: {{ f.lotacao|tojson }},
-                                    local_trabalho: {{ f.local_trabalho|tojson }},
-                                    tipo_vinculo: {{ f.tipo_vinculo|tojson }},
-                                    classe: {{ f.classe|tojson }},
-                                    contracheque: {{ f.contracheque|tojson }},
-                                    remuneracao: {{ f.remuneracao|tojson }},
-                                    dt_inicio: {{ f.dt_inicio|tojson }},
-                                    dt_termino: {{ f.dt_termino|tojson }},
-                                    banco: {{ f.banco|tojson }},
-                                    agencia: {{ f.agencia|tojson }},
-                                    conta: {{ f.conta|tojson }},
-                                    tipo_conta: {{ f.tipo_conta|tojson }},
-                                    foi_indicacao: "{{ "sim" if f.foi_indicacao else "nao" }}",
-                                    quem_indicou: {{ f.quem_indicou|tojson if f.quem_indicou else "null" }},
-                                    token_validacao: {{ f.token_validacao|tojson }}
-                                })' class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar"><i class="ph ph-pencil-simple text-xl"></i></button>
-                                
-                                <button type="button" onclick='imprimirHistoricoFromButton(this.previousElementSibling.getAttribute("onclick"))' class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Imprimir Ficha PDF"><i class="ph ph-file-pdf text-xl"></i></button>
-
-                                <button type="button" onclick='prepararCracha({{ f.nome|tojson }}, {{ f.funcao|tojson }}, {{ f.lotacao|tojson }}, "{{ f.token_validacao }}")' class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Gerar Crachá"><i class="ph ph-identification-card text-xl"></i></button>
-                                {% if role == 'admin' or is_admin %}<button onclick="confirmAction('{{ url_for('excluir_ficha', id=f.id) }}', 'Excluir Ficha', 'Tem certeza que deseja excluir este registro permanentemente?')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Excluir"><i class="ph ph-trash text-xl"></i></button>{% endif %}
-                            </td>
-                        </tr>
-                        {% else %}<tr><td colspan="4" class="px-6 py-8 text-center text-gray-400">Nenhum registro.</td></tr>{% endfor %}
-                    </tbody>
-                </table>
+    <div class="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden dark:bg-gray-800 dark:border-gray-700 transition-colors duration-200">
+        
+        <div class="px-8 py-6 border-b border-gray-100 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white">Histórico de Fichas</h3>
+            
+            <div class="relative w-full md:w-80">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="ph ph-magnifying-glass text-gray-400"></i>
+                </div>
+                <input type="text" id="inputBuscaFicha" onkeyup="filtrarTabelaFichas()" placeholder="Buscar por Nome ou CPF..." 
+                    class="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
             </div>
         </div>
-    </section>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left" id="tabelaFichas">
+                <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                    <tr>
+                        <th class="px-6 py-4">Nome</th>
+                        <th class="px-6 py-4">CPF</th>
+                        <th class="px-6 py-4">Função</th>
+                        <th class="px-6 py-4 text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                    {% for f in lista_funcionarios %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        <td class="px-6 py-4 font-bold dark:text-white">{{ f.nome }}</td>
+                        <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ f.cpf }}</td>
+                        <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ f.funcao }}</td>
+                        <td class="px-6 py-4 flex justify-center gap-2">
+                            <button type="button" onclick='carregarDados({
+                                id: {{ f.id }},
+                                nome: {{ f.nome|tojson }},
+                                num_vinculo: {{ f.num_vinculo|tojson }},
+                                cpf: {{ f.cpf|tojson }},
+                                rg: {{ f.rg|tojson }},
+                                data_nasc: {{ f.data_nasc|tojson }},
+                                pis: {{ f.pis|tojson }},
+                                titulo_eleitor: {{ f.titulo_eleitor|tojson }},
+                                zona_eleitoral: {{ f.zona_eleitoral|tojson }},
+                                secao_eleitoral: {{ f.secao_eleitoral|tojson }},
+                                mae: {{ f.mae|tojson }},
+                                nacionalidade: {{ f.nacionalidade|tojson }},
+                                estado_civil: {{ f.estado_civil|tojson }},
+                                telefone: {{ f.telefone|tojson }},
+                                email: {{ f.email|tojson }},
+                                endereco: {{ f.endereco|tojson }},
+                                funcao: {{ f.funcao|tojson }},
+                                secretaria_id: {{ f.secretaria_id }},
+                                lotacao: {{ f.lotacao|tojson }},
+                                local_trabalho: {{ f.local_trabalho|tojson }},
+                                tipo_vinculo: {{ f.tipo_vinculo|tojson }},
+                                classe: {{ f.classe|tojson }},
+                                contracheque: {{ f.contracheque|tojson }},
+                                remuneracao: {{ f.remuneracao|tojson }},
+                                dt_inicio: {{ f.dt_inicio|tojson }},
+                                dt_termino: {{ f.dt_termino|tojson }},
+                                banco: {{ f.banco|tojson }},
+                                agencia: {{ f.agencia|tojson }},
+                                conta: {{ f.conta|tojson }},
+                                tipo_conta: {{ f.tipo_conta|tojson }},
+                                foi_indicacao: "{{ "sim" if f.foi_indicacao else "nao" }}",
+                                quem_indicou: {{ f.quem_indicou|tojson if f.quem_indicou else "null" }},
+                                token_validacao: {{ f.token_validacao|tojson }}
+                            })' class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar">
+                                <i class="ph ph-pencil-simple text-xl"></i>
+                            </button>
+                            
+                            <button type="button" onclick='imprimirHistoricoFromButton(this.previousElementSibling.getAttribute("onclick"))' class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Imprimir Ficha PDF">
+                                <i class="ph ph-file-pdf text-xl"></i>
+                            </button>
+
+                            <button type="button" onclick='prepararCracha({{ f.nome|tojson }}, {{ f.funcao|tojson }}, {{ f.lotacao|tojson }}, "{{ f.token_validacao }}")' class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Gerar Crachá">
+                                <i class="ph ph-identification-card text-xl"></i>
+                            </button>
+
+                            {% if role == 'admin' or is_admin %}
+                            <button onclick="confirmAction('{{ url_for('excluir_ficha', id=f.id) }}', 'Excluir Ficha', 'Tem certeza que deseja excluir este registro permanentemente?')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Excluir">
+                                <i class="ph ph-trash text-xl"></i>
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" class="px-6 py-8 text-center text-gray-400">Nenhum registro encontrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
 
     <div id="modalCracha" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm">
         <div class="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl dark:bg-gray-800">
@@ -728,6 +762,30 @@
 
             imprimirHistorico(data);
         }
+        function filtrarTabelaFichas() {
+    const input = document.getElementById("inputBuscaFicha");
+    const filter = input.value.toUpperCase();
+    const table = document.getElementById("tabelaFichas");
+    const tr = table.getElementsByTagName("tr");
+
+    // Começa no 1 para ignorar o cabeçalho (thead)
+    for (let i = 1; i < tr.length; i++) {
+        const tdNome = tr[i].getElementsByTagName("td")[0];
+        const tdCPF = tr[i].getElementsByTagName("td")[1];
+        
+        if (tdNome && tdCPF) {
+            const txtNome = tdNome.textContent || tdNome.innerText;
+            const txtCPF = tdCPF.textContent || tdCPF.innerText;
+            
+            // Se encontrar o termo no Nome OU no CPF, mostra a linha
+            if (txtNome.toUpperCase().indexOf(filter) > -1 || txtCPF.toUpperCase().indexOf(filter) > -1) {
+                tr[i].style.display = "";
+            } else {
+                tr[i].style.display = "none";
+            }
+        }
+    }
+}
     </script>
 </body>
 </html>
