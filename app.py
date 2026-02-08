@@ -2,6 +2,8 @@ import os
 import csv
 import io
 import uuid
+import locale
+from datetime import date
 from flask import Flask, render_template, request, redirect, url_for, flash, Response
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -597,6 +599,29 @@ def atualizar_schema():
         except Exception as e:
             # Se der erro, provavelmente a coluna já existe, então ignoramos
             pass
+
+
+# Tente configurar para PT-BR para datas por extenso
+try:
+    locale.setlocale(locale.LC_TIME, 'pt_BR.utf8')
+except:
+    pass
+
+@app.route('/imprimir_encaminhamento/<int:id>')
+@login_required
+def imprimir_encaminhamento(id):
+    funcionario = db.session.get(Funcionario, id)
+    if not funcionario:
+        return "Funcionário não encontrado", 404
+        
+    hoje = datetime.now()
+    meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    data_extenso = f"{hoje.day} de {meses[hoje.month - 1]} de {hoje.year}"
+    
+    return render_template('encaminhamento.html', 
+                           funcionario=funcionario, 
+                           data_extenso=data_extenso, 
+                           ano=hoje.year)       
 
 if __name__ == '__main__':
     create_admin()

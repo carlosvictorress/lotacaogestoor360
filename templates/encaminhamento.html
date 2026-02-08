@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Encaminhamento - {{ funcionario.nome }}</title>
+    <style>
+        @page { size: A4; margin: 20mm; }
+        body { font-family: 'Times New Roman', serif; line-height: 1.5; color: #000; font-size: 12pt; padding: 10px; }
+        .header { text-align: center; font-weight: bold; margin-bottom: 30px; line-height: 1.2; }
+        .header img { height: 70px; margin-bottom: 10px; }
+        .title { text-align: center; font-size: 13pt; font-weight: bold; text-decoration: underline; margin-bottom: 30px; margin-top: 20px; }
+        .content { text-align: justify; margin-bottom: 20px; }
+        .checkbox-group { margin: 25px 0; }
+        .checkbox-item { margin-bottom: 12px; display: flex; align-items: center; }
+        .box { width: 14px; height: 14px; border: 1px solid #000; display: inline-block; margin-right: 10px; }
+        .signature-section { margin-top: 80px; text-align: center; }
+        .line { border-top: 1px solid #000; width: 350px; margin: 0 auto 5px auto; }
+        .footer { position: fixed; bottom: 20mm; width: 100%; text-align: center; font-size: 10pt; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão"> <br>
+        SECRETARIA MUNICIPAL DE EDUCAÇÃO <br>
+        PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ – PI
+    </div>
+
+    <div class="title">ENCAMINHAMENTO DE SERVIDOR(A)</div>
+
+    <p>Ofício/Encaminhamento nº ________/{{ ano }}</p>
+
+    <p style="text-align: right;">Valença do Piauí – PI, {{ data_extenso }}</p>
+
+    <p>À <br> <strong>{{ funcionario.local_trabalho }}</strong> <br> Valença do Piauí – PI</p>
+
+    <p><strong>Assunto:</strong> Encaminhamento de Servidor(a)</p>
+
+    <div class="content">
+        A Secretaria Municipal de Educação de Valença do Piauí – PI, no uso de suas atribuições, encaminha o(a) servidor(a) <strong>{{ funcionario.nome }}</strong>, CPF nº <strong>{{ funcionario.cpf }}</strong>, cargo/função <strong>{{ funcionario.funcao }}</strong>, para exercer suas atividades a partir de <strong>{% if funcionario.dt_inicio %}{{ funcionario.dt_inicio.strftime('%d/%m/%Y') }}{% else %}__/__/____{% endif %}</strong> nesta:
+    </div>
+
+    <div class="checkbox-group">
+        <div class="checkbox-item"><div class="box"></div> ( &nbsp; ) Unidade Escolar: __________________________________________</div>
+        <div class="checkbox-item"><div class="box"></div> ( &nbsp; ) Setor da Secretaria Municipal de Educação: ________________________</div>
+    </div>
+
+    <p class="content">O(a) servidor(a) deverá apresentar-se à chefia imediata para ciência das atribuições, horários e demais orientações necessárias ao início das atividades.</p>
+    <p>Sem mais para o momento, colocamo-nos à disposição para quaisquer esclarecimentos.</p>
+    <p>Atenciosamente,</p>
+
+    <div class="signature-section">
+        <div class="line"></div>
+        <strong></strong> <br>
+        <span style="font-size: 10pt;">Secretário(a) Municipal de Educação</span>
+    </div>
+    <br>
+
+        <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>

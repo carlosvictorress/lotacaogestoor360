@@ -235,58 +235,62 @@
                         <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ f.cpf }}</td>
                         <td class="px-6 py-4 text-gray-600 dark:text-gray-300">{{ f.funcao }}</td>
                         <td class="px-6 py-4 flex justify-center gap-2">
-                            <button type="button" onclick='carregarDados({
-                                id: {{ f.id }},
-                                nome: {{ f.nome|tojson }},
-                                num_vinculo: {{ f.num_vinculo|tojson }},
-                                cpf: {{ f.cpf|tojson }},
-                                rg: {{ f.rg|tojson }},
-                                data_nasc: {{ f.data_nasc|tojson }},
-                                pis: {{ f.pis|tojson }},
-                                titulo_eleitor: {{ f.titulo_eleitor|tojson }},
-                                zona_eleitoral: {{ f.zona_eleitoral|tojson }},
-                                secao_eleitoral: {{ f.secao_eleitoral|tojson }},
-                                mae: {{ f.mae|tojson }},
-                                nacionalidade: {{ f.nacionalidade|tojson }},
-                                estado_civil: {{ f.estado_civil|tojson }},
-                                telefone: {{ f.telefone|tojson }},
-                                email: {{ f.email|tojson }},
-                                endereco: {{ f.endereco|tojson }},
-                                funcao: {{ f.funcao|tojson }},
-                                secretaria_id: {{ f.secretaria_id }},
-                                lotacao: {{ f.lotacao|tojson }},
-                                local_trabalho: {{ f.local_trabalho|tojson }},
-                                tipo_vinculo: {{ f.tipo_vinculo|tojson }},
-                                classe: {{ f.classe|tojson }},
-                                contracheque: {{ f.contracheque|tojson }},
-                                remuneracao: {{ f.remuneracao|tojson }},
-                                dt_inicio: {{ f.dt_inicio|tojson }},
-                                dt_termino: {{ f.dt_termino|tojson }},
-                                banco: {{ f.banco|tojson }},
-                                agencia: {{ f.agencia|tojson }},
-                                conta: {{ f.conta|tojson }},
-                                tipo_conta: {{ f.tipo_conta|tojson }},
-                                foi_indicacao: "{{ "sim" if f.foi_indicacao else "nao" }}",
-                                quem_indicou: {{ f.quem_indicou|tojson if f.quem_indicou else "null" }},
-                                token_validacao: {{ f.token_validacao|tojson }}
-                            })' class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar">
-                                <i class="ph ph-pencil-simple text-xl"></i>
-                            </button>
-                            
-                            <button type="button" onclick='imprimirHistoricoFromButton(this.previousElementSibling.getAttribute("onclick"))' class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Imprimir Ficha PDF">
-                                <i class="ph ph-file-pdf text-xl"></i>
-                            </button>
+    <button type="button" onclick='carregarDados({
+        id: {{ f.id }},
+        nome: {{ f.nome|tojson }},
+        num_vinculo: {{ f.num_vinculo|tojson }},
+        cpf: {{ f.cpf|tojson }},
+        rg: {{ f.rg|tojson }},
+        data_nasc: {{ f.data_nasc|tojson }},
+        pis: {{ f.pis|tojson }},
+        titulo_eleitor: {{ f.titulo_eleitor|tojson }},
+        zona_eleitoral: {{ f.zona_eleitoral|tojson }},
+        secao_eleitoral: {{ f.secao_eleitoral|tojson }},
+        mae: {{ f.mae|tojson }},
+        nacionalidade: {{ f.nacionalidade|tojson }},
+        estado_civil: {{ f.estado_civil|tojson }},
+        telefone: {{ f.telefone|tojson }},
+        email: {{ f.email|tojson }},
+        endereco: {{ f.endereco|tojson }},
+        funcao: {{ f.funcao|tojson }},
+        secretaria_id: {{ f.secretaria_id }},
+        lotacao: {{ f.lotacao|tojson }},
+        local_trabalho: {{ f.local_trabalho|tojson }},
+        tipo_vinculo: {{ f.tipo_vinculo|tojson }},
+        classe: {{ f.classe|tojson }},
+        contracheque: {{ f.contracheque|tojson }},
+        remuneracao: {{ f.remuneracao|tojson }},
+        dt_inicio: {{ f.dt_inicio|tojson }},
+        dt_termino: {{ f.dt_termino|tojson }},
+        banco: {{ f.banco|tojson }},
+        agencia: {{ f.agencia|tojson }},
+        conta: {{ f.conta|tojson }},
+        tipo_conta: {{ f.tipo_conta|tojson }},
+        foi_indicacao: "{{ "sim" if f.foi_indicacao else "nao" }}",
+        quem_indicou: {{ f.quem_indicou|tojson if f.quem_indicou else "null" }},
+        token_validacao: {{ f.token_validacao|tojson }}
+    })' class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Editar">
+        <i class="ph ph-pencil-simple text-xl"></i>
+    </button>
+    
+    <button type="button" onclick='imprimirHistoricoFromButton(this.previousElementSibling.getAttribute("onclick"))' class="p-2 text-green-600 hover:bg-green-50 rounded-lg" title="Imprimir Ficha PDF">
+        <i class="ph ph-file-pdf text-xl"></i>
+    </button>
 
-                            <button type="button" onclick='prepararCracha({{ f.nome|tojson }}, {{ f.funcao|tojson }}, {{ f.lotacao|tojson }}, "{{ f.token_validacao }}")' class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Gerar Crachá">
-                                <i class="ph ph-identification-card text-xl"></i>
-                            </button>
+    <a href="{{ url_for('imprimir_encaminhamento', id=f.id) }}" target="_blank" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg" title="Imprimir Encaminhamento">
+        <i class="ph ph-paper-plane-tilt text-xl"></i>
+    </a>
 
-                            {% if role == 'admin' or is_admin %}
-                            <button onclick="confirmAction('{{ url_for('excluir_ficha', id=f.id) }}', 'Excluir Ficha', 'Tem certeza que deseja excluir este registro permanentemente?')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Excluir">
-                                <i class="ph ph-trash text-xl"></i>
-                            </button>
-                            {% endif %}
-                        </td>
+    <button type="button" onclick='prepararCracha({{ f.nome|tojson }}, {{ f.funcao|tojson }}, {{ f.lotacao|tojson }}, "{{ f.token_validacao }}")' class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Gerar Crachá">
+        <i class="ph ph-identification-card text-xl"></i>
+    </button>
+
+    {% if role == 'admin' or is_admin %}
+    <button onclick="confirmAction('{{ url_for('excluir_ficha', id=f.id) }}', 'Excluir Ficha', 'Tem certeza que deseja excluir este registro permanentemente?')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Excluir">
+        <i class="ph ph-trash text-xl"></i>
+    </button>
+    {% endif %}
+</td>
                     </tr>
                     {% else %}
                     <tr>
