@@ -144,20 +144,47 @@
                         </div>
                     </div>
                     <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                        <div class="col-span-2">
-                            <label class="text-xs font-bold text-gray-500 uppercase">Secretaria</label>
-                            <select name="secretaria_id" id="filter_sec" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white"><option value="">Todas</option>{% for sec in secretarias %}<option value="{{ sec.id }}" {{ 'selected' if filtros.sec == sec.id|string }}>{{ sec.nome }}</option>{% endfor %}</select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-gray-500 uppercase">Vínculo</label>
-                            <select name="tipo_vinculo" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white"><option value="">Todos</option><option value="Servidor Efetivo" {{ 'selected' if filtros.vinculo == 'Servidor Efetivo' }}>Efetivo</option><option value="Comissionado" {{ 'selected' if filtros.vinculo == 'Comissionado' }}>Comissionado</option><option value="Terceirizado" {{ 'selected' if filtros.vinculo == 'Terceirizado' }}>Terceirizado</option></select>
-                        </div>
-                        <div>
-                            <label class="text-xs font-bold text-gray-500 uppercase text-blue-600">Quem Indicou</label>
-                            <select name="quem_indicou" class="w-full mt-1 border border-blue-200 bg-blue-50 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:bg-blue-900/30 dark:border-blue-800 dark:text-white"><option value="">Todos</option>{% for ind in lista_indicadores %}<option value="{{ ind }}" {{ 'selected' if filtros.indicacao == ind }}>{{ ind }}</option>{% endfor %}</select>
-                        </div>
-                        <button class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition dark:bg-blue-600 dark:hover:bg-blue-700"><i class="ph ph-magnifying-glass"></i> Filtrar</button>
-                    </form>
+    <div>
+        <label class="text-xs font-bold text-gray-500 uppercase">Nome ou CPF</label>
+        <input type="text" name="busca_termo" value="{{ filtros.busca or '' }}" 
+               placeholder="Buscar..." 
+               class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+    </div>
+
+    <div>
+        <label class="text-xs font-bold text-gray-500 uppercase">Secretaria</label>
+        <select name="secretaria_id" id="filter_sec" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <option value="">Todas</option>
+            {% for sec in secretarias %}
+            <option value="{{ sec.id }}" {{ 'selected' if filtros.sec == sec.id|string }}>{{ sec.nome }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div>
+        <label class="text-xs font-bold text-gray-500 uppercase">Vínculo</label>
+        <select name="tipo_vinculo" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <option value="">Todos</option>
+            <option value="Servidor Efetivo" {{ 'selected' if filtros.vinculo == 'Servidor Efetivo' }}>Efetivo</option>
+            <option value="Comissionado" {{ 'selected' if filtros.vinculo == 'Comissionado' }}>Comissionado</option>
+            <option value="Terceirizado" {{ 'selected' if filtros.vinculo == 'Terceirizado' }}>Terceirizado</option>
+        </select>
+    </div>
+
+    <div>
+        <label class="text-xs font-bold text-gray-500 uppercase text-blue-600">Padrinho</label>
+        <select name="quem_indicou" class="w-full mt-1 border border-blue-200 bg-blue-50 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:bg-blue-900/30 dark:border-blue-800 dark:text-white">
+            <option value="">Todos</option>
+            {% for ind in lista_indicadores %}
+            <option value="{{ ind }}" {{ 'selected' if filtros.indicacao == ind }}>{{ ind }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <button class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition dark:bg-blue-600 dark:hover:bg-blue-700">
+        <i class="ph ph-magnifying-glass"></i> Filtrar
+    </button>
+</form>
                 </div>
 
                 {% if filtros.indicacao %}

@@ -280,7 +280,8 @@ def exportar_pendentes():
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin_dashboard():
-    if not current_user.is_admin: return redirect(url_for('sistema'))
+    if not current_user.is_admin: 
+        return redirect(url_for('sistema'))
     
     if request.method == 'POST':
         # CRIAR SECRETARIA
@@ -292,7 +293,7 @@ def admin_dashboard():
                 registrar_log("CRIOU SECRETARIA", nome_sec)
                 flash('Secretaria criada!', 'success')
         
-        # CRIAR USUÁRIO (CORRIGIDO)
+        # CRIAR USUÁRIO
         elif 'create_user' in request.form:
             username = request.form.get('username')
             sec_id_form = request.form.get('secretaria_id')
@@ -301,7 +302,6 @@ def admin_dashboard():
             if not sec_id_form:
                 flash('Erro: Selecione uma Secretaria para o usuário!', 'error')
             elif not User.query.filter_by(username=username).first():
-                # Garante que o ID seja inteiro
                 is_admin_bool = (role_form == 'admin')
                 u = User(username=username, secretaria_id=int(sec_id_form), role=role_form, is_admin=is_admin_bool)
                 u.set_password(request.form.get('password'))
@@ -312,28 +312,35 @@ def admin_dashboard():
             else:
                 flash('Usuário já existe!', 'error')
 
-    # Filtros
+    # --- LÓGICA DE FILTRAGEM (CORRIGIDA) ---
     filtro_secretaria = request.args.get('secretaria_id')
     filtro_vinculo = request.args.get('tipo_vinculo')
-    filtro_funcao = request.args.get('funcao')
     filtro_indicacao = request.args.get('quem_indicou')
-    busca_cpf = request.args.get('cpf')
+    busca_termo = request.args.get('busca_termo') 
     
     query = Funcionario.query
-    if filtro_secretaria: query = query.filter_by(secretaria_id=filtro_secretaria)
-    if filtro_vinculo: query = query.filter_by(tipo_vinculo=filtro_vinculo)
-    if filtro_indicacao: query = query.filter_by(quem_indicou=filtro_indicacao)
-    if filtro_funcao: query = query.filter(Funcionario.funcao.like(f'%{filtro_funcao.upper()}%'))
-    if busca_cpf: query = query.filter(Funcionario.cpf.like(f'%{busca_cpf}%'))
+    
+    if filtro_secretaria: 
+        query = query.filter_by(secretaria_id=filtro_secretaria)
+    if filtro_vinculo: 
+        query = query.filter_by(tipo_vinculo=filtro_vinculo)
+    if filtro_indicacao: 
+        query = query.filter_by(quem_indicou=filtro_indicacao)
+    
+    if busca_termo:
+        termo = f"%{busca_termo.upper()}%"
+        query = query.filter((Funcionario.nome.like(termo)) | (Funcionario.cpf.like(termo)))
 
     funcionarios_filtrados = query.order_by(Funcionario.nome).all()
     total_filtrado = len(funcionarios_filtrados)
 
+    # Carregamento de dados para o Dashboard
     indicadores_query = db.session.query(Funcionario.quem_indicou).distinct().filter(Funcionario.quem_indicou != None, Funcionario.quem_indicou != "").all()
     lista_indicadores = [i[0] for i in indicadores_query]
 
     stats_sec_query = db.session.query(Secretaria.nome, func.count(Funcionario.id)).join(Funcionario).group_by(Secretaria.nome).all()
     stats_secretaria = {s[0]: s[1] for s in stats_sec_query}
+    
     stats_vinculo_query = db.session.query(Funcionario.tipo_vinculo, func.count(Funcionario.id)).group_by(Funcionario.tipo_vinculo).all()
     stats_vinculo = {v[0]: v[1] for v in stats_vinculo_query if v[0]}
     
@@ -342,14 +349,28 @@ def admin_dashboard():
     stats_validacao = {'Aptos': count_validados, 'Pendentes': count_pendentes}
 
     locais_query = db.session.query(Funcionario.local_trabalho, func.count(Funcionario.id))
-    if filtro_secretaria: locais_query = locais_query.filter_by(secretaria_id=filtro_secretaria)
+    if filtro_secretaria: 
+        locais_query = locais_query.filter_by(secretaria_id=filtro_secretaria)
     locais_stats = locais_query.group_by(Funcionario.local_trabalho).order_by(func.count(Funcionario.id).desc()).all()
 
     logs = LogAuditoria.query.order_by(LogAuditoria.data_hora.desc()).limit(100).all()
     secretarias = Secretaria.query.all()
     users = User.query.order_by(User.username).all()
 
-    return render_template('admin.html', secretarias=secretarias, users=users, funcionarios=funcionarios_filtrados, total_geral=total_filtrado, stats_secretaria=stats_secretaria, stats_vinculo=stats_vinculo, stats_validacao=stats_validacao, locais_stats=locais_stats, lista_indicadores=lista_indicadores, logs=logs, filtros={'sec': filtro_secretaria, 'vinculo': filtro_vinculo, 'funcao': filtro_funcao, 'indicacao': filtro_indicacao, 'cpf': busca_cpf}, role=current_user.role, is_admin=current_user.is_admin)
+    return render_template('admin.html', 
+                           secretarias=secretarias, 
+                           users=users, 
+                           funcionarios=funcionarios_filtrados, 
+                           total_geral=total_filtrado, 
+                           stats_secretaria=stats_secretaria, 
+                           stats_vinculo=stats_vinculo, 
+                           stats_validacao=stats_validacao, 
+                           locais_stats=locais_stats, 
+                           lista_indicadores=lista_indicadores, 
+                           logs=logs, 
+                           filtros={'sec': filtro_secretaria, 'vinculo': filtro_vinculo, 'indicacao': filtro_indicacao, 'busca': busca_termo}, 
+                           role=current_user.role, 
+                           is_admin=current_user.is_admin)
 
 @app.route('/excluir_ficha/<int:id>')
 @login_required
