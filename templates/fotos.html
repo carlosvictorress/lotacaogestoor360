@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estúdio de Fotos 3x4 - SME</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        /* Máscara de enquadramento 3x4 */
+        .camera-overlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 210px; height: 280px; /* Proporção 3x4 */
+            border: 2px solid #3B82F6;
+            box-shadow: 0 0 0 1000px rgba(0,0,0,0.5);
+            border-radius: 8px;
+            pointer-events: none;
+        }
+        .camera-overlay::after {
+            content: "POSICIONE O ROSTO AQUI";
+            position: absolute;
+            bottom: -30px; left: 0; width: 100%;
+            text-align: center; color: #3B82F6; font-size: 10px; font-weight: bold;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <img id="logo_marca_dagua" src="{{ url_for('static', filename='logo.png') }}" class="hidden">
+
+    <header class="max-w-6xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900">Estúdio de Captura 3x4</h1>
+            <p class="text-sm text-gray-500">Capture e salve fotos dos servidores localmente.</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/sistema" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-50 flex items-center gap-2">
+                <i class="ph ph-arrow-left"></i> Voltar
+            </a>
+            <div class="relative">
+                <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-gray-400"></i>
+                <input type="text" id="buscaServidor" onkeyup="filtrarServidores()" placeholder="Buscar servidor..." 
+                    class="pl-10 pr-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64">
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="lg:col-span-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden h-[600px] flex flex-col">
+            <div class="p-4 border-b bg-gray-50 font-bold text-xs uppercase text-gray-500 tracking-widest">
+                Servidores Cadastrados
+            </div>
+            <div class="overflow-y-auto flex-1" id="listaServidores">
+                {% for f in funcionarios %}
+                <div class="servidor-card p-4 border-b hover:bg-blue-50 cursor-pointer transition" 
+                     onclick="selecionarServidor('{{ f.nome }}', '{{ f.cpf }}')">
+                    <p class="font-bold text-sm text-gray-800">{{ f.nome }}</p>
+                    <p class="text-xs text-gray-500">{{ f.cpf }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="lg:col-span-2 space-y-4">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 text-center">
+                <div id="instrucao" class="mb-4 p-4 bg-blue-50 text-blue-700 rounded-xl text-sm font-medium">
+                    <i class="ph ph-user-focus text-xl block mb-1"></i>
+                    Selecione um servidor na lista ao lado para iniciar.
+                </div>
+
+                <div id="areaCaptura" class="hidden">
+                    <h2 id="nomeSelecionado" class="text-xl font-bold text-gray-900 mb-4 uppercase"></h2>
+                    
+                    <div class="relative mx-auto w-fit overflow-hidden rounded-2xl border-4 border-gray-200 bg-black">
+                        <video id="video" width="640" height="480" autoplay class="scale-x-[-1]"></video>
+                        <div class="camera-overlay"></div>
+                    </div>
+
+                    <div class="mt-6 flex justify-center gap-4">
+                        <button onclick="pararCamera()" class="bg-gray-100 text-gray-600 px-6 py-3 rounded-xl font-bold hover:bg-gray-200 transition">
+                            Cancelar
+                        </button>
+                        <button onclick="capturarEBaixar()" class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 flex items-center gap-2">
+                            <i class="ph ph-camera"></i> Tirar Foto e Salvar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <canvas id="canvas" width="300" height="400" class="hidden"></canvas>
+        </div>
+    </main>
+
+    <script>
+       let stream = null;
+let nomeAtual = "";
+
+async function selecionarServidor(nome, cpf) {
+    nomeAtual = nome;
+    document.getElementById('instrucao').classList.add('hidden');
+    document.getElementById('areaCaptura').classList.remove('hidden');
+    document.getElementById('nomeSelecionado').innerText = nome;
+    
+    if (stream) pararCamera();
+
+    const constraints = { 
+        video: { 
+            width: { ideal: 640 }, 
+            height: { ideal: 480 } 
+        }, 
+        audio: false 
+    };
+
+    try {
+        // Tenta acessar a câmera
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const video = document.getElementById('video');
+        video.srcObject = stream;
+        
+        // Garante que o vídeo toque após carregar
+        video.onloadedmetadata = () => {
+            video.play();
+        };
+    } catch (err) {
+        console.error("Erro ao acessar a câmera:", err);
+        alert("Erro: Não foi possível abrir a câmera. Verifique se o site possui permissão ou se você está usando HTTPS.");
+    }
+}
+
+function pararCamera() {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+    document.getElementById('areaCaptura').classList.add('hidden');
+    document.getElementById('instrucao').classList.remove('hidden');
+}
+
+function capturarEBaixar() {
+    console.log("Iniciando captura...");
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const context = canvas.getContext('2d');
+    const imgLogo = document.getElementById('logo_marca_dagua');
+
+    try {
+        // 1. Limpa o canvas
+        context.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 2. Tira a foto (Recorte 3x4 centralizado do vídeo 640x480)
+        // Se a imagem estiver invertida (espelhada), descomente as duas linhas abaixo:
+        // context.translate(canvas.width, 0);
+        // context.scale(-1, 1);
+        context.drawImage(video, 170, 40, 300, 400, 0, 0, 300, 400);
+        // context.setTransform(1, 0, 0, 1, 0, 0); // Reseta transformações
+
+        // 3. Tenta aplicar a Marca d'Água
+        if (imgLogo && imgLogo.complete && imgLogo.naturalWidth !== 0) {
+            console.log("Aplicando marca d'água...");
+            const larguraDesejada = 70;
+            const proporcao = imgLogo.naturalHeight / imgLogo.naturalWidth;
+            const alturaCalculada = larguraDesejada * proporcao;
+            
+            context.globalAlpha = 0.2;
+            const x = (canvas.width / 2) - (larguraDesejada / 2);
+            const y = canvas.height - alturaCalculada - 15;
+
+            context.drawImage(imgLogo, x, y, larguraDesejada, alturaCalculada);
+            context.globalAlpha = 1.0;
+        } else {
+            console.warn("Logo não carregada, tirando foto sem marca d'água.");
+        }
+
+        // 4. Converte e Baixa
+        const dataURL = canvas.toDataURL('image/jpeg', 0.9);
+        const link = document.createElement('a');
+        // Limpa o nome para evitar caracteres inválidos no Windows
+        const nomeArquivo = `FOTO_3X4_${nomeAtual.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase()}.jpg`;
+        
+        link.download = nomeArquivo;
+        link.href = dataURL;
+        document.body.appendChild(link); // Necessário para alguns navegadores
+        link.click();
+        document.body.removeChild(link);
+        
+        console.log("Sucesso!");
+    } catch (err) {
+        console.error("Erro na captura:", err);
+        alert("Erro técnico ao salvar: " + err.message);
+    }
+}
+    </script>
+</body>
+</html>

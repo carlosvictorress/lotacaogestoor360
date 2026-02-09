@@ -643,6 +643,12 @@ def imprimir_encaminhamento(id):
                            funcionario=funcionario, 
                            data_extenso=data_extenso, 
                            ano=hoje.year)       
+@app.route('/fotos')
+@login_required
+def gerenciar_fotos():
+    # Busca todos os funcionários para listar na página de fotos
+    funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
+    return render_template('fotos.html', funcionarios=funcionarios)    
 
 if __name__ == '__main__':
     create_admin()
