@@ -342,7 +342,7 @@ def admin_dashboard():
     stats_secretaria = {s[0]: s[1] for s in stats_sec_query}
     
     stats_vinculo_query = db.session.query(Funcionario.tipo_vinculo, func.count(Funcionario.id)).group_by(Funcionario.tipo_vinculo).all()
-    stats_vinculo = {v[0]: v[1] for v in stats_vinculo_query if v[0]}
+    stats_vinculo = { (v[0] if v[0] else "Não Informado"): v[1] for v in stats_vinculo_query }
     
     count_validados = Funcionario.query.filter_by(validado=True).count()
     count_pendentes = Funcionario.query.filter_by(validado=False).count()
