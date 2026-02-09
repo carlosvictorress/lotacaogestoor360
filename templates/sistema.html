@@ -184,8 +184,14 @@
                     <div class="md:col-span-2"><label class="form-label">Função</label><input type="text" id="funcao" name="funcao" class="form-input uppercase"></div>
                     <div class="md:col-span-2"><label class="form-label">Lotação</label>{% if role == 'admin' or is_admin %}<select id="lotacao" name="secretaria_id" class="form-input bg-yellow-50 dark:bg-gray-700"><option value="">Selecione</option>{% for sec in secretarias_opcoes %}<option value="{{ sec.id }}">{{ sec.nome }}</option>{% endfor %}</select>{% else %}<input type="text" id="lotacao" name="lotacao_texto" value="{{ nome_secretaria }}" readonly class="form-input bg-gray-100 text-gray-500 cursor-not-allowed dark:bg-gray-700 dark:text-gray-400">{% endif %}</div>
                     <div class="md:col-span-2"><label class="form-label">Local Trabalho</label><input type="text" id="local_trabalho" name="local_trabalho" class="form-input uppercase"></div>
-                    <div><label class="form-label">Vínculo</label><select id="tipo_vinculo" name="tipo_vinculo" class="form-input bg-white"><option>Servidor Efetivo</option><option>Comissionado</option><option>Terceirizado</option></select></div>
-                    <div><label class="form-label">Classe</label><input type="text" id="classe" name="classe" class="form-input"></div>
+<div>
+        <label class="form-label">Vínculo</label>
+        <select id="tipo_vinculo" name="tipo_vinculo" class="form-input bg-white">
+            <option value="">Nenhum / Em branco</option> <option value="Servidor Efetivo">Servidor Efetivo</option>
+            <option value="Comissionado">Comissionado</option>
+            <option value="Terceirizado">Terceirizado</option>
+        </select>
+    </div>                    <div><label class="form-label">Classe</label><input type="text" id="classe" name="classe" class="form-input"></div>
                     <div><label class="form-label">Contracheque</label><input type="text" id="contracheque" name="contracheque" class="form-input"></div>
                 </div>
                 <hr class="border-gray-100 dark:border-gray-700">
