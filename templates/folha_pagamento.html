@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Folha de Pagamento - Valença do Piauí</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        @media print {
+            body * { visibility: hidden; }
+            .no-print { display: none !important; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 1rem; }
+            table { font-size: 10pt; }
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
+
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700 no-print">
+        <div>
+            <div class="p-6 flex items-center gap-3">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="h-10 w-auto object-contain dark:invert">
+            </div>
+            <nav class="px-4 space-y-1">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-chart-pie-slice text-lg"></i> Dashboard</a>
+                <a href="{{ url_for('gerenciar_fotos') }}" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-camera text-lg text-blue-500"></i> Estúdio de Fotos</a>
+                <a href="{{ url_for('folha_pagamento') }}" class="nav-item active bg-gray-900 text-white w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors dark:bg-gray-700"><i class="ph ph-currency-dollar text-lg text-green-400"></i> Gerar Folha Pagamento</a>
+                <a href="{{ url_for('admin_dashboard') }}?tab=dados" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-table text-lg"></i> Base de Dados</a>
+                <a href="{{ url_for('admin_dashboard') }}?tab=auditoria" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-fingerprint text-lg"></i> Auditoria</a>
+                <a href="{{ url_for('admin_dashboard') }}?tab=config" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-gear text-lg"></i> Configurações</a>
+            </nav>
+        </div>
+        <div class="p-4 border-t border-gray-100 dark:border-gray-700">
+            <a href="{{ url_for('sistema') }}" class="flex items-center gap-3 px-4 py-2 text-sm font-medium text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"><i class="ph ph-file-plus"></i> Novo Cadastro</a>
+            <a href="{{ url_for('validar_cadastros') }}" class="flex items-center justify-between px-4 py-2 text-sm font-medium text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"><div class="flex items-center gap-3"><i class="ph ph-check-circle"></i> Validar Cadastros</div></a>
+            <button onclick="window.location.href='{{ url_for('logout') }}'" class="w-full flex items-center gap-3 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-left"><i class="ph ph-sign-out"></i> Sair</button>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col h-screen overflow-hidden">
+        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm z-20 dark:bg-gray-800 dark:border-gray-700 no-print">
+            <h2 class="text-lg font-bold text-gray-800 dark:text-white">Gerar Folha de Pagamento</h2>
+            <div class="flex items-center gap-4">
+                <button onclick="toggleDarkMode()" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors" title="Alternar Tema">
+                    <i id="theme-icon" class="ph ph-moon text-xl"></i>
+                </button>
+                <div class="text-right"><p class="text-sm font-bold text-gray-900 dark:text-white">Administrador</p><p class="text-xs text-green-600 dark:text-green-400">● Online</p></div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-8">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6 dark:bg-gray-800 dark:border-gray-700 no-print">
+                <form method="GET">
+                    <label class="text-xs font-bold text-gray-500 uppercase">Selecione o Local de Trabalho</label>
+                    <div class="flex items-end gap-4 mt-1">
+                        <select name="local_id" class="w-full border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                            <option value="">Selecione para gerar a folha...</option>
+                            {% for local in locais_trabalho %}
+                            <option value="{{ local.id }}" {{ 'selected' if local_selecionado and local_selecionado.id == local.id }}>{{ local.nome }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="bg-black text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition dark:bg-blue-600 dark:hover:bg-blue-700 h-10 flex items-center gap-2">
+                            <i class="ph ph-funnel"></i> Gerar
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            {% if local_selecionado %}
+            <div id="print-area" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center dark:border-gray-700">
+                    <div>
+                        <h3 class="font-bold text-gray-800 dark:text-white">Folha de Pagamento - {{ local_selecionado.nome }}</h3>
+                        <p class="text-sm text-gray-500">{{ funcionarios_folha|length }} servidores encontrados.</p>
+                    </div>
+                    <button onclick="window.print()" class="no-print bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-200 transition flex items-center gap-2">
+                        <i class="ph ph-printer"></i> Imprimir Folha
+                    </button>
+                </div>
+                <table class="w-full text-sm text-left text-gray-600">
+                    <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                        <tr>
+                            <th class="px-6 py-3">Nome</th>
+                            <th class="px-6 py-3">CPF</th>
+                            <th class="px-6 py-3">Banco</th>
+                            <th class="px-6 py-3">Agência</th>
+                            <th class="px-6 py-3">Conta</th>
+                            <th class="px-6 py-3">Tipo</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        {% for f in funcionarios_folha %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ f.nome }}</td>
+                            <td class="px-6 py-4">{{ f.cpf }}</td>
+                            <td class="px-6 py-4">{{ f.banco }}</td>
+                            <td class="px-6 py-4">{{ f.agencia }}</td>
+                            <td class="px-6 py-4">{{ f.conta }}</td>
+                            <td class="px-6 py-4">{{ f.tipo_conta }}</td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="6" class="text-center p-6">Nenhum servidor encontrado para este local.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center p-10 bg-white rounded-2xl border border-dashed dark:bg-gray-800 dark:border-gray-700">
+                <i class="ph ph-file-text text-4xl text-gray-300 mb-2 dark:text-gray-600"></i>
+                <p class="text-gray-500 dark:text-gray-400">Selecione um local de trabalho para gerar a folha de pagamento.</p>
+            </div>
+            {% endif %}
+        </main>
+    </div>
+
+    <script>
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) { html.classList.remove('dark'); localStorage.setItem('theme', 'light'); if(icon) icon.classList.replace('ph-sun', 'ph-moon'); } 
+            else { html.classList.add('dark'); localStorage.setItem('theme', 'dark'); if(icon) icon.classList.replace('ph-moon', 'ph-sun'); }
+        }
+        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            const icon = document.getElementById('theme-icon');
+            if(icon) icon.classList.replace('ph-moon', 'ph-sun');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RH - Quantitativo por Cargos</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', '-apple-system', 'sans-serif'] },
+                    colors: { apple: { blue: '#0071e3', gray: '#f5f5f7', 'dark-gray': '#86868b', text: '#1d1d1f' } }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #1d1d1f; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 10px; }
+
+        /* Estilo para a área oculta de impressão */
+        #areaImpressao { display: none; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <header class="bg-white/90 backdrop-blur-md sticky top-0 z-40 border-b border-gray-100">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i class="ph ph-briefcase text-xl text-apple-blue"></i>
+                <h1 class="text-lg font-bold tracking-tight">Gestor 360</h1>
+            </div>
+            <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-2 px-4 py-1.5 rounded-full bg-apple-gray hover:bg-gray-200 text-xs font-semibold transition-colors">
+                <i class="ph ph-arrow-left"></i> Dashboard
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-10">
+        <div class="mb-10">
+            <h2 class="text-3xl font-extrabold tracking-tight text-apple-text">Quantitativo por Cargos</h2>
+            <p class="text-sm text-apple-dark-gray mt-1">Análise volumétrica de servidores por função.</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {% for cargo, dados in stats_cargos.items() %}
+            <div onclick='abrirModalCargo({{ cargo|tojson|safe }}, {{ dados.servidores|tojson|safe }})' 
+                 class="group cursor-pointer bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-apple-blue/30 transition-all">
+                <div class="flex justify-between items-start mb-4">
+                    <div class="w-8 h-8 flex items-center justify-center bg-apple-gray rounded-lg text-apple-dark-gray group-hover:bg-apple-blue group-hover:text-white transition-colors">
+                        <i class="ph ph-identification-card text-lg"></i>
+                    </div>
+                    <span class="text-[10px] font-bold text-gray-400 group-hover:text-apple-blue uppercase tracking-widest">Ver Lista</span>
+                </div>
+                <h3 class="text-sm font-bold text-apple-text uppercase truncate mb-3 tracking-tight">{{ cargo }}</h3>
+                <div class="flex items-end justify-between border-t border-gray-50 pt-3">
+                    <p class="text-xs text-apple-dark-gray font-medium">Total</p>
+                    <p class="text-3xl font-extrabold text-apple-blue leading-none">{{ dados.total }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+
+    <div id="modalCargo" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50 backdrop-blur-sm p-4">
+        <div class="bg-white rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 flex items-center justify-center bg-white rounded-xl shadow-sm border border-gray-100 text-apple-blue">
+                        <i class="ph ph-users-three text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 id="modalTitle" class="text-base font-bold uppercase tracking-tight"></h3>
+                        <p class="text-[11px] font-medium text-apple-dark-gray uppercase" id="modalCountText"></p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="executarImpressao()" class="flex items-center gap-2 px-3 py-1.5 bg-apple-blue text-white rounded-lg text-[11px] font-bold hover:bg-blue-600 transition-colors">
+                        <i class="ph ph-printer"></i> Imprimir Lista
+                    </button>
+                    <button onclick="fecharModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-200 text-apple-dark-gray transition-colors">
+                        <i class="ph ph-x text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="px-6 py-3 border-b border-gray-100">
+                <label class="text-[10px] font-bold text-gray-400 uppercase mb-1 block">Unidade de Lotação</label>
+                <select id="selectLocal" onchange="filtrarPorLocal()" class="w-full sm:max-w-xs bg-apple-gray border border-gray-200 rounded-lg text-xs p-2 outline-none focus:ring-2 focus:ring-apple-blue transition-all">
+                    <option value="GERAL">TODAS AS UNIDADES (GERAL)</option>
+                </select>
+            </div>
+
+            <div class="overflow-y-auto flex-1 px-4 py-4">
+                <table class="w-full text-left" id="tabelaServidores">
+                    <thead>
+                        <tr class="text-[10px] uppercase text-apple-dark-gray tracking-widest border-b border-gray-100">
+                            <th class="py-3 px-4 font-bold">Nome</th>
+                            <th class="py-3 px-4 font-bold">CPF</th>
+                            <th class="py-3 px-4 font-bold">Local de Trabalho</th>
+                            <th class="py-3 px-4 font-bold text-center">Vínculo</th>
+                        </tr>
+                    </thead>
+                    <tbody id="listaCorpo" class="text-[11px] divide-y divide-gray-50"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="areaImpressao">
+        <div style="text-align: center; font-family: sans-serif; padding: 20px;">
+            <h1 style="font-size: 18pt; margin: 0;">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h1>
+            <h2 id="printCargoTitle" style="font-size: 14pt; margin: 5px 0; text-transform: uppercase;"></h2>
+            <div style="border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 8px 0; margin: 15px 0;">
+                <h3 id="printSubTitle" style="font-size: 11pt; margin: 0; text-transform: uppercase;"></h3>
+                <p id="printTotalCount" style="font-size: 10pt; margin: 5px 0 0 0; font-weight: bold;"></p>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 10pt; text-align: left;">
+                <thead>
+                    <tr style="background-color: #f2f2f2;">
+                        <th style="border: 1px solid #000; padding: 8px;">NOME DO SERVIDOR</th>
+                        <th style="border: 1px solid #000; padding: 8px;">CPF</th>
+                        <th style="border: 1px solid #000; padding: 8px;">LOCAL DE TRABALHO</th>
+                        <th style="border: 1px solid #000; padding: 8px;">VÍNCULO</th>
+                    </tr>
+                </thead>
+                <tbody id="printListaCorpo"></tbody>
+            </table>
+            <div style="margin-top: 30px; font-size: 8pt; color: #666; text-align: right;">
+                Documento gerado em: <span id="printDataHora"></span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let servidoresAtuais = [];
+        let servidoresFiltrados = [];
+        let cargoAtual = "";
+        const modal = document.getElementById('modalCargo');
+
+        function abrirModalCargo(cargo, lista) {
+            cargoAtual = cargo;
+            servidoresAtuais = lista;
+            document.getElementById('modalTitle').innerText = cargo;
+            
+            // Popula o Dropdown dinamicamente
+            const select = document.getElementById('selectLocal');
+            select.innerHTML = '<option value="GERAL">TODAS AS UNIDADES (GERAL)</option>';
+            const locais = [...new Set(lista.map(s => s.local || "NÃO DEFINIDO"))].sort();
+            locais.forEach(local => {
+                const opt = document.createElement('option');
+                opt.value = local;
+                opt.innerText = local;
+                select.appendChild(opt);
+            });
+
+            filtrarPorLocal();
+            modal.classList.remove('hidden');
+        }
+
+        function filtrarPorLocal() {
+            const localSelecionado = document.getElementById('selectLocal').value;
+            if (localSelecionado === "GERAL") {
+                servidoresFiltrados = servidoresAtuais;
+            } else {
+                servidoresFiltrados = servidoresAtuais.filter(s => (s.local || "NÃO DEFINIDO") === localSelecionado);
+            }
+            renderizarTabela(servidoresFiltrados);
+            
+            const textoFiltro = localSelecionado === "GERAL" ? "TODAS AS UNIDADES" : `UNIDADE: ${localSelecionado}`;
+            document.getElementById('modalCountText').innerText = `${servidoresFiltrados.length} Profissionais (${textoFiltro})`;
+        }
+
+        function renderizarTabela(dados) {
+            const corpo = document.getElementById('listaCorpo');
+            corpo.innerHTML = dados.map(s => `
+                <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="py-3 px-4 font-semibold text-gray-900 uppercase">${s.nome || '---'}</td>
+                    <td class="py-3 px-4 text-gray-500 font-mono">${s.cpf || '---'}</td>
+                    <td class="py-3 px-4 font-medium text-gray-700 uppercase">${s.local || 'NÃO DEFINIDO'}</td>
+                    <td class="py-3 px-4 text-center">
+                        <span class="px-2 py-0.5 bg-gray-100 rounded text-[9px] font-bold uppercase">${s.vinculo || '---'}</span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function executarImpressao() {
+            const localSel = document.getElementById('selectLocal').value;
+            const textoFiltro = localSel === "GERAL" ? "LISTAGEM GERAL" : `FILTRADO POR UNIDADE: ${localSel}`;
+            
+            // Preencher os dados na estrutura de impressão
+            document.getElementById('printCargoTitle').innerText = cargoAtual;
+            document.getElementById('printSubTitle').innerText = textoFiltro;
+            document.getElementById('printTotalCount').innerText = `TOTAL DE SERVIDORES: ${servidoresFiltrados.length}`;
+            document.getElementById('printDataHora').innerText = new Date().toLocaleString('pt-BR');
+            
+            const printCorpo = document.getElementById('printListaCorpo');
+            printCorpo.innerHTML = servidoresFiltrados.map(s => `
+                <tr>
+                    <td style="border: 1px solid #000; padding: 6px; text-transform: uppercase;">${s.nome || '---'}</td>
+                    <td style="border: 1px solid #000; padding: 6px;">${s.cpf || '---'}</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-transform: uppercase;">${s.local || 'NÃO DEFINIDO'}</td>
+                    <td style="border: 1px solid #000; padding: 6px; text-transform: uppercase;">${s.vinculo || '---'}</td>
+                </tr>
+            `).join('');
+
+            // Criar a janela de impressão
+            const conteudo = document.getElementById('areaImpressao').innerHTML;
+            const janelaPrint = window.open('', '', 'width=900,height=700');
+            janelaPrint.document.write('<html><head><title>Impressão - Gestor 360</title></head><body>');
+            janelaPrint.document.write(conteudo);
+            janelaPrint.document.write('</body></html>');
+            janelaPrint.document.close();
+            
+            // Pequeno delay para garantir que o conteúdo carregou antes de imprimir
+            setTimeout(() => {
+                janelaPrint.print();
+                janelaPrint.close();
+            }, 500);
+        }
+
+        function fecharModal() { modal.classList.add('hidden'); }
+        modal.addEventListener('click', (e) => { if (e.target === modal) fecharModal(); });
+    </script>
+</body>
+</html>

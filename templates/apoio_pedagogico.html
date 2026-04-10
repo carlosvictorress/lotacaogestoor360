@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Apoio Pedagógico - Valença do Piauí</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+    </style>
+</head>
+<body class="dark:bg-gray-900 dark:text-gray-100">
+
+    <div class="flex h-screen bg-gray-100 dark:bg-gray-900">
+        <!-- Sidebar (pode ser copiado do admin.html se quiser navegação completa) -->
+        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700">
+            <div>
+                <div class="p-6 flex items-center gap-3">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="h-10 w-auto object-contain dark:invert">
+                </div>
+                <nav class="px-4 space-y-1">
+                    <a href="{{ url_for('admin_dashboard') }}" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
+                        <i class="ph ph-arrow-left text-lg"></i> Voltar ao Dashboard
+                    </a>
+                    <a href="{{ url_for('apoio_pedagogico') }}" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium bg-gray-900 text-white rounded-lg dark:bg-gray-700">
+                        <i class="ph ph-student text-lg text-orange-500"></i> Apoio Pedagógico
+                    </a>
+                </nav>
+            </div>
+        </aside>
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm dark:bg-gray-800 dark:border-gray-700">
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white">Apoio Pedagógico - Cuidadores</h2>
+                <a href="{{ url_for('sistema') }}" class="text-xs bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition">
+                    <i class="ph ph-plus-circle"></i> Novo Cadastro
+                </a>
+            </header>
+
+            <main class="flex-1 overflow-y-auto p-8">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden dark:bg-gray-800 dark:border-gray-700">
+                    <table class="w-full text-sm text-left text-gray-600">
+                        <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                            <tr>
+                                <th class="px-6 py-4">Profissional de Apoio (Cuidador)</th>
+                                <th class="px-6 py-4">Criança Assistida</th>
+                                <th class="px-6 py-4">Local de Trabalho</th>
+                                <th class="px-6 py-4">Contato</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                            {% for cuidador in cuidadores %}
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                <td class="px-6 py-4">
+                                    <span class="block font-bold text-gray-900 dark:text-white">{{ cuidador.nome }}</span>
+                                    <span class="text-xs text-gray-400">{{ cuidador.cpf }}</span>
+                                </td>
+                                <td class="px-6 py-4 font-bold text-blue-700 dark:text-blue-400">{{ cuidador.crianca_assistida }}</td>
+                                <td class="px-6 py-4">
+                                    <span class="block text-gray-900 font-medium dark:text-gray-200">{{ cuidador.local_trabalho.nome if cuidador.local_trabalho else 'Não definido' }}</span>
+                                </td>
+                                <td class="px-6 py-4 text-xs">{{ cuidador.telefone }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="4" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">Nenhum profissional de apoio com criança assistida encontrado.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+    </div>
+</body>
+</html>

@@ -63,12 +63,12 @@
 
     <p style="text-align: right;">Valença do Piauí – PI, {{ data_extenso }}</p>
 
-    <p>À <br> <strong>{{ funcionario.local_trabalho }}</strong> <br> Valença do Piauí – PI</p>
+    <p>À <br> <strong>{{ funcionario.local_trabalho.nome if funcionario.local_trabalho else '____________________' }}</strong> <br> Valença do Piauí – PI</p>
 
     <p><strong>Assunto:</strong> Encaminhamento de Servidor(a)</p>
 
     <div class="content">
-        A Secretaria Municipal de Educação de Valença do Piauí – PI, no uso de suas atribuições, encaminha o(a) servidor(a) <strong>{{ funcionario.nome }}</strong>, CPF nº <strong>{{ funcionario.cpf }}</strong>, cargo/função <strong>{{ funcionario.funcao }}</strong>, para exercer suas atividades a partir de <strong>{% if funcionario.dt_inicio %}{{ funcionario.dt_inicio.strftime('%d/%m/%Y') }}{% else %}__/__/____{% endif %}</strong> nesta:
+        A Secretaria Municipal de Educação de Valença do Piauí – PI, no uso de suas atribuições, encaminha o(a) servidor(a) <strong>{{ funcionario.nome }}</strong>, CPF nº <strong>{{ funcionario.cpf }}</strong>, cargo/função <strong>{{ funcionario.funcao.nome if funcionario.funcao else '____________________' }}</strong>, para exercer suas atividades a partir de <strong>{% if funcionario.dt_inicio %}{{ funcionario.dt_inicio.strftime('%d/%m/%Y') }}{% else %}__/__/____{% endif %}</strong> nesta:
     </div>
 
     <div class="checkbox-group">

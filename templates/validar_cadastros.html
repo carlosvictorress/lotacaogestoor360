@@ -118,7 +118,7 @@
                             </td>
                             <td class="px-6 py-4">
                                 <span class="block text-gray-900 font-medium dark:text-gray-200">{{ f.secretaria.nome }}</span>
-                                <span class="text-xs dark:text-gray-400">{{ f.funcao }}</span>
+                                <span class="text-xs dark:text-gray-400">{{ f.funcao.nome if f.funcao else 'Não Definido' }}</span>
                             </td>
                             <td class="px-6 py-4 text-center">
                                 {% if f.validado %}

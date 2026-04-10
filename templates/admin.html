@@ -25,40 +25,64 @@
         .pdf-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
         .pdf-table th { background-color: #e5e5e5; border: 1px solid #000; padding: 4px; text-transform: uppercase; font-weight: bold; }
         .pdf-table td { border: 1px solid #000; padding: 4px; }
+        
+        .menu-scroll::-webkit-scrollbar { width: 4px; }
+        .menu-scroll::-webkit-scrollbar-track { background: transparent; }
+        .menu-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 10px; }
+        .dark .menu-scroll::-webkit-scrollbar-thumb { background: #4b5563; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
 
-    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700 transition-colors">
-        <div>
-            <div class="p-6 flex items-center gap-3">
+    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700 transition-colors">
+        <div class="p-6 flex-shrink-0">
+            <div class="flex items-center gap-3">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="h-10 w-auto object-contain dark:invert">
             </div>
-            <nav class="px-4 space-y-1">
-    <button onclick="switchTab('dashboard', this)" class="nav-item active w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
-        <i class="ph ph-chart-pie-slice text-lg"></i> Dashboard
-    </button>
-
-    {% if role == 'admin' or is_admin %}
-    <a href="{{ url_for('gerenciar_fotos') }}" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
-        <i class="ph ph-camera text-lg text-blue-500"></i> Estúdio de Fotos
-    </a>
-
-    <button onclick="switchTab('dados', this)" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
-        <i class="ph ph-table text-lg"></i> Base de Dados
-    </button>
-    
-    <button onclick="switchTab('auditoria', this)" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
-        <i class="ph ph-fingerprint text-lg"></i> Auditoria
-    </button>
-    
-    <button onclick="switchTab('config', this)" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
-        <i class="ph ph-gear text-lg"></i> Configurações
-    </button>
-    {% endif %}
-</nav>
         </div>
-        <div class="p-4 border-t border-gray-100 dark:border-gray-700">
+
+<nav class="flex-1 px-4 space-y-1 overflow-y-auto menu-scroll">
+            <button onclick="switchTab('dashboard', this)" class="nav-item active w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="ph ph-chart-pie-slice text-lg"></i> Dashboard
+            </button>
+
+            {% if role == 'admin' or is_admin %}
+            <a href="{{ url_for('gerenciar_fotos') }}" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="ph ph-camera text-lg text-blue-500"></i> Estúdio de Fotos
+            </a>
+            
+            <a href="/admin/reconhecimento_facial" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="ph ph-scan text-lg text-blue-500"></i> Reconhecimento Facial
+            </a>
+
+            <a href="{{ url_for('folha_pagamento') }}" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="ph ph-currency-dollar text-lg text-green-500"></i> Gerar Folha Pagamento
+            </a>
+            <a href="{{ url_for('apoio_pedagogico') }}" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="ph ph-student text-lg text-orange-500"></i> Apoio Pedagógico
+            </a>
+            
+            <a href="/admin/cargos_total" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="ph ph-identification-card text-lg text-indigo-500"></i> Quantitativo por Cargo
+            </a> 
+
+            <a href="/recisoes" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="ph ph-file-x text-lg text-red-500"></i> Rescisão Contratual
+            </a>
+            
+            <button onclick="switchTab('dados', this)" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="ph ph-table text-lg"></i> Base de Dados
+            </button>
+            <button onclick="switchTab('auditoria', this)" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="ph ph-fingerprint text-lg"></i> Auditoria
+            </button>
+            <button onclick="switchTab('config', this)" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
+                <i class="ph ph-gear text-lg"></i> Configurações
+            </button>
+            {% endif %}
+        </nav>
+
+        <div class="p-4 border-t border-gray-100 dark:border-gray-700 flex-shrink-0">
             <a href="{{ url_for('sistema') }}" class="flex items-center gap-3 px-4 py-2 text-sm font-medium text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"><i class="ph ph-file-plus"></i> Novo Cadastro</a>
             {% if role == 'admin' or is_admin %}
             <a href="{{ url_for('validar_cadastros') }}" class="flex items-center justify-between px-4 py-2 text-sm font-medium text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white">
@@ -75,7 +99,6 @@
         <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm z-20 dark:bg-gray-800 dark:border-gray-700 transition-colors">
             <h2 id="page-title" class="text-lg font-bold text-gray-800 dark:text-white">Visão Geral</h2>
             <div class="flex items-center gap-4">
-                <!-- Notifications -->
                 <div class="relative">
                     <button id="notificationBtn" onclick="document.getElementById('notificationDropdown').classList.toggle('hidden')" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors relative">
                         <i class="ph ph-bell text-xl"></i>
@@ -85,7 +108,7 @@
                     </button>
                     <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-100 z-50 dark:bg-gray-800 dark:border-gray-700 overflow-hidden">
                         <div class="p-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center"><span class="font-bold text-xs text-gray-700 dark:text-gray-200 uppercase">Últimas Ações</span><span class="text-[10px] text-gray-400">Recentes</span></div>
-                        <div class="max-h-64 overflow-y-auto">
+                        <div class="max-h-64 overflow-y-auto menu-scroll">
                             {% for notif in notifications %}
                             <div class="p-3 border-b border-gray-50 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700 transition-colors">
                                 <div class="flex justify-between items-start"><p class="text-xs font-bold text-gray-800 dark:text-white">{{ notif.acao }}</p><span class="text-[10px] text-gray-400">{{ notif.data_hora.strftime('%H:%M') }}</span></div>
@@ -154,75 +177,95 @@
                     <div class="flex justify-between items-center mb-4 border-b border-gray-100 pb-4 dark:border-gray-700">
                         <h3 class="font-bold text-gray-800 flex items-center gap-2 dark:text-white"><i class="ph ph-funnel"></i> Filtros e Relatórios</h3>
                         <div class="flex gap-2">
-                            <a href="{{ url_for('exportar_excel', secretaria_id=filtros.sec) }}" class="text-xs bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition"><i class="ph ph-file-xls text-lg"></i> Excel</a>
+                            <a href="{{ url_for('exportar_excel', secretaria_id=filtros.sec, tipo_vinculo=filtros.vinculo, padrinho_id=filtros.indicacao, funcao_id=filtros.funcao, local_trabalho_id=filtros.local) }}" class="text-xs bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition"><i class="ph ph-file-xls text-lg"></i> Excel</a>
+                            <a href="{{ url_for('exportar_migracao') }}" class="text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition"><i class="ph ph-export text-lg"></i> Exportar (Migração)</a>
                             <button onclick="generateReportPDF()" class="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition"><i class="ph ph-file-pdf text-lg"></i> Baixar PDF</button>
                         </div>
                     </div>
                     <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-    <div>
-        <label class="text-xs font-bold text-gray-500 uppercase">Nome ou CPF</label>
-        <input type="text" name="busca_termo" value="{{ filtros.busca or '' }}" 
-               placeholder="Buscar..." 
-               class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-    </div>
-
-    <div>
-        <label class="text-xs font-bold text-gray-500 uppercase">Secretaria</label>
-        <select name="secretaria_id" id="filter_sec" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-            <option value="">Todas</option>
-            {% for sec in secretarias %}
-            <option value="{{ sec.id }}" {{ 'selected' if filtros.sec == sec.id|string }}>{{ sec.nome }}</option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <div>
-        <label class="text-xs font-bold text-gray-500 uppercase">Vínculo</label>
-        <select name="tipo_vinculo" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-            <option value="">Todos</option>
-            <option value="Servidor Efetivo" {{ 'selected' if filtros.vinculo == 'Servidor Efetivo' }}>Efetivo</option>
-            <option value="Comissionado" {{ 'selected' if filtros.vinculo == 'Comissionado' }}>Comissionado</option>
-            <option value="Terceirizado" {{ 'selected' if filtros.vinculo == 'Terceirizado' }}>Terceirizado</option>
-        </select>
-    </div>
-
-    <div>
-        <label class="text-xs font-bold text-gray-500 uppercase text-blue-600">Padrinho</label>
-        <select name="quem_indicou" class="w-full mt-1 border border-blue-200 bg-blue-50 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:bg-blue-900/30 dark:border-blue-800 dark:text-white">
-            <option value="">Todos</option>
-            {% for ind in lista_indicadores %}
-            <option value="{{ ind }}" {{ 'selected' if filtros.indicacao == ind }}>{{ ind }}</option>
-            {% endfor %}
-        </select>
-    </div>
-
-    <button class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition dark:bg-blue-600 dark:hover:bg-blue-700">
-        <i class="ph ph-magnifying-glass"></i> Filtrar
-    </button>
-</form>
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase">Nome ou CPF</label>
+                            <input type="text" name="busca_termo" value="{{ filtros.busca or '' }}" placeholder="Buscar..." class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase">Secretaria</label>
+                            <select name="secretaria_id" id="filter_sec" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                <option value="">Todas</option>
+                                {% for sec in secretarias %}
+                                <option value="{{ sec.id }}" {{ 'selected' if filtros.sec == sec.id|string }}>{{ sec.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase">Vínculo</label>
+                            <select name="tipo_vinculo" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                <option value="">Todos</option>
+                                <option value="Servidor Efetivo" {{ 'selected' if filtros.vinculo == 'Servidor Efetivo' }}>Efetivo</option>
+                                <option value="Comissionado" {{ 'selected' if filtros.vinculo == 'Comissionado' }}>Comissionado</option>
+                                <option value="Terceirizado" {{ 'selected' if filtros.vinculo == 'Terceirizado' }}>Terceirizado</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase text-blue-600">Padrinho</label>
+                            <select name="padrinho_id" class="w-full mt-1 border border-blue-200 bg-blue-50 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:bg-blue-900/30 dark:border-blue-800 dark:text-white">
+                                <option value="">Todos</option>
+                                {% for ind in padrinhos %}
+                                <option value="{{ ind.id }}" {{ 'selected' if filtros.indicacao == ind.id|string }}>{{ ind.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase">Função</label>
+                            <select name="funcao_id" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                <option value="">Todas</option>
+                                {% for f in funcoes %}
+                                <option value="{{ f.id }}" {{ 'selected' if filtros.funcao == f.id|string }}>{{ f.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-gray-500 uppercase">Local de Trabalho</label>
+                            <select name="local_trabalho_id" class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                <option value="">Todos</option>
+                                {% for l in locais_trabalho %}
+                                <option value="{{ l.id }}" {{ 'selected' if filtros.local == l.id|string }}>{{ l.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button class="bg-black text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition dark:bg-blue-600 dark:hover:bg-blue-700">
+                            <i class="ph ph-magnifying-glass"></i> Filtrar
+                        </button>
+                    </form>
                 </div>
 
                 {% if filtros.indicacao %}
                 <div class="bg-yellow-50 border border-yellow-200 rounded-2xl p-6 mb-6 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 dark:bg-yellow-900/20 dark:border-yellow-800">
-                    <div><p class="text-xs font-bold text-yellow-600 uppercase mb-1 dark:text-yellow-500">RELATÓRIO DE INDICAÇÃO</p><h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ filtros.indicacao }}</h2><p class="text-sm text-gray-600 mt-1 dark:text-gray-300">Este padrinho indicou <strong>{{ total_geral }}</strong> servidores.</p></div>
-                    <div class="flex gap-4"><div class="bg-white p-3 rounded-xl border border-yellow-100 text-center"><span class="block text-xl font-bold text-gray-800">{{ total_geral }}</span><span class="text-[10px] text-gray-500 uppercase">Total</span></div></div>
+                    {% set padrinho_selecionado = padrinhos|selectattr('id', 'equalto', filtros.indicacao|int)|first %}
+                    <div>
+                        <p class="text-xs font-bold text-yellow-600 uppercase mb-1 dark:text-yellow-500">RELATÓRIO DE INDICAÇÃO</p>
+                        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ padrinho_selecionado.nome if padrinho_selecionado else 'Indicador não encontrado' }}</h2>
+                        <p class="text-sm text-gray-600 mt-1 dark:text-gray-300">Este padrinho indicou <strong>{{ total_geral }}</strong> servidores.</p></div>
+                    <div class="flex gap-4"><div class="bg-white p-3 rounded-xl border border-yellow-100 text-center dark:bg-gray-700"><span class="block text-xl font-bold text-gray-800 dark:text-white">{{ total_geral }}</span><span class="text-[10px] text-gray-500 uppercase dark:text-gray-400">Total</span></div></div>
                 </div>
                 {% endif %}
 
                 <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden dark:bg-gray-800 dark:border-gray-700">
                     <table class="w-full text-sm text-left text-gray-600" id="mainTable">
                         <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                            <tr><th class="px-6 py-4">Nome / CPF</th><th class="px-6 py-4">Lotação / Local</th><th class="px-6 py-4">Função / Vínculo</th><th class="px-6 py-4 text-center">Indicação</th><th class="px-6 py-4">Quem Indicou</th><th class="px-6 py-4 text-center">Histórico</th></tr>
+                            <tr><th class="px-6 py-4">Nome / CPF</th><th class="px-6 py-4">Lotação / Local</th><th class="px-6 py-4">Função / Vínculo</th><th class="px-6 py-4 text-center">Indicação</th><th class="px-6 py-4">Quem Indicou</th><th class="px-6 py-4 text-center">Ações</th></tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                             {% for f in funcionarios %}
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                                 <td class="px-6 py-4"><span class="block font-bold text-gray-900 dark:text-white">{{ f.nome }}</span><span class="text-xs text-gray-400">{{ f.cpf }}</span></td>
-                                <td class="px-6 py-4"><span class="block text-gray-900 font-medium dark:text-gray-200">{{ f.secretaria.nome }}</span><span class="text-xs dark:text-gray-400">{{ f.local_trabalho }}</span></td>
-                                <td class="px-6 py-4"><span class="block dark:text-gray-300">{{ f.funcao }}</span><span class="text-xs bg-gray-100 px-1 rounded dark:bg-gray-600 dark:text-gray-200">{{ f.tipo_vinculo }}</span></td>
+                                <td class="px-6 py-4"><span class="block text-gray-900 font-medium dark:text-gray-200">{{ f.secretaria.nome }}</span><span class="text-xs dark:text-gray-400">{{ f.local_trabalho.nome if f.local_trabalho else 'Não Definido' }}</span></td>
+                                <td class="px-6 py-4"><span class="block dark:text-gray-300">{{ f.funcao.nome if f.funcao else 'Não Definido' }}</span><span class="text-xs bg-gray-100 px-1 rounded dark:bg-gray-600 dark:text-gray-200">{{ f.tipo_vinculo }}</span></td>
                                 <td class="px-6 py-4 text-center">{% if f.foi_indicacao %}<span class="w-2 h-2 bg-red-500 rounded-full inline-block" title="Sim"></span>{% else %}<span class="w-2 h-2 bg-gray-200 rounded-full inline-block" title="Não"></span>{% endif %}</td>
-                                <td class="px-6 py-4 text-xs font-bold text-blue-800 uppercase dark:text-blue-400">{{ f.quem_indicou if f.quem_indicou else '-' }}</td>
-                                <td class="px-6 py-4 text-center"><button onclick="abrirHistorico({{ f.id }}, '{{ f.nome }}')" class="text-gray-500 hover:text-black border border-gray-200 p-2 rounded-lg dark:border-gray-600 dark:text-gray-400 dark:hover:text-white" title="Ver Histórico"><i class="ph ph-clock-counter-clockwise text-lg"></i></button></td>
+                                <td class="px-6 py-4 text-xs font-bold text-blue-800 uppercase dark:text-blue-400">{{ f.padrinho.nome if f.padrinho else '---' }}</td>
+                                <td class="px-6 py-4 text-center flex justify-center gap-2">
+                                    <button onclick="abrirModalMovimentacao({{ f.id }}, '{{ f.nome }}', '{{ f.funcao_id }}', '{{ f.local_trabalho_id }}')" class="text-gray-500 hover:text-black border border-gray-200 p-2 rounded-lg dark:border-gray-600 dark:text-gray-400 dark:hover:text-white" title="Movimentação Rápida"><i class="ph ph-arrows-left-right text-lg"></i></button>
+                                    <button onclick="abrirHistorico({{ f.id }}, '{{ f.nome }}')" class="text-gray-500 hover:text-black border border-gray-200 p-2 rounded-lg dark:border-gray-600 dark:text-gray-400 dark:hover:text-white" title="Ver Histórico"><i class="ph ph-clock-counter-clockwise text-lg"></i></button>
+                                </td>
                             </tr>
                             {% else %}<tr class="bg-white border-b hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700"><td colspan="6" class="px-6 py-4 text-center dark:text-gray-400">Nenhum registro encontrado.</td></tr>{% endfor %}
                         </tbody>
@@ -261,12 +304,28 @@
             </div>
 
             <div id="config" class="tab-content">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
                         <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-gray-800 dark:text-white">Secretarias</h3><button onclick="document.getElementById('formSec').classList.toggle('hidden')" class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Nova</button></div>
                         <form method="POST" id="formSec" class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700"><input type="hidden" name="create_secretaria" value="1"><input type="text" name="nome_secretaria" class="w-full border p-2 rounded mb-2 uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" placeholder="Nome da Secretaria" required><button class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Salvar</button></form>
-                        <ul class="space-y-2 max-h-60 overflow-y-auto">{% for sec in secretarias %}<li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700"><span>{{ sec.nome }}</span><button onclick="confirmAction('{{ url_for('delete_secretaria', sec_id=sec.id) }}', 'Excluir Secretaria', 'Tem certeza? Isso pode afetar usuários vinculados.')" class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{% endfor %}</ul>
+                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">{% for sec in secretarias %}<li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700"><span>{{ sec.nome }}</span><button onclick="confirmAction('{{ url_for('delete_secretaria', sec_id=sec.id) }}', 'Excluir Secretaria', 'Tem certeza? Isso pode afetar usuários e servidores vinculados.')" class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{% endfor %}</ul>
                     </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-gray-800 dark:text-white">Funções</h3><button onclick="document.getElementById('formFuncao').classList.toggle('hidden')" class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Nova</button></div>
+                        <form method="POST" id="formFuncao" class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700"><input type="hidden" name="create_funcao" value="1"><input type="text" name="nome_funcao" class="w-full border p-2 rounded mb-2 uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" placeholder="Nome da Função" required><button class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Salvar</button></form>
+                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">{% for f in funcoes %}<li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700"><span>{{ f.nome }}</span><button onclick="confirmAction('{{ url_for('delete_funcao', id=f.id) }}', 'Excluir Função', 'Tem certeza? Verifique se não há servidores com esta função.')" class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{% endfor %}</ul>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-gray-800 dark:text-white">Locais de Trabalho</h3><button onclick="document.getElementById('formLocal').classList.toggle('hidden')" class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Novo</button></div>
+                        <form method="POST" id="formLocal" class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700"><input type="hidden" name="create_local" value="1"><input type="text" name="nome_local" class="w-full border p-2 rounded mb-2 uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" placeholder="Nome do Local" required><button class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Salvar</button></form>
+                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">{% for l in locais_trabalho %}<li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700"><span>{{ l.nome }}</span><button onclick="confirmAction('{{ url_for('delete_local', id=l.id) }}', 'Excluir Local', 'Tem certeza? Verifique se não há servidores neste local.')" class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{% endfor %}</ul>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-gray-800 dark:text-white">Padrinhos (Indicadores)</h3><button onclick="document.getElementById('formPadrinho').classList.toggle('hidden')" class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Novo</button></div>
+                        <form method="POST" id="formPadrinho" class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700"><input type="hidden" name="create_padrinho" value="1"><input type="text" name="nome_padrinho" class="w-full border p-2 rounded mb-2 uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" placeholder="Nome do Padrinho" required><button class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Salvar</button></form>
+                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">{% for p in padrinhos %}<li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700"><span>{{ p.nome }}</span><button onclick="confirmAction('{{ url_for('delete_padrinho', id=p.id) }}', 'Excluir Padrinho', 'Tem certeza? Verifique se não há servidores indicados por ele.')" class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{% endfor %}</ul>
+                    </div>
+
                     <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
                         <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-gray-800 dark:text-white">Usuários</h3><button onclick="document.getElementById('formUser').classList.toggle('hidden')" class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Novo</button></div>
                         
@@ -292,7 +351,7 @@
                             <button class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Criar</button>
                         </form>
 
-                        <ul class="space-y-2 max-h-60 overflow-y-auto">
+                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">
                             {% for u in users %}
                             <li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
                                 <div>
@@ -319,7 +378,6 @@
     <div id="pdf-report"><div class="pdf-header"><img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão" style="height: 60px; margin-bottom: 10px;"><h2 style="margin: 0; font-size: 14pt; font-weight: bold;">ESTADO DO PIAUÍ</h2><h2 style="margin: 0; font-size: 14pt; font-weight: bold;">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h2><h3 style="margin: 10px 0; font-size: 12pt; text-decoration: underline;">RELATÓRIO GERENCIAL DE PESSOAL</h3><p id="report-subtitle" style="font-size: 10pt; font-weight: bold;">FILTRO: GERAL</p></div><div id="pdf-table-container"></div><div style="margin-top: 15px; padding-top: 8px; border-top: 0.5px solid #eee; display: flex; align-items: center; justify-content: center; gap: 3px; text-align: center; font-size: 6pt;"><span style="color: #999;">Gerado por</span><img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 5mm; width: auto; display: inline-block; opacity: 0.7;"><span style="color: #999;">no dia</span><span id="report-date" style="color: #888;"></span></div></div>
     <div id="loading" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white"><i class="ph ph-spinner-gap animate-spin text-4xl mb-3"></i><span>Gerando Relatório...</span></div>
 
-    <!-- MODAL DE CONFIRMAÇÃO GENÉRICO -->
     <div id="modalConfirm" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm transition-opacity duration-300">
         <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl transform scale-100 transition-transform duration-300 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
             <div class="text-center">
@@ -334,7 +392,6 @@
         </div>
     </div>
 
-    <!-- MODAL EDITAR USUÁRIO -->
     <div id="modalEditUser" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm">
         <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
             <div class="flex justify-between items-center mb-4">
@@ -360,6 +417,36 @@
         </div>
     </div>
 
+    <div id="modalMovimentacao" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Movimentação Rápida</h3>
+                    <p id="movimentacaoNomeFuncionario" class="text-sm text-gray-500"></p>
+                </div>
+                <button onclick="document.getElementById('modalMovimentacao').classList.add('hidden')" class="text-gray-400 hover:text-black dark:hover:text-white"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            <form action="{{ url_for('movimentar_servidor') }}" method="POST">
+                <input type="hidden" name="funcionario_id" id="movimentacao_func_id">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Nova Função</label>
+                        <select name="nova_funcao_id" id="movimentacao_funcao_id" class="w-full border p-2 rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                            {% for f in funcoes %}<option value="{{ f.id }}">{{ f.nome }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Novo Local de Trabalho</label>
+                        <select name="novo_local_id" id="movimentacao_local_id" class="w-full border p-2 rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                            {% for l in locais_trabalho %}<option value="{{ l.id }}">{{ l.nome }}</option>{% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end"><button type="submit" class="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition">Salvar Movimentação</button></div>
+            </form>
+        </div>
+    </div>
+
     <div id="modalHistorico" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50 backdrop-blur-sm">
         <div class="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl">
             <div class="flex justify-between items-center mb-4 border-b pb-4"><div><h3 class="text-lg font-bold text-gray-900">Histórico de Lotação</h3><p class="text-xs text-gray-500" id="histNomeFuncionario">Carregando...</p></div><button onclick="document.getElementById('modalHistorico').classList.add('hidden')" class="text-gray-400 hover:text-black"><i class="ph ph-x text-xl"></i></button></div>
@@ -380,7 +467,6 @@
             if(icon) icon.classList.replace('ph-moon', 'ph-sun');
         }
 
-        // --- CONFIRMATION MODAL LOGIC ---
         let confirmUrl = "";
         function confirmAction(url, title, msg) {
             confirmUrl = url; document.getElementById('modalConfirmTitle').innerText = title; document.getElementById('modalConfirmMessage').innerText = msg; document.getElementById('modalConfirm').classList.remove('hidden');
@@ -391,7 +477,7 @@
         function switchTab(tabId, btn) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(el => { el.classList.remove('active'); el.classList.remove('text-white'); el.classList.add('text-gray-600'); });
-            document.getElementById(tabId).classList.add('active'); btn.classList.add('active'); btn.classList.remove('text-gray-600'); btn.classList.add('text-white');
+            document.getElementById(tabId).classList.add('active'); if (btn) { btn.classList.add('active'); btn.classList.remove('text-gray-600'); btn.classList.add('text-white'); }
         }
         function abrirHistorico(id, nome) {
             document.getElementById('modalHistorico').classList.remove('hidden');
@@ -405,6 +491,13 @@
             document.getElementById('edit_role').value = role;
             document.getElementById('edit_secretaria_id').value = secId;
             document.getElementById('modalEditUser').classList.remove('hidden');
+        }
+        function abrirModalMovimentacao(id, nome, funcaoId, localId) {
+            document.getElementById('movimentacao_func_id').value = id;
+            document.getElementById('movimentacaoNomeFuncionario').innerText = nome;
+            document.getElementById('movimentacao_funcao_id').value = funcaoId;
+            document.getElementById('movimentacao_local_id').value = localId;
+            document.getElementById('modalMovimentacao').classList.remove('hidden');
         }
         function generateReportPDF() {
             document.getElementById('loading').style.display = 'flex';
@@ -433,6 +526,13 @@
         new Chart(document.getElementById('chartSecretaria'), { type: 'bar', data: { labels: Object.keys(dataSecretaria), datasets: [{ label: 'Servidores', data: Object.values(dataSecretaria), backgroundColor: '#1F2937', borderRadius: 4 }] }, options: { responsive: true, scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false } } } });
         new Chart(document.getElementById('chartValidacao'), { type: 'pie', data: { labels: Object.keys(dataValidacao), datasets: [{ data: Object.values(dataValidacao), backgroundColor: ['#10B981', '#F59E0B'], borderWidth: 0 }] }, options: { responsive: true, plugins: { legend: { position: 'bottom' } } } });
         window.addEventListener('click', function(e){ const d = document.getElementById('notificationDropdown'); const b = document.getElementById('notificationBtn'); if(d && !d.classList.contains('hidden') && !d.contains(e.target) && !b.contains(e.target)) d.classList.add('hidden'); });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('tab') === 'config') {
+                switchTab('config', document.querySelector('button[onclick*="config"]'));
+            }
+        });
     </script>
 </body>
 </html>

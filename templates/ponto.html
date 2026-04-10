@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ponto Eletrônico - SME</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        video, canvas {
+            width: 100%;
+            max-height: 260px;
+            border-radius: 0.75rem;
+            object-fit: cover;
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-100 flex items-center justify-center">
+    <div class="w-full max-w-xl mx-auto px-4 py-8">
+        <div class="bg-white rounded-3xl shadow-lg border border-slate-200 overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-9 h-9 rounded-xl bg-black text-white flex items-center justify-center text-lg font-bold">P</div>
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ponto Eletrônico</p>
+                        <p class="text-sm font-bold text-slate-900">Secretaria Municipal de Educação</p>
+                    </div>
+                </div>
+            </div>
+
+            {% if erro %}
+                <div class="px-6 pt-4">
+                    <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
+                        <i class="ph ph-warning-circle"></i>
+                        <span>{{ erro }}</span>
+                    </div>
+                </div>
+            {% elif not funcionario %}
+                <div class="px-6 pt-4">
+                    <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 flex items-center gap-2">
+                        <i class="ph ph-warning-circle"></i>
+                        <span>Servidor não encontrado.</span>
+                    </div>
+                </div>
+            {% else %}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div class="px-6 pt-4">
+                            {% for category, message in messages %}
+                                <div class="mb-3 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2
+                                    {% if category == 'success' %} bg-emerald-50 text-emerald-700 border border-emerald-200
+                                    {% else %} bg-red-50 text-red-700 border border-red-200 {% endif %}">
+                                    <i class="ph ph-info"></i>
+                                    <span>{{ message }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+
+                <div class="px-6 pt-4 space-y-4">
+                    <div class="bg-slate-50 rounded-2xl px-4 py-3 border border-slate-200">
+                        <p class="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">Servidor</p>
+                        <p class="text-base font-bold text-slate-900">{{ funcionario.nome }}</p>
+                        <p class="text-xs text-slate-500 mt-1">
+                            {{ funcionario.funcao.nome if funcionario.funcao else 'Função não informada' }} ·
+                            {{ funcionario.local_trabalho.nome if funcionario.local_trabalho else 'Local não informado' }}
+                        </p>
+                        <p class="text-[11px] text-slate-400 mt-1">
+                            Jornada: {{ funcionario.jornada_trabalho or 'não cadastrada' }}
+                        </p>
+                    </div>
+
+                    <div class="bg-slate-50 rounded-2xl px-4 py-3 border border-slate-200 flex items-start gap-3 text-xs text-slate-600">
+                        <i class="ph ph-shield-check text-base text-emerald-600 mt-0.5"></i>
+                        <div>
+                            <p class="font-semibold text-slate-800 mb-1">Como funciona?</p>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>Permita o acesso à localização do dispositivo.</li>
+                                <li>Permita o acesso à câmera para registrar sua foto.</li>
+                                <li>Toque em <strong>"Bater Ponto"</strong> e aguarde a confirmação.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <form id="pontoForm" method="POST" action="{{ url_for('registrar_ponto', token=funcionario.token_validacao) }}" class="space-y-4">
+                        <input type="hidden" name="lat" id="lat">
+                        <input type="hidden" name="lng" id="lng">
+                        <input type="hidden" name="acc" id="acc">
+                        <input type="hidden" name="tipo" id="tipo" value="entrada">
+                        <input type="hidden" name="foto_base64" id="foto_base64">
+
+                        <div class="space-y-2">
+                            <p class="text-xs font-semibold text-slate-600 flex items-center gap-2">
+                                <i class="ph ph-map-pin-line text-base text-slate-500"></i>
+                                Localização atual
+                            </p>
+                            <div id="geoStatus" class="text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2 border border-dashed border-slate-200">
+                                Aguardando permissão de localização...
+                            </div>
+                        </div>
+
+                        <div class="space-y-2">
+                            <p class="text-xs font-semibold text-slate-600 flex items-center gap-2">
+                                <i class="ph ph-camera text-base text-slate-500"></i>
+                                Captura de rosto
+                            </p>
+                            <div class="bg-black rounded-2xl overflow-hidden relative">
+                                <video id="video" autoplay playsinline class="bg-black"></video>
+                                <canvas id="canvas" class="hidden"></canvas>
+                                <div class="absolute inset-x-0 bottom-0 bg-black/40 text-[11px] text-slate-100 px-3 py-1 flex items-center justify-between">
+                                    <span id="camStatus">Iniciando câmera...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <button type="button" class="btnTipoPonto w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold
+                                       bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    data-tipo="entrada">
+                                <i class="ph ph-sign-in text-lg"></i>
+                                <span>Entrada</span>
+                            </button>
+                            <button type="button" class="btnTipoPonto w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold
+                                       bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                                    data-tipo="saida">
+                                <i class="ph ph-sign-out text-lg"></i>
+                                <span>Saída</span>
+                            </button>
+                        </div>
+
+                        <p class="text-[10px] text-slate-400 text-center pb-4">
+                            Este registro será enviado com data/hora do sistema,
+                            localização aproximada e foto para conferência pelo RH.
+                        </p>
+                    </form>
+
+                    {% if registros %}
+                        <div class="border-t border-slate-100 pt-4 mt-2">
+                            <p class="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-2">
+                                <i class="ph ph-clock-counter-clockwise text-base text-slate-500"></i>
+                                Últimos registros
+                            </p>
+                            <div class="max-h-40 overflow-y-auto space-y-1 pb-4">
+                                {% for r in registros %}
+                                    <div class="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-1.5">
+                                        <span>{{ r.data_hora.strftime('%d/%m/%Y %H:%M') }}</span>
+                                        <span class="uppercase tracking-wide">{{ r.tipo }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+
+        <p class="mt-4 text-[10px] text-center text-slate-400 flex items-center justify-center gap-1">
+            <span>Gerenciado por</span>
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="h-4 opacity-70">
+        </p>
+    </div>
+
+    {% if funcionario %}
+    <script>
+        const latInput = document.getElementById('lat');
+        const lngInput = document.getElementById('lng');
+        const accInput = document.getElementById('acc');
+        const geoStatus = document.getElementById('geoStatus');
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const camStatus = document.getElementById('camStatus');
+        const tipoInput = document.getElementById('tipo');
+        const fotoInput = document.getElementById('foto_base64');
+        const botoes = Array.from(document.querySelectorAll('.btnTipoPonto'));
+
+        let geoOk = false;
+        let camOk = false;
+
+        function atualizarEstadoBotao() {
+            botoes.forEach((b) => b.disabled = !(geoOk && camOk));
+        }
+
+        // Geolocalização
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function(pos) {
+                latInput.value = pos.coords.latitude;
+                lngInput.value = pos.coords.longitude;
+                accInput.value = pos.coords.accuracy;
+                geoStatus.textContent = `Localização capturada: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)} (±${Math.round(pos.coords.accuracy)}m)`;
+                geoStatus.classList.remove('text-slate-500');
+                geoStatus.classList.add('text-emerald-700');
+                geoOk = true;
+                atualizarEstadoBotao();
+            }, function(err) {
+                geoStatus.textContent = 'Não foi possível obter sua localização. Verifique as permissões de GPS.';
+                geoStatus.classList.remove('text-slate-500');
+                geoStatus.classList.add('text-red-600');
+            }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+        } else {
+            geoStatus.textContent = 'Seu navegador não suporta geolocalização.';
+            geoStatus.classList.remove('text-slate-500');
+            geoStatus.classList.add('text-red-600');
+        }
+
+        // Câmera
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    video.srcObject = stream;
+                    camStatus.textContent = 'Câmera ativa. Mantenha o rosto visível.';
+                    camOk = true;
+                    atualizarEstadoBotao();
+                })
+                .catch(function(err) {
+                    camStatus.textContent = 'Não foi possível acessar a câmera. Verifique as permissões.';
+                });
+        } else {
+            camStatus.textContent = 'Seu navegador não suporta captura de câmera.';
+        }
+
+        botoes.forEach((botao) => {
+            botao.addEventListener('click', function () {
+            if (!(geoOk && camOk)) {
+                alert('Ative a localização e a câmera para registrar o ponto.');
+                return;
+            }
+
+            tipoInput.value = botao.dataset.tipo;
+
+            const ctx = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            fotoInput.value = dataUrl;
+
+            botoes.forEach((b) => b.disabled = true);
+            botao.querySelector('span').textContent = 'Enviando...';
+
+            document.getElementById('pontoForm').submit();
+            });
+        });
+    </script>
+    {% endif %}
+</body>
+</html>
+

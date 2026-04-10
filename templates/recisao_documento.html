@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Times New Roman', serif; padding: 40px; line-height: 1.6; }
+        .header { text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 40px; }
+        .content { text-align: justify; }
+        .footer { margin-top: 50px; }
+        .signatures { margin-top: 80px; width: 100%; }
+        .line { border-top: 1px solid black; width: 300px; margin-top: 40px; text-align: center; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <button class="no-print" onclick="window.print()">Imprimir Termo</button>
+    <div class="header">TERMO DE RESCISÃO CONTRATUAL</div>
+    
+    <div class="content">
+        <p>Pelo presente instrumento, as partes abaixo identificadas:</p>
+        <p><strong>CONTRATANTE:</strong> SECRETARIA MUNICIPAL DE EDUCAÇÃO DE VALENÇA DO PIAUÍ</p>
+        <p><strong>CONTRATADO:</strong> {{ f.nome }}</p>
+        
+        <p>Resolvem, de comum acordo, rescindir o contrato firmado em {{ f.dt_inicio }}, referente a prestação de serviço temporário na função de {{ f.funcao }}, conforme anotação na CTPS Digital. [cite: 1]</p>
+        
+        <p>O servidor prestou serviços até o dia {{ f.dt_saida }}. As partes declaram estar cientes e de acordo com a rescisão, dando-se plena e geral quitação, nada mais havendo a reclamar, seja a que título for. [cite: 2]</p>
+        
+        <p>E, por estarem de acordo, assinam o presente termo em duas vias de igual teor e forma, juntamente com as testemunhas abaixo. [cite: 3]</p>
+    </div>
+
+    <div class="footer">
+        Valença do Piauí, {{ data_atual }}. [cite: 4]
+    </div>
+
+    <div class="signatures">
+        <div class="line">CONTRATANTE</div>
+        <div class="line">CONTRATADO</div>
+        <div style="margin-top: 40px">TESTEMUNHAS:</div>
+        <div class="line" style="width: 400px">Nome: __________________________ CPF: __________</div>
+        <div class="line" style="width: 400px">Nome: __________________________ CPF: __________</div>
+    </div>
+</body>
+</html>

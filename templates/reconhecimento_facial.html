@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestor 360 - Reconhecimento Facial</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { 
+                        sans: ['Inter', '-apple-system', 'sans-serif'], 
+                        mono: ['JetBrains Mono', 'monospace'] 
+                    },
+                    colors: {
+                        app: {
+                            bg: '#f5f5f7', // Fundo cinza claro para contraste
+                            card: '#ffffff', // Cards em branco puro para destaque
+                            border: '#d2d2d7', // Borda mais definida
+                            'input-bg': '#ffffff',
+                            text: '#1d1d1f',
+                            'text-sec': '#48484a', // Cinza mais escuro para melhor leitura
+                        },
+                        system: {
+                            green: '#248a3d', // Verde com contraste maior
+                            yellow: '#a68a00', // Amarelo com tom mais escuro para leitura
+                        }
+                    },
+                    animation: { 'scan': 'scan 2.5s linear infinite' },
+                    keyframes: { scan: { '0%, 100%': { top: '0%' }, '50%': { top: '100%' } } }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { 
+            background-color: #f5f5f7; 
+            color: #1d1d1f; 
+            -webkit-font-smoothing: antialiased; 
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .bio-card { 
+            background: #ffffff; 
+            border: 1px solid #e5e5e7; 
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+            transition: all 0.2s ease-in-out; 
+        }
+        .bio-card:hover { 
+            border-color: #ffcc00; 
+            transform: translateY(-2px); 
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08); 
+        }
+        
+        .scanner-line { 
+            height: 2px; 
+            background: #34c759; 
+            box-shadow: 0 0 8px #34c759;
+            position: absolute; 
+            width: 100%; 
+            z-index: 20; 
+        }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 2px; }
+    </style>
+</head>
+<body class="min-h-screen pb-16">
+
+    <header class="sticky top-0 z-50 border-b border-gray-200 bg-white/80 backdrop-blur-md no-print">
+        <div class="max-w-[1600px] mx-auto px-6 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 flex items-center justify-center bg-gray-100 rounded-lg border border-gray-200">
+                    <i class="ph ph-detective text-base text-app-text"></i>
+                </div>
+                <div>
+                    <h1 class="text-base font-bold tracking-tight text-app-text">Mapeamento Biométrico</h1>
+                    <p class="text-[9px] text-app-text-sec font-bold uppercase tracking-widest">BioID v2.0 • Gestor 360</p>
+                </div>
+            </div>
+            <a href="{{ url_for('admin_dashboard') }}" class="px-4 py-1.5 bg-black hover:bg-gray-800 text-white rounded-full text-[10px] font-bold transition-all shadow-sm">
+                DASHBOARD
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-[1600px] mx-auto px-6 mt-8">
+        
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-8 p-3 bg-white rounded-2xl border border-gray-200 shadow-sm">
+            <div class="md:col-span-3 relative">
+                <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
+                <input type="text" id="filtroGeral" onkeyup="filtrarGaleria()" placeholder="Nome, CPF ou Função..." 
+                       class="w-full pl-10 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-black focus:bg-white outline-none transition-all">
+            </div>
+            <select id="filtroLocal" onchange="filtrarGaleria()" class="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:ring-2 focus:ring-black">
+                <option value="">TODAS AS UNIDADES</option>
+                {% set locais = [] %}
+                {% for f in lista_funcionarios %}
+                    {% if f.local_trabalho and f.local_trabalho.nome not in locais %}
+                        <option value="{{ f.local_trabalho.nome }}">{{ f.local_trabalho.nome }}</option>
+                        {% set _ = locais.append(f.local_trabalho.nome) %}
+                    {% endif %}
+                {% endfor %}
+            </select>
+            <div class="flex items-center justify-center px-3 py-2 bg-gray-100 rounded-xl border border-gray-200">
+                <p class="text-[10px] font-black text-gray-600 uppercase tracking-tighter"><span id="contador" class="text-black text-xs font-mono">0</span> Servidores</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-8 gap-4" id="galeriaServidores">
+            {% for f in lista_funcionarios %}
+            <div class="card-servidor bio-card rounded-xl overflow-hidden group p-1.5" 
+                 data-nome="{{ f.nome }}" data-cpf="{{ f.cpf }}" data-funcao="{{ f.funcao.nome if f.funcao else '' }}" data-local="{{ f.local_trabalho.nome if f.local_trabalho else '' }}">
+                
+                <div class="relative aspect-square overflow-hidden bg-gray-100 rounded-lg border border-gray-200">
+                    <div class="scanner-line animate-scan hidden group-hover:block"></div>
+                    
+                    <label class="absolute inset-0 cursor-pointer z-30 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm">
+                        <i class="ph ph-camera-plus text-2xl text-black mb-1"></i>
+                        <span class="text-[8px] font-black uppercase text-black">Upload</span>
+                        <input type="file" class="hidden" accept="image/*" onchange="uploadFoto(this, '{{ f.id }}')">
+                    </label>
+
+                    <img id="img-{{ f.id }}" src="https://ui-avatars.com/api/?name={{ f.nome }}&background=e5e7eb&color=374151&size=256" 
+                         class="profile-pic w-full h-full object-cover">
+                    
+                    <div class="absolute bottom-1.5 right-1.5 z-10">
+                        <i class="ph ph-fingerprint text-system-green text-xs"></i>
+                    </div>
+                </div>
+
+                <div class="p-2 space-y-1">
+                    <h3 class="text-[10px] font-bold uppercase truncate text-black leading-tight">{{ f.nome }}</h3>
+                    <p class="text-[9px] font-bold text-gray-500 font-mono tracking-tighter">{{ f.cpf if f.cpf else 'ID: ' ~ f.id }}</p>
+                    
+                    <div class="pt-1.5 border-t border-gray-100 space-y-0.5">
+                        <p class="text-[8px] font-bold text-app-text-sec uppercase truncate italic">{{ f.funcao.nome if f.funcao else 'N/A' }}</p>
+                        <p class="text-[8px] font-medium text-gray-400 uppercase truncate">{{ f.local_trabalho.nome if f.local_trabalho else 'SME' }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
+            Object.keys(fotosSalvas).forEach(id => {
+                const img = document.getElementById(`img-${id}`);
+                if(img) img.src = fotosSalvas[id];
+            });
+            atualizarContador();
+        });
+
+        function uploadFoto(input, id) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = document.getElementById(`img-${id}`);
+                    img.src = e.target.result;
+                    const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
+                    fotosSalvas[id] = e.target.result;
+                    localStorage.setItem('bioid_fotos', JSON.stringify(fotosSalvas));
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function filtrarGaleria() {
+            const busca = document.getElementById('filtroGeral').value.toUpperCase();
+            const local = document.getElementById('filtroLocal').value.toUpperCase();
+            const cards = document.getElementsByClassName('card-servidor');
+            
+            for (let card of cards) {
+                const dados = card.dataset.nome.toUpperCase() + card.dataset.cpf + card.dataset.funcao.toUpperCase();
+                const localCard = card.dataset.local.toUpperCase();
+                card.style.display = (dados.includes(busca) && (local === "" || localCard === local)) ? "" : "none";
+            }
+            atualizarContador();
+        }
+
+        function atualizarContador() {
+            const visiveis = Array.from(document.getElementsByClassName('card-servidor')).filter(c => c.style.display !== 'none').length;
+            document.getElementById('contador').innerText = visiveis;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rescisões - Gestor 360</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: #f5f5f7; 
+            -webkit-font-smoothing: antialiased;
+        }
+        .fade-in { animation: fadeIn 0.5s ease-out forwards; opacity: 0; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* Glassmorphism subtle effect */
+        .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(10px); }
+        
+        /* Custom Table Scroll */
+        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 10px; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-5xl mx-auto">
+        <div class="flex justify-between items-center mb-10 fade-in" style="animation-delay: 0.1s;">
+            <div>
+                <h1 class="text-3xl font-black tracking-tight text-gray-900">Rescisão Contratual</h1>
+                <p class="text-gray-500 text-sm font-medium">Gestão de desligamentos e termos contratuais</p>
+            </div>
+            <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-2 px-4 py-2 rounded-full bg-white shadow-sm border border-gray-200 text-sm font-bold text-gray-600 hover:text-black transition-all hover:shadow-md">
+                <i class="ph ph-arrow-left"></i> Voltar
+            </a>
+        </div>
+
+        <div class="bg-white p-8 rounded-[32px] shadow-sm border border-gray-100 mb-10 fade-in" style="animation-delay: 0.2s;">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center">
+                    <i class="ph ph-user-minus text-2xl"></i>
+                </div>
+                <h2 class="text-lg font-bold text-gray-800 tracking-tight">Novo Desligamento</h2>
+            </div>
+            
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="relative flex-1">
+                    <i class="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="buscaServidorAtivo" onkeyup="filtrarAtivos()" placeholder="Procurar servidor ativo por nome ou CPF..." 
+                           class="w-full pl-12 pr-4 py-4 bg-gray-50 border-none rounded-2xl text-sm focus:ring-2 focus:ring-blue-500 transition-all outline-none">
+                    
+                    <div id="listaAtivos" class="absolute z-10 w-full mt-2 bg-white rounded-2xl shadow-xl border border-gray-100 max-h-60 overflow-y-auto hidden custom-scroll">
+                        {% for a in ativos %}
+                        <div class="item-ativo p-4 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50 last:border-0" 
+                             onclick="selecionarServidor('{{ a.id }}', '{{ a.nome }}')">
+                            <p class="text-sm font-bold text-gray-900 uppercase">{{ a.nome }}</p>
+                            <p class="text-xs text-gray-500 font-mono">{{ a.cpf }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <input type="hidden" id="selectServidor">
+                <button id="btnGerar" disabled onclick="abrirModalRecisao()" 
+                        class="bg-black text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-gray-800 transition-all disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed shadow-lg shadow-gray-200">
+                    Gerar Rescisão
+                </button>
+            </div>
+            <p id="nomeSelecionado" class="mt-3 text-xs text-blue-600 font-bold hidden"></p>
+        </div>
+
+        <div class="bg-white rounded-[32px] shadow-sm border border-gray-100 overflow-hidden fade-in" style="animation-delay: 0.3s;">
+            <div class="p-8 border-b border-gray-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h3 class="font-black text-xl text-gray-900 tracking-tight">Servidores Baixados</h3>
+                <div class="relative">
+                    <i class="ph ph-funnel absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="filtroHistorico" onkeyup="filtrarHistorico()" placeholder="Filtrar histórico..." 
+                           class="pl-10 pr-4 py-2 bg-gray-50 border-none rounded-xl text-xs focus:ring-1 focus:ring-gray-300 outline-none w-full md:w-64">
+                </div>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm" id="tabelaBaixados">
+                    <thead class="bg-gray-50 text-gray-400 uppercase text-[10px] font-black tracking-widest">
+                        <tr>
+                            <th class="px-8 py-4">Nome do Profissional</th>
+                            <th class="px-8 py-4">Período Contratual</th>
+                            <th class="px-8 py-4">Data da Saída</th>
+                            <th class="px-8 py-4 text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-50">
+                        {% for h in historico %}
+                        <tr class="linha-historico hover:bg-gray-50/50 transition-colors">
+                            <td class="px-8 py-5">
+                                <span class="block font-bold text-gray-900 uppercase">{{ h.nome }}</span>
+                                <span class="text-[10px] text-gray-400 font-mono">{{ h.cpf }}</span>
+                            </td>
+                            <td class="px-8 py-5 text-gray-500 font-medium">
+                                {{ h.data_inicio.strftime('%d/%m/%Y') }} <i class="ph ph-arrow-right text-[10px] mx-1"></i> {{ h.data_saida.strftime('%d/%m/%Y') }}
+                            </td>
+                            <td class="px-8 py-5">
+                                <span class="px-3 py-1 bg-blue-50 text-blue-600 rounded-full text-xs font-bold">{{ h.data_saida.strftime('%d/%m/%Y') }}</span>
+                            </td>
+                            <td class="px-8 py-5 text-center">
+                                <span class="w-2 h-2 bg-red-500 rounded-full inline-block animate-pulse"></span>
+                                <span class="text-[10px] font-bold text-gray-400 uppercase ml-1">Desligado</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalRecisao" class="fixed inset-0 bg-black/40 hidden flex items-center justify-center z-50 backdrop-blur-sm transition-all p-4">
+        <div class="bg-white p-10 rounded-[40px] w-full max-w-md shadow-2xl scale-up border border-gray-100">
+            <div class="w-16 h-16 bg-red-50 text-red-600 rounded-3xl flex items-center justify-center mb-6 mx-auto">
+                <i class="ph ph-calendar-x text-3xl"></i>
+            </div>
+            <h3 class="text-2xl font-black mb-2 text-center">Confirmar Datas</h3>
+            <p class="text-gray-500 text-sm text-center mb-8">Defina o período exato para o termo de rescisão.</p>
+            
+            <form action="{{ url_for('processar_recisao') }}" method="POST" class="space-y-6">
+                <input type="hidden" name="id_funcionario" id="input_func_id">
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Data de Início (Contratação)</label>
+                        <input type="date" name="data_inicio" required class="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm focus:ring-2 focus:ring-blue-500 transition-all outline-none font-bold">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Data de Saída (Desligamento)</label>
+                        <input type="date" name="data_saida" required class="w-full bg-gray-50 border-none rounded-2xl p-4 text-sm focus:ring-2 focus:ring-red-500 transition-all outline-none font-bold">
+                    </div>
+                </div>
+                <div class="flex flex-col gap-3 mt-10">
+                    <button type="submit" class="w-full bg-red-600 text-white p-4 rounded-2xl font-bold shadow-xl shadow-red-200 hover:bg-red-700 transition-all active:scale-95">
+                        Confirmar Baixa e Gerar Termo
+                    </button>
+                    <button type="button" onclick="fecharModal()" class="w-full p-4 font-bold text-gray-400 hover:text-gray-600 transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Lógica de Busca Dinâmica (Ativos)
+        function filtrarAtivos() {
+            const busca = document.getElementById('buscaServidorAtivo').value.toUpperCase();
+            const lista = document.getElementById('listaAtivos');
+            const itens = document.getElementsByClassName('item-ativo');
+            let algumVisivel = false;
+
+            if (busca.length > 0) {
+                lista.classList.remove('hidden');
+                for (let i = 0; i < itens.length; i++) {
+                    const texto = itens[i].textContent.toUpperCase();
+                    if (texto.includes(busca)) {
+                        itens[i].style.display = "";
+                        algumVisivel = true;
+                    } else {
+                        itens[i].style.display = "none";
+                    }
+                }
+            } else {
+                lista.classList.add('hidden');
+            }
+        }
+
+        function selecionarServidor(id, nome) {
+            document.getElementById('selectServidor').value = id;
+            document.getElementById('buscaServidorAtivo').value = nome;
+            document.getElementById('listaAtivos').classList.add('hidden');
+            document.getElementById('btnGerar').disabled = false;
+            
+            const label = document.getElementById('nomeSelecionado');
+            label.innerText = "✓ SELECIONADO: " + nome;
+            label.classList.remove('hidden');
+        }
+
+        // Lógica de Filtro (Histórico)
+        function filtrarHistorico() {
+            const busca = document.getElementById('filtroHistorico').value.toUpperCase();
+            const linhas = document.getElementsByClassName('linha-historico');
+
+            for (let i = 0; i < linhas.length; i++) {
+                const texto = linhas[i].textContent.toUpperCase();
+                linhas[i].style.display = texto.includes(busca) ? "" : "none";
+            }
+        }
+
+        function abrirModalRecisao() {
+            const id = document.getElementById('selectServidor').value;
+            document.getElementById('input_func_id').value = id;
+            const modal = document.getElementById('modalRecisao');
+            modal.classList.remove('hidden');
+        }
+
+        function fecharModal() {
+            document.getElementById('modalRecisao').classList.add('hidden');
+        }
+
+        // Fecha dropdown ao clicar fora
+        window.onclick = function(event) {
+            if (!event.target.matches('#buscaServidorAtivo')) {
+                document.getElementById('listaAtivos').classList.add('hidden');
+            }
+            if (event.target == document.getElementById('modalRecisao')) {
+                fecharModal();
+            }
+        }
+    </script>
+</body>
+</html>
