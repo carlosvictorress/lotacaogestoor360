@@ -677,13 +677,18 @@ def delete_padrinho(id):
 @app.route('/exportar_excel')
 @login_required
 def exportar_excel():
-    if not current_user.is_admin: return redirect(url_for('sistema'))
+    # 1. Verificação de permissão
+    if not current_user.is_admin: 
+        return redirect(url_for('sistema'))
+
+    # 2. Captura dos filtros da URL
     filtro_secretaria = request.args.get('secretaria_id')
     filtro_vinculo = request.args.get('tipo_vinculo')
     filtro_indicacao = request.args.get('padrinho_id')
     filtro_funcao = request.args.get('funcao_id')
     filtro_local = request.args.get('local_trabalho_id')
 
+    # 3. Construção da Query
     query = Funcionario.query
     if filtro_secretaria: query = query.filter_by(secretaria_id=filtro_secretaria)
     if filtro_vinculo: query = query.filter_by(tipo_vinculo=filtro_vinculo)
@@ -692,14 +697,63 @@ def exportar_excel():
     if filtro_local: query = query.filter_by(local_trabalho_id=filtro_local)
     
     funcionarios = query.order_by(Funcionario.nome).all()
+
+    # 4. Preparação do CSV
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
-    writer.writerow(['Nome', 'CPF', 'Secretaria', 'Local', 'Função', 'Vínculo', 'Token'])
-    for f in funcionarios: # Adicionado .nome para os relacionamentos
-        writer.writerow([f.nome, f.cpf, f.secretaria.nome, f.local_trabalho.nome if f.local_trabalho else '', f.funcao.nome if f.funcao else '', f.tipo_vinculo, f.token_validacao])
+
+    # Cabeçalho idêntico aos campos do add_server do Gestor360
+    header = [
+        'Nº CONTRATO', 'NOME', 'CPF', 'RG', 'DATA NASCIMENTO', 'NOME DA MÃE', 
+        'EMAIL', 'PIS/PASEP', 'VÍNCULO', 'LOCAL', 'ESCOLA_ID', 'CLASSE/NÍVEL', 
+        'Nº CONTRA CHEQUE', 'NACIONALIDADE', 'ESTADO CIVIL', 'TELEFONE', 
+        'ENDEREÇO', 'FUNÇÃO', 'LOTAÇÃO', 'CARGA HORÁRIA', 'REMUNERAÇÃO', 
+        'DADOS BANCÁRIOS', 'DATA INÍCIO', 'DATA SAÍDA', 'OBSERVAÇÕES'
+    ]
+    writer.writerow(header)
+
+    # 5. Preenchimento dos dados com tratamento de erros
+    for f in funcionarios:
+        writer.writerow([
+            getattr(f, 'num_contrato', ''),
+            f.nome,
+            f.cpf,
+            getattr(f, 'rg', ''),
+            f.data_nascimento.strftime('%Y-%m-%d') if getattr(f, 'data_nascimento', None) else '',
+            getattr(f, 'nome_mae', ''),
+            getattr(f, 'email', ''),
+            getattr(f, 'pis_pasep', ''),
+            f.tipo_vinculo,
+            f.local_trabalho.nome if getattr(f, 'local_trabalho', None) else '',
+            getattr(f, 'escola_id', ''),
+            getattr(f, 'classe_nivel', ''),
+            getattr(f, 'num_contra_cheque', ''),
+            getattr(f, 'nacionalidade', ''),
+            getattr(f, 'estado_civil', ''),
+            getattr(f, 'telefone', ''),
+            getattr(f, 'endereco', ''),
+            f.funcao.nome if getattr(f, 'funcao', None) else '',
+            getattr(f, 'lotacao', ''),
+            getattr(f, 'carga_horaria', ''),
+            getattr(f, 'remuneracao', 0),
+            getattr(f, 'dados_bancarios', ''),
+            f.data_inicio.strftime('%Y-%m-%d') if getattr(f, 'data_inicio', None) else '',
+            f.data_saida.strftime('%Y-%m-%d') if getattr(f, 'data_saida', None) else '',
+            getattr(f, 'observacoes', '')
+        ])
+
+    # 6. Finalização e Log
     output.seek(0)
-    registrar_log("EXPORTOU DADOS", "Relatório Excel")
-    return Response(output, mimetype="text/csv", headers={"Content-Disposition": "attachment;filename=relatorio.csv"})
+    registrar_log("EXPORTOU DADOS", f"Relatório completo ({len(funcionarios)} registros)")
+
+    # Retorno com utf-8-sig para garantir acentuação correta no Excel (Windows)
+    return Response(
+        output.getvalue().encode("utf-8-sig"),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": "attachment;filename=exportacao_servidores_completa.csv"
+        }
+    )
 
 def gerar_proximo_vinculo():
     """Gera o próximo número de vínculo no formato NUMERO/ANO."""
@@ -1153,32 +1207,70 @@ def painel_ponto():
 @app.route('/exportar_migracao')
 @login_required
 def exportar_migracao():
-    if not current_user.is_admin:
-        return redirect(url_for('sistema'))
-    
-    funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
-    
+    funcionarios = Funcionario.query.all()
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
-    writer.writerow(['Nº CONTRATO', 'NOME', 'FUNÇÃO', 'LOTAÇÃO', 'CARGA HORÁRIA', 'REMUNERAÇÃO'])
     
+    # Cabeçalho que o Gestor 360 espera ler
+    header = [
+        "Nº CONTRATO", "NOME", "CPF", "RG", "DATA NASCIMENTO", 
+        "NOME DA MÃE", "EMAIL", "PIS/PASEP", "VÍNCULO", "LOCAL", 
+        "ESCOLA_ID", "CLASSE/NÍVEL", "Nº CONTRA CHEQUE", "NACIONALIDADE", 
+        "ESTADO CIVIL", "TELEFONE", "ENDEREÇO", "FUNÇÃO", "LOTAÇÃO", 
+        "CARGA HORÁRIA", "REMUNERAÇÃO", "DADOS BANCÁRIOS", 
+        "DATA INÍCIO", "DATA SAÍDA", "OBSERVAÇÕES"
+    ]
+    writer.writerow(header)
+    
+    def formatar_data(dt):
+        if not dt: return ""
+        try:
+            return dt.strftime('%Y-%m-%d')
+        except:
+            return ""
+
     for f in funcionarios:
-        # Limpeza da remuneração para formato numérico (remove R$, espaços e pontos de milhar)
-        remun = f.remuneracao if f.remuneracao else "0"
-        remun = remun.replace('R$', '').replace(' ', '').replace('.', '')
+        # Garantia contra Erro 404
+        contrato = f.num_vinculo if f.num_vinculo else f"MIG-{f.id}"
         
+        # Lógica para Dados Bancários (unindo os campos do seu formulário)
+        dados_bancarios = f"Bco: {f.banco}, Ag: {f.agencia}, Cta: {f.conta}" if f.banco else ""
+
         writer.writerow([
-            f.num_vinculo if f.num_vinculo else '',
-            f.nome,
-            f.funcao.nome if f.funcao else '',
-            f.secretaria.nome if f.secretaria else '',
-            f.jornada_trabalho if f.jornada_trabalho else '',
-            remun
+            contrato,                                         # Nº CONTRATO
+            f.nome.upper() if f.nome else "",                 # NOME
+            f.cpf if f.cpf else "",                           # CPF
+            f.rg if f.rg else "",                             # RG
+            formatar_data(f.data_nasc),                       # DATA NASCIMENTO (Confirmado: data_nasc)
+            f.mae.upper() if f.mae else "",                   # NOME DA MÃE (Confirmado: mae)
+            f.email if f.email else "",                       # EMAIL
+            f.pis if f.pis else "",                           # PIS/PASEP (Confirmado: pis)
+            f.tipo_vinculo if f.tipo_vinculo else "CONTRATADO",# VÍNCULO
+            f.local_trabalho.nome if f.local_trabalho else "SEME", # LOCAL
+            f.local_trabalho_id if f.local_trabalho_id else "",# ESCOLA_ID (Usando local_trabalho_id)
+            f.classe if f.classe else "",                     # CLASSE/NÍVEL
+            f.contracheque if f.contracheque else "",         # Nº CONTRA CHEQUE
+            f.nacionalidade if f.nacionalidade else "BRASILEIRA",# NACIONALIDADE
+            f.estado_civil if f.estado_civil else "SOLTEIRO(A)", # ESTADO CIVIL
+            f.telefone if f.telefone else "",                 # TELEFONE
+            f.endereco.upper() if f.endereco else "",         # ENDEREÇO
+            f.funcao.nome if f.funcao else "AUXILIAR",        # FUNÇÃO
+            f.lotacao if f.lotacao else "EDUCAÇÃO",           # LOTAÇÃO
+            f.jornada_trabalho if f.jornada_trabalho else "40",# CARGA HORÁRIA
+            f.remuneracao if f.remuneracao else "0.00",       # REMUNERAÇÃO
+            dados_bancarios,                                  # DADOS BANCÁRIOS
+            formatar_data(f.dt_inicio),                       # DATA INÍCIO (Confirmado: dt_inicio)
+            formatar_data(f.dt_termino),                      # DATA SAÍDA (Confirmado: dt_termino)
+            "Migração automática Ficha2026"                   # OBSERVAÇÕES
         ])
     
     output.seek(0)
-    return Response(output.getvalue().encode('utf-8-sig'), mimetype="text/csv", headers={"Content-Disposition": "attachment;filename=exportacao_migracao.csv"})
-
+    return Response(
+        output.getvalue().encode('utf-8-sig'), 
+        mimetype="text/csv", 
+        headers={"Content-Disposition": "attachment;filename=migracao_pronta_gestor360.csv"}
+    )
+    
 @app.route('/admin/movimentar_servidor', methods=['POST'])
 @login_required
 def movimentar_servidor():
