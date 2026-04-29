@@ -179,7 +179,12 @@
                         <div class="flex gap-2">
                             <a href="{{ url_for('exportar_excel', secretaria_id=filtros.sec, tipo_vinculo=filtros.vinculo, padrinho_id=filtros.indicacao, funcao_id=filtros.funcao, local_trabalho_id=filtros.local) }}" class="text-xs bg-green-100 text-green-700 hover:bg-green-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition"><i class="ph ph-file-xls text-lg"></i> Excel</a>
                             <a href="{{ url_for('exportar_migracao') }}" class="text-xs bg-purple-100 text-purple-700 hover:bg-purple-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition"><i class="ph ph-export text-lg"></i> Exportar (Migração)</a>
-                            <button onclick="generateReportPDF()" class="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition"><i class="ph ph-file-pdf text-lg"></i> Baixar PDF</button>
+                            <button onclick="generateReportPDF(false)" class="text-xs bg-red-100 text-red-700 hover:bg-red-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition">
+    <i class="ph ph-file-pdf text-lg"></i> PDF Completo
+</button>
+<button onclick="generateReportPDF(true)" class="text-xs bg-orange-100 text-orange-700 hover:bg-orange-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition">
+    <i class="ph ph-file-text text-lg"></i> PDF Simplificado
+</button>
                         </div>
                     </div>
                     <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
@@ -499,26 +504,62 @@
             document.getElementById('movimentacao_local_id').value = localId;
             document.getElementById('modalMovimentacao').classList.remove('hidden');
         }
-        function generateReportPDF() {
-            document.getElementById('loading').style.display = 'flex';
-            const selectSec = document.getElementById('filter_sec');
-            const selectedText = selectSec.options[selectSec.selectedIndex].text;
-            const subtitle = (selectSec.value === "") ? "FILTRO: GERAL (TODAS AS SECRETARIAS)" : "FILTRO: " + selectedText;
-            document.getElementById('report-subtitle').innerText = subtitle;
-            const dataHoje = new Date();
-            const diaHoje = String(dataHoje.getDate()).padStart(2, '0');
-            const mesHoje = String(dataHoje.getMonth() + 1).padStart(2, '0');
-            const anoHoje = dataHoje.getFullYear();
-            document.getElementById('report-date').innerText = `${diaHoje}/${mesHoje}/${anoHoje}`;
-            const originalTable = document.getElementById('mainTable');
-            const cloneTable = originalTable.cloneNode(true);
-            cloneTable.classList.add('pdf-table'); cloneTable.classList.remove('w-full', 'text-sm', 'text-left', 'text-gray-600');
-            const rows = cloneTable.querySelectorAll('tr'); rows.forEach(row => { if(row.cells.length > 0) row.deleteCell(-1); });
-            const container = document.getElementById('pdf-table-container'); container.innerHTML = ''; container.appendChild(cloneTable);
-            const element = document.getElementById('pdf-report'); element.style.display = 'block';
-            const opt = { margin: 5, filename: 'relatorio_servidores.pdf', image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } };
-            html2pdf().set(opt).from(element).save().then(() => { element.style.display = 'none'; document.getElementById('loading').style.display = 'none'; });
+        function generateReportPDF(simplified = false) {
+    document.getElementById('loading').style.display = 'flex';
+    const selectSec = document.getElementById('filter_sec');
+    const selectedText = selectSec.options[selectSec.selectedIndex].text;
+    
+    // Ajusta o subtítulo conforme o tipo de relatório
+    let subtitle = (selectSec.value === "") ? "FILTRO: GERAL" : "FILTRO: " + selectedText;
+    if (simplified) subtitle += " (SIMPLIFICADO)";
+    
+    document.getElementById('report-subtitle').innerText = subtitle;
+    
+    const dataHoje = new Date();
+    const diaHoje = String(dataHoje.getDate()).padStart(2, '0');
+    const mesHoje = String(dataHoje.getMonth() + 1).padStart(2, '0');
+    const anoHoje = dataHoje.getFullYear();
+    document.getElementById('report-date').innerText = `${diaHoje}/${mesHoje}/${anoHoje}`;
+
+    const originalTable = document.getElementById('mainTable');
+    const cloneTable = originalTable.cloneNode(true);
+    cloneTable.classList.add('pdf-table');
+    cloneTable.classList.remove('w-full', 'text-sm', 'text-left', 'text-gray-600');
+
+    const rows = cloneTable.querySelectorAll('tr');
+    rows.forEach(row => {
+        if(row.cells.length > 0) {
+            // 1. Sempre remove a última coluna (Ações)
+            row.deleteCell(-1); 
+            
+            // 2. Se for simplificado, remove as colunas de Indicação (índice 3 e 4)
+            if(simplified) {
+                row.deleteCell(-1); // Remove "Quem Indicou"
+                row.deleteCell(-1); // Remove "Indicação"
+            }
         }
+    });
+
+    const container = document.getElementById('pdf-table-container');
+    container.innerHTML = ''; 
+    container.appendChild(cloneTable);
+
+    const element = document.getElementById('pdf-report');
+    element.style.display = 'block';
+
+    const opt = { 
+        margin: 5, 
+        filename: simplified ? 'relatorio_simplificado.pdf' : 'relatorio_completo.pdf', 
+        image: { type: 'jpeg', quality: 0.98 }, 
+        html2canvas: { scale: 2 }, 
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } 
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => { 
+        element.style.display = 'none'; 
+        document.getElementById('loading').style.display = 'none'; 
+    });
+}
         const dataVinculo = {{ stats_vinculo|tojson }};
         const dataSecretaria = {{ stats_secretaria|tojson }};
         const dataValidacao = {{ stats_validacao|tojson }};
