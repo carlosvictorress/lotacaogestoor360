@@ -1,121 +1,271 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="scroll-smooth">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Folha de Pagamento - Valença do Piauí</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            900: '#0c4a6e',
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+                    },
+                    keyframes: {
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                        slideUp: { '0%': { transform: 'translateY(20px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } },
+                    }
+                }
+            }
         }
     </script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        body { font-family: 'Inter', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); }
+        .dark .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); }
+        
         @media print {
-            body * { visibility: hidden; }
             .no-print { display: none !important; }
-            #print-area, #print-area * { visibility: visible; }
-            #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 1rem; }
-            table { font-size: 10pt; }
+            body { background: white !important; padding: 0 !important; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; border: none; shadow: none; }
+            table { font-size: 9pt; width: 100%; border-collapse: collapse; }
+            th { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; }
         }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
     </style>
 </head>
-<body class="flex h-screen overflow-hidden text-gray-800 dark:bg-gray-900 dark:text-gray-100 transition-colors duration-200">
+<body class="flex h-screen overflow-hidden text-slate-900 bg-slate-50 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300">
 
-    <!-- Sidebar -->
-    <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700 no-print">
-        <div>
-            <div class="p-6 flex items-center gap-3">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="h-10 w-auto object-contain dark:invert">
+    <aside class="w-72 bg-white/80 dark:bg-slate-900/80 border-r border-slate-200 dark:border-slate-800 flex flex-col justify-between hidden md:flex z-30 no-print backdrop-blur-xl">
+        <div class="overflow-y-auto custom-scroll">
+            <div class="p-8 flex items-center gap-3">
+                <div class="w-10 h-10 bg-black dark:bg-white rounded-xl flex items-center justify-center shadow-lg">
+                    <i class="ph ph-intersect text-white dark:text-black text-2xl"></i>
+                </div>
+                <span class="font-extrabold text-xl tracking-tighter">GESTOOR <span class="text-brand-500">360º</span></span>
             </div>
-            <nav class="px-4 space-y-1">
-                <a href="{{ url_for('admin_dashboard') }}" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-chart-pie-slice text-lg"></i> Dashboard</a>
-                <a href="{{ url_for('gerenciar_fotos') }}" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-camera text-lg text-blue-500"></i> Estúdio de Fotos</a>
-                <a href="{{ url_for('folha_pagamento') }}" class="nav-item active bg-gray-900 text-white w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium rounded-lg transition-colors dark:bg-gray-700"><i class="ph ph-currency-dollar text-lg text-green-400"></i> Gerar Folha Pagamento</a>
-                <a href="{{ url_for('admin_dashboard') }}?tab=dados" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-table text-lg"></i> Base de Dados</a>
-                <a href="{{ url_for('admin_dashboard') }}?tab=auditoria" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-fingerprint text-lg"></i> Auditoria</a>
-                <a href="{{ url_for('admin_dashboard') }}?tab=config" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700"><i class="ph ph-gear text-lg"></i> Configurações</a>
+
+            <nav class="px-6 space-y-2">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-4 mb-4">Menu Principal</p>
+                <a href="{{ url_for('admin_dashboard') }}" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-600 rounded-2xl hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
+                    <i class="ph ph-squares-four text-xl"></i> Dashboard
+                </a>
+                <a href="{{ url_for('gerenciar_fotos') }}" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-600 rounded-2xl hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
+                    <i class="ph ph-camera-plus text-xl"></i> Estúdio de Fotos
+                </a>
+                <a href="{{ url_for('folha_pagamento') }}" class="flex items-center gap-3 px-4 py-3 text-sm font-bold bg-slate-900 text-white dark:bg-white dark:text-black rounded-2xl shadow-xl shadow-slate-200 dark:shadow-none transition-all scale-[1.02]">
+                    <i class="ph ph-briefcase-metal text-xl"></i> Folha de Pagamento
+                </a>
+                <a href="{{ url_for('admin_dashboard') }}?tab=dados" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-600 rounded-2xl hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
+                    <i class="ph ph-database text-xl"></i> Base de Dados
+                </a>
+                
+                <div class="pt-6">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-4 mb-4">Administrativo</p>
+                    <a href="{{ url_for('sistema') }}" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-600 rounded-2xl hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
+                        <i class="ph ph-user-plus text-xl"></i> Novo Cadastro
+                    </a>
+                    <a href="{{ url_for('validar_cadastros') }}" class="flex items-center gap-3 px-4 py-3 text-sm font-semibold text-slate-600 rounded-2xl hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all">
+                        <i class="ph ph-shield-check text-xl"></i> Validar Cadastros
+                    </a>
+                </div>
             </nav>
         </div>
-        <div class="p-4 border-t border-gray-100 dark:border-gray-700">
-            <a href="{{ url_for('sistema') }}" class="flex items-center gap-3 px-4 py-2 text-sm font-medium text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"><i class="ph ph-file-plus"></i> Novo Cadastro</a>
-            <a href="{{ url_for('validar_cadastros') }}" class="flex items-center justify-between px-4 py-2 text-sm font-medium text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white"><div class="flex items-center gap-3"><i class="ph ph-check-circle"></i> Validar Cadastros</div></a>
-            <button onclick="window.location.href='{{ url_for('logout') }}'" class="w-full flex items-center gap-3 px-4 py-2 text-sm font-medium text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-left"><i class="ph ph-sign-out"></i> Sair</button>
+
+        <div class="p-6">
+            <button onclick="window.location.href='{{ url_for('logout') }}'" class="w-full flex items-center justify-center gap-3 px-4 py-4 text-sm font-bold text-red-500 bg-red-50 dark:bg-red-500/10 rounded-2xl hover:bg-red-100 transition-all">
+                <i class="ph ph-power"></i> Encerrar Sessão
+            </button>
         </div>
     </aside>
 
     <div class="flex-1 flex flex-col h-screen overflow-hidden">
-        <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm z-20 dark:bg-gray-800 dark:border-gray-700 no-print">
-            <h2 class="text-lg font-bold text-gray-800 dark:text-white">Gerar Folha de Pagamento</h2>
-            <div class="flex items-center gap-4">
-                <button onclick="toggleDarkMode()" class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors" title="Alternar Tema">
+        <header class="h-20 bg-white/50 dark:bg-slate-950/50 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-10 z-20 no-print">
+            <div>
+                <h2 class="text-xl font-extrabold tracking-tight text-slate-800 dark:text-white">Folha de Pagamento</h2>
+                <p class="text-xs text-slate-500 font-medium">Valença do Piauí • Secretaria de Educação</p>
+            </div>
+            
+            <div class="flex items-center gap-6">
+                <button onclick="toggleDarkMode()" class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center hover:scale-110 transition-all" title="Alternar Tema">
                     <i id="theme-icon" class="ph ph-moon text-xl"></i>
                 </button>
-                <div class="text-right"><p class="text-sm font-bold text-gray-900 dark:text-white">Administrador</p><p class="text-xs text-green-600 dark:text-green-400">● Online</p></div>
+                <div class="h-10 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
+                <div class="flex items-center gap-3">
+                    <div class="text-right">
+                        <p class="text-sm font-bold">Administrador</p>
+                        <span class="text-[10px] bg-green-500/10 text-green-600 px-2 py-0.5 rounded-full font-bold uppercase">Sistema Ativo</span>
+                    </div>
+                    <div class="w-10 h-10 bg-slate-200 dark:bg-slate-800 rounded-xl flex items-center justify-center">
+                        <i class="ph ph-user text-xl"></i>
+                    </div>
+                </div>
             </div>
         </header>
 
-        <main class="flex-1 overflow-y-auto p-8">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6 dark:bg-gray-800 dark:border-gray-700 no-print">
-                <form method="GET">
-                    <label class="text-xs font-bold text-gray-500 uppercase">Selecione o Local de Trabalho</label>
-                    <div class="flex items-end gap-4 mt-1">
-                        <select name="local_id" class="w-full border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
-                            <option value="">Selecione para gerar a folha...</option>
-                            {% for local in locais_trabalho %}
-                            <option value="{{ local.id }}" {{ 'selected' if local_selecionado and local_selecionado.id == local.id }}>{{ local.nome }}</option>
-                            {% endfor %}
-                        </select>
-                        <button type="submit" class="bg-black text-white px-6 py-2 rounded-lg text-sm font-bold hover:bg-gray-800 transition dark:bg-blue-600 dark:hover:bg-blue-700 h-10 flex items-center gap-2">
-                            <i class="ph ph-funnel"></i> Gerar
-                        </button>
+        <main class="flex-1 overflow-y-auto p-6 md:p-10 animate-fade-in custom-scroll">
+            
+            <div class="glass p-8 rounded-[32px] border border-white dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-none mb-10 no-print animate-slide-up">
+                <form method="GET" class="flex flex-col md:flex-row items-end gap-6">
+                    <div class="flex-1 space-y-2 w-full">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Unidade de Lotação</label>
+                        <div class="relative">
+                            <i class="ph ph-buildings absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-xl"></i>
+                            <select name="local_id" class="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-semibold outline-none focus:ring-4 focus:ring-brand-500/10 transition-all appearance-none">
+                                <option value="">Selecione o local para processar...</option>
+                                {% for local in locais_trabalho %}
+                                <option value="{{ local.id }}" {{ 'selected' if local_selecionado and local_selecionado.id == local.id }}>{{ local.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
                     </div>
+                    <button type="submit" class="w-full md:w-auto bg-brand-500 hover:bg-brand-600 text-white px-10 py-4 rounded-2xl font-bold text-sm shadow-lg shadow-brand-500/30 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        <i class="ph ph-magnifying-glass font-bold"></i> Gerar Relatório
+                    </button>
                 </form>
             </div>
 
             {% if local_selecionado %}
-            <div id="print-area" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden dark:bg-gray-800 dark:border-gray-700">
-                <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center dark:border-gray-700">
-                    <div>
-                        <h3 class="font-bold text-gray-800 dark:text-white">Folha de Pagamento - {{ local_selecionado.nome }}</h3>
-                        <p class="text-sm text-gray-500">{{ funcionarios_folha|length }} servidores encontrados.</p>
+            <div class="animate-slide-up" style="animation-delay: 0.1s;">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 no-print">
+                    <div class="glass p-6 rounded-[24px] border border-white dark:border-slate-800 shadow-xl flex items-center gap-5">
+                        <div class="w-14 h-14 bg-brand-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-brand-500/20">
+                            <i class="ph ph-users-three text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total de Servidores</p>
+                            <h4 class="text-2xl font-black">{{ funcionarios_folha|length }}</h4>
+                        </div>
                     </div>
-                    <button onclick="window.print()" class="no-print bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-blue-200 transition flex items-center gap-2">
-                        <i class="ph ph-printer"></i> Imprimir Folha
-                    </button>
+                    
+                    <div class="glass p-6 rounded-[24px] border border-white dark:border-slate-800 shadow-xl flex items-center gap-5">
+                        <div class="w-14 h-14 bg-slate-900 dark:bg-white text-white dark:text-black rounded-2xl flex items-center justify-center">
+                            <i class="ph ph-map-pin text-2xl"></i>
+                        </div>
+                        <div class="flex-1 truncate">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Unidade Atual</p>
+                            <h4 class="text-sm font-black truncate uppercase">{{ local_selecionado.nome }}</h4>
+                        </div>
+                    </div>
+
+                    <div class="glass p-6 rounded-[24px] border border-white dark:border-slate-800 shadow-xl flex items-center gap-5">
+                        <div class="w-14 h-14 bg-green-500 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-green-500/20">
+                            <i class="ph ph-calendar-check text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mês de Referência</p>
+                            <h4 class="text-lg font-black uppercase" id="current-month">Maio 2026</h4>
+                        </div>
+                    </div>
                 </div>
-                <table class="w-full text-sm text-left text-gray-600">
-                    <thead class="bg-gray-50 text-xs uppercase font-semibold text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                        <tr>
-                            <th class="px-6 py-3">Nome</th>
-                            <th class="px-6 py-3">CPF</th>
-                            <th class="px-6 py-3">Banco</th>
-                            <th class="px-6 py-3">Agência</th>
-                            <th class="px-6 py-3">Conta</th>
-                            <th class="px-6 py-3">Tipo</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-                        {% for f in funcionarios_folha %}
-                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ f.nome }}</td>
-                            <td class="px-6 py-4">{{ f.cpf }}</td>
-                            <td class="px-6 py-4">{{ f.banco }}</td>
-                            <td class="px-6 py-4">{{ f.agencia }}</td>
-                            <td class="px-6 py-4">{{ f.conta }}</td>
-                            <td class="px-6 py-4">{{ f.tipo_conta }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="6" class="text-center p-6">Nenhum servidor encontrado para este local.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+
+                <div id="print-area" class="bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <div class="px-8 py-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center no-print">
+                        <div>
+                            <h3 class="font-black text-xl tracking-tight">Listagem Bancária</h3>
+                            <p class="text-xs text-slate-400 font-medium">Dados processados para depósito em conta.</p>
+                        </div>
+                        <button onclick="window.print()" class="bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white px-6 py-3 rounded-xl text-xs font-black hover:bg-slate-200 transition-all flex items-center gap-2">
+                            <i class="ph ph-printer text-lg"></i> Imprimir Folha
+                        </button>
+                    </div>
+
+                    <div class="hidden print:block p-8 border-b-2 border-slate-900 mb-6">
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <h1 class="text-2xl font-black">RELATÓRIO DE PAGAMENTO</h1>
+                                <p class="text-sm uppercase font-bold text-slate-600">UNIDADE: {{ local_selecionado.nome }}</p>
+                            </div>
+                            <div class="text-right text-xs">
+                                <p>Gerado em: 29/04/2026</p>
+                                <p>GESTOOR 360º - V. Piauí</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-slate-800/50 text-[10px] uppercase font-black tracking-widest text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800">
+                                    <th class="px-8 py-5">Nome do Servidor</th>
+                                    <th class="px-8 py-5">CPF</th>
+                                    <th class="px-8 py-5">Instituição</th>
+                                    <th class="px-8 py-5">Agência</th>
+                                    <th class="px-8 py-5">Nº Conta</th>
+                                    <th class="px-8 py-5">Tipo</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                {% for f in funcionarios_folha %}
+                                <tr class="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors group">
+                                    <td class="px-8 py-5">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-500 group-hover:bg-brand-500 group-hover:text-white transition-all">
+                                                {{ loop.index }}
+                                            </div>
+                                            <span class="font-bold text-slate-800 dark:text-slate-200 uppercase truncate max-w-[200px]">{{ f.nome }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-8 py-5 font-mono text-xs text-slate-500">{{ f.cpf }}</td>
+                                    <td class="px-8 py-5">
+                                        <span class="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-full text-[10px] font-black uppercase text-slate-600 dark:text-slate-400">
+                                            {{ f.banco or 'N/I' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-8 py-5 font-medium text-slate-600 dark:text-slate-400">{{ f.agencia or '---' }}</td>
+                                    <td class="px-8 py-5 font-bold text-slate-800 dark:text-slate-200">{{ f.conta or '---' }}</td>
+                                    <td class="px-8 py-5">
+                                        <span class="text-[10px] font-bold py-1 px-2 rounded bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-500/20">
+                                            {{ f.tipo_conta or 'Corrente' }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="p-20 text-center">
+                                        <div class="flex flex-col items-center gap-4">
+                                            <div class="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center">
+                                                <i class="ph ph-mask-sad text-4xl text-slate-300"></i>
+                                            </div>
+                                            <p class="text-slate-500 font-medium">Nenhum servidor encontrado para esta unidade.</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
             {% else %}
-            <div class="text-center p-10 bg-white rounded-2xl border border-dashed dark:bg-gray-800 dark:border-gray-700">
-                <i class="ph ph-file-text text-4xl text-gray-300 mb-2 dark:text-gray-600"></i>
-                <p class="text-gray-500 dark:text-gray-400">Selecione um local de trabalho para gerar a folha de pagamento.</p>
+            <div class="flex flex-col items-center justify-center py-20 animate-slide-up no-print">
+                <div class="w-24 h-24 bg-white dark:bg-slate-900 rounded-[32px] shadow-2xl flex items-center justify-center mb-6">
+                    <i class="ph ph-file-search text-5xl text-brand-500"></i>
+                </div>
+                <h3 class="text-xl font-black text-slate-800 dark:text-white mb-2">Aguardando Seleção</h3>
+                <p class="text-slate-500 text-center max-w-xs text-sm">
+                    Utilize o filtro acima para selecionar um local de trabalho e gerar o relatório de folha.
+                </p>
             </div>
             {% endif %}
         </main>
@@ -125,14 +275,29 @@
         function toggleDarkMode() {
             const html = document.documentElement;
             const icon = document.getElementById('theme-icon');
-            if (html.classList.contains('dark')) { html.classList.remove('dark'); localStorage.setItem('theme', 'light'); if(icon) icon.classList.replace('ph-sun', 'ph-moon'); } 
-            else { html.classList.add('dark'); localStorage.setItem('theme', 'dark'); if(icon) icon.classList.replace('ph-moon', 'ph-sun'); }
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                icon.classList.replace('ph-sun', 'ph-moon');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                icon.classList.replace('ph-moon', 'ph-sun');
+            }
         }
+
+        // Auto-check Dark Mode
         if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
             const icon = document.getElementById('theme-icon');
             if(icon) icon.classList.replace('ph-moon', 'ph-sun');
         }
+
+        // Set current month in the card
+        const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+        const d = new Date();
+        const monthLabel = document.getElementById('current-month');
+        if(monthLabel) monthLabel.innerText = monthNames[d.getMonth()] + " " + d.getFullYear();
     </script>
 </body>
 </html>

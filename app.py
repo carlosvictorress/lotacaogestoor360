@@ -1035,11 +1035,9 @@ def folha_pagamento():
     local_selecionado = None
 
     if local_id_filtro:
-        # CORREÇÃO: Adicionamos o filtro validado=True.
-        # Isso impede que cadastros pendentes ou "fantasmas" apareçam na folha.
+        # Removido o filtro 'validado=True' para permitir a exibição de todos os servidores do local
         funcionarios_folha = Funcionario.query.filter_by(
-            local_trabalho_id=local_id_filtro,
-            validado=True 
+            local_trabalho_id=local_id_filtro
         ).order_by(Funcionario.nome).all()
         
         local_selecionado = db.session.get(LocalTrabalho, local_id_filtro)
