@@ -475,16 +475,24 @@ def admin_dashboard():
 @login_required
 def processar_recisao():
     id_func = request.form.get('id_funcionario')
-    dt_ini = parse_date(request.form.get('data_inicio'))
-    dt_sai = parse_date(request.form.get('data_saida'))
+    # Captura as datas do formulário
+    data_inicio_str = request.form.get('data_inicio')
+    data_saida_str = request.form.get('data_saida')
+    
+    dt_ini = parse_date(data_inicio_str)
+    dt_sai = parse_date(data_saida_str)
     
     funcionario = db.session.get(Funcionario, id_func)
     if not funcionario:
         flash("Servidor não encontrado", "error")
         return redirect(url_for('pagina_recisoes'))
 
+    # Se as datas vierem vazias, tenta usar as da ficha como backup
+    if not dt_ini: dt_ini = funcionario.dt_inicio
+    if not dt_sai: dt_sai = date.today()
+
     try:
-        # 1. Salva no histórico de rescisões
+        # 1. Salva no histórico de rescisões (antes de excluir o objeto)
         nova_rescisao = RescisaoHistorico(
             nome=funcionario.nome,
             cpf=funcionario.cpf,
@@ -494,23 +502,27 @@ def processar_recisao():
         )
         db.session.add(nova_rescisao)
 
-        # 2. Dados para o documento (mantendo sua lógica anterior)
+        # 2. Prepara dados para o template com segurança contra datas nulas
         dados_doc = {
             'nome': funcionario.nome,
             'funcao': funcionario.funcao.nome if funcionario.funcao else 'N/A',
-            'dt_inicio': dt_ini.strftime('%d/%m/%Y'),
-            'dt_saida': dt_sai.strftime('%d/%m/%Y')
+            'dt_inicio': dt_ini.strftime('%d/%m/%Y') if dt_ini else "N/D",
+            'dt_saida': dt_sai.strftime('%d/%m/%Y') if dt_sai else "N/D"
         }
 
-        # 3. Exclui o servidor da base ativa (limpando FKs)
+        # 3. Limpeza total de vínculos e exclusão definitiva
+        # Remove históricos e pontos para evitar erros de integridade (FK)
         HistoricoLotacao.query.filter_by(funcionario_id=funcionario.id).delete()
         RegistroPonto.query.filter_by(funcionario_id=funcionario.id).delete()
+        
+        nome_servidor = funcionario.nome
         db.session.delete(funcionario)
         
+        # O commit deve ser feito após todas as operações de banco
         db.session.commit()
-        registrar_log("GEROU RESCISAO", dados_doc['nome'])
+        registrar_log("GEROU RESCISAO", nome_servidor)
 
-        # Prepara data por extenso para o papel
+        # Prepara data por extenso para o documento
         meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
         hoje = datetime.now()
         data_extenso = f"{hoje.day} de {meses[hoje.month - 1]} de {hoje.year}"
@@ -519,7 +531,7 @@ def processar_recisao():
         
     except Exception as e:
         db.session.rollback()
-        flash(f"Erro: {str(e)}", "error")
+        flash(f"Erro ao processar baixa: {str(e)}", "error")
         return redirect(url_for('pagina_recisoes'))
         
     
@@ -681,14 +693,14 @@ def exportar_excel():
     if not current_user.is_admin: 
         return redirect(url_for('sistema'))
 
-    # 2. Captura dos filtros da URL
+    # 2. Captura dos filtros da URL para manter a precisão do relatório
     filtro_secretaria = request.args.get('secretaria_id')
     filtro_vinculo = request.args.get('tipo_vinculo')
     filtro_indicacao = request.args.get('padrinho_id')
     filtro_funcao = request.args.get('funcao_id')
     filtro_local = request.args.get('local_trabalho_id')
 
-    # 3. Construção da Query
+    # 3. Construção da Query filtrada
     query = Funcionario.query
     if filtro_secretaria: query = query.filter_by(secretaria_id=filtro_secretaria)
     if filtro_vinculo: query = query.filter_by(tipo_vinculo=filtro_vinculo)
@@ -702,51 +714,52 @@ def exportar_excel():
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
 
-    # Cabeçalho idêntico aos campos do add_server do Gestor360
+    # Cabeçalho organizado para o Gestoor 360º
     header = [
-        'Nº CONTRATO', 'NOME', 'CPF', 'RG', 'DATA NASCIMENTO', 'NOME DA MÃE', 
-        'EMAIL', 'PIS/PASEP', 'VÍNCULO', 'LOCAL', 'ESCOLA_ID', 'CLASSE/NÍVEL', 
+        'Nº VÍNCULO', 'NOME', 'CPF', 'RG', 'DATA NASCIMENTO', 'NOME DA MÃE', 
+        'EMAIL', 'PIS', 'VÍNCULO', 'LOCAL', 'CLASSE', 
         'Nº CONTRA CHEQUE', 'NACIONALIDADE', 'ESTADO CIVIL', 'TELEFONE', 
-        'ENDEREÇO', 'FUNÇÃO', 'LOTAÇÃO', 'CARGA HORÁRIA', 'REMUNERAÇÃO', 
-        'DADOS BANCÁRIOS', 'DATA INÍCIO', 'DATA SAÍDA', 'OBSERVAÇÕES'
+        'ENDEREÇO', 'FUNÇÃO', 'LOTAÇÃO', 'JORNADA', 'REMUNERAÇÃO', 
+        'DADOS BANCÁRIOS', 'DATA INÍCIO', 'DATA TÉRMINO'
     ]
     writer.writerow(header)
 
-    # 5. Preenchimento dos dados com tratamento de erros
+    # 5. Preenchimento dos dados corrigindo os nomes das colunas do banco
     for f in funcionarios:
+        # Formatação de dados bancários em uma única célula
+        banco_info = f"Bco: {f.banco or ''}, Ag: {f.agencia or ''}, Cta: {f.conta or ''} ({f.tipo_conta or ''})"
+        
         writer.writerow([
-            getattr(f, 'num_contrato', ''),
+            f.num_vinculo,                                    # num_vinculo corrigido
             f.nome,
             f.cpf,
-            getattr(f, 'rg', ''),
-            f.data_nascimento.strftime('%Y-%m-%d') if getattr(f, 'data_nascimento', None) else '',
-            getattr(f, 'nome_mae', ''),
-            getattr(f, 'email', ''),
-            getattr(f, 'pis_pasep', ''),
+            f.rg,
+            f.data_nasc.strftime('%d/%m/%Y') if f.data_nasc else '', # data_nasc corrigido
+            f.mae,                                            # mae corrigido
+            f.email,
+            f.pis,                                            # pis corrigido
             f.tipo_vinculo,
-            f.local_trabalho.nome if getattr(f, 'local_trabalho', None) else '',
-            getattr(f, 'escola_id', ''),
-            getattr(f, 'classe_nivel', ''),
-            getattr(f, 'num_contra_cheque', ''),
-            getattr(f, 'nacionalidade', ''),
-            getattr(f, 'estado_civil', ''),
-            getattr(f, 'telefone', ''),
-            getattr(f, 'endereco', ''),
-            f.funcao.nome if getattr(f, 'funcao', None) else '',
-            getattr(f, 'lotacao', ''),
-            getattr(f, 'carga_horaria', ''),
-            getattr(f, 'remuneracao', 0),
-            getattr(f, 'dados_bancarios', ''),
-            f.data_inicio.strftime('%Y-%m-%d') if getattr(f, 'data_inicio', None) else '',
-            f.data_saida.strftime('%Y-%m-%d') if getattr(f, 'data_saida', None) else '',
-            getattr(f, 'observacoes', '')
+            f.local_trabalho.nome if f.local_trabalho else '',
+            f.classe,
+            f.contracheque,
+            f.nacionalidade,
+            f.estado_civil,
+            f.telefone,
+            f.endereco,
+            f.funcao.nome if f.funcao else '',
+            f.lotacao,
+            f.jornada_trabalho,
+            f.remuneracao,
+            banco_info,
+            f.dt_inicio.strftime('%d/%m/%Y') if f.dt_inicio else '', # dt_inicio corrigido
+            f.dt_termino.strftime('%d/%m/%Y') if f.dt_termino else '' # dt_termino corrigido
         ])
 
     # 6. Finalização e Log
     output.seek(0)
     registrar_log("EXPORTOU DADOS", f"Relatório completo ({len(funcionarios)} registros)")
 
-    # Retorno com utf-8-sig para garantir acentuação correta no Excel (Windows)
+    # Retorno com utf-8-sig para compatibilidade com Excel no Windows
     return Response(
         output.getvalue().encode("utf-8-sig"),
         mimetype="text/csv",
@@ -1022,7 +1035,13 @@ def folha_pagamento():
     local_selecionado = None
 
     if local_id_filtro:
-        funcionarios_folha = Funcionario.query.filter_by(local_trabalho_id=local_id_filtro).order_by(Funcionario.nome).all()
+        # CORREÇÃO: Adicionamos o filtro validado=True.
+        # Isso impede que cadastros pendentes ou "fantasmas" apareçam na folha.
+        funcionarios_folha = Funcionario.query.filter_by(
+            local_trabalho_id=local_id_filtro,
+            validado=True 
+        ).order_by(Funcionario.nome).all()
+        
         local_selecionado = db.session.get(LocalTrabalho, local_id_filtro)
 
     return render_template('folha_pagamento.html', 
@@ -1490,33 +1509,46 @@ def gerar_rescisao_excluir(id):
         flash("Funcionário não encontrado", "error")
         return redirect(url_for('sistema'))
         
-    # 1. Criamos um dicionário com os dados ANTES de deletar para usar no template
-    dados_rescisao = {
-        'nome': funcionario.nome,
-        'dt_inicio': funcionario.dt_inicio,
-        'dt_termino': funcionario.dt_termino,
-        'funcao_nome': funcionario.funcao.nome if funcionario.funcao else 'N/A'
-    }
-    
     try:
-        # 2. Registra o log primeiro
+        # 1. Salva no histórico de rescisões ANTES de deletar
+        # Isso é essencial para que o servidor apareça no painel de "Servidores Baixados"
+        nova_rescisao = RescisaoHistorico(
+            nome=funcionario.nome,
+            cpf=funcionario.cpf,
+            funcao=funcionario.funcao.nome if funcionario.funcao else 'N/A',
+            data_inicio=funcionario.dt_inicio,
+            data_saida=funcionario.dt_termino if funcionario.dt_termino else date.today()
+        )
+        db.session.add(nova_rescisao)
+
+        # 2. Criamos um dicionário com os dados formatados antes de deletar
+        # Usamos variáveis locais pois o objeto 'funcionario' será removido da sessão
+        dados_rescisao = {
+            'nome': funcionario.nome,
+            'dt_inicio': funcionario.dt_inicio.strftime('%d/%m/%Y') if funcionario.dt_inicio else "N/D",
+            'dt_termino': funcionario.dt_termino.strftime('%d/%m/%Y') if funcionario.dt_termino else date.today().strftime('%d/%m/%Y'),
+            'funcao_nome': funcionario.funcao.nome if funcionario.funcao else 'N/A'
+        }
+        
+        # 3. Registra o log da operação
         registrar_log("RESCISAO E EXCLUSAO", funcionario.nome)
 
-        # 3. CORREÇÃO DO ERRO: Deletar registros vinculados manualmente
-        # Remove histórico e pontos antes para evitar violação de integridade (FK)
+        # 4. Limpeza de registros vinculados (Foreign Keys)
+        # Remove histórico e pontos para evitar violação de integridade no banco
         HistoricoLotacao.query.filter_by(funcionario_id=id).delete()
         RegistroPonto.query.filter_by(funcionario_id=id).delete()
         
-        # 4. Agora deleta o funcionário
+        # 5. Deleta o funcionário da base ativa definitivamente
         db.session.delete(funcionario)
         db.session.commit()
         
-        # 5. Prepara data atual para o termo
+        # 6. Prepara a data atual por extenso para o documento
         meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
         hoje = datetime.now()
         data_extenso = f"{hoje.day} de {meses[hoje.month - 1]} de {hoje.year}"
         
-        # 6. Renderiza a página de rescisão (certifique-se de ter o rescisao.html)
+        # 7. Renderiza o template de rescisão
+        # Verifique se o arquivo se chama 'recisao.html' ou 'recisao_documento.html' no seu projeto
         return render_template('recisao.html', funcionario=dados_rescisao, data_atual=data_extenso)
         
     except Exception as e:
@@ -1524,5 +1556,4 @@ def gerar_rescisao_excluir(id):
         print(f"Erro ao excluir: {e}")
         flash("Erro ao processar exclusão no banco de dados.", "error")
         return redirect(url_for('sistema'))
-
 
