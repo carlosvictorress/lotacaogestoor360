@@ -62,6 +62,7 @@
             </script>
         {% endif %}
     {% endwith %}
+
     <div class="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden transition-all" id="mainContainer">
         
         <div id="stepClock" class="p-8 text-center space-y-6">
@@ -122,7 +123,7 @@
             <h2 class="text-xl font-black text-slate-900 mt-4">Registro Manual</h2>
             <p class="text-sm text-slate-500 mb-4">Para não ficar com falta, registre o ponto pelo seu CPF abaixo.</p>
 
-            <form id="pontoForm" method="POST" action="/ponto/registrar_facial" class="space-y-4">
+            <form id="pontoForm" method="POST" action="/ponto/registrar_facial" class="space-y-4" onsubmit="return validarEnvio()">
                 <input type="hidden" name="lat" id="lat">
                 <input type="hidden" name="lng" id="lng">
                 <input type="hidden" name="foto_base64" id="foto_base64">
@@ -165,7 +166,6 @@
         let detectionInterval;
 
         // --- 2. CARREGAMENTO FANTASMA DA INTELIGÊNCIA ---
-        // Começa a baixar a IA silenciosamente assim que o site abre
         Promise.all([
             faceapi.nets.ssdMobilenetv1.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
             faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
@@ -181,7 +181,6 @@
             const loadingMsg = document.getElementById('loadingModelsMsg');
             loadingMsg.classList.remove('hidden');
 
-            // Se o servidor clicou muito rápido, aguarda baixar
             if (!isModelsLoaded) {
                 loadingMsg.innerText = "Iniciando redes neurais...";
                 while(!isModelsLoaded) {
@@ -191,7 +190,6 @@
 
             loadingMsg.innerText = "Sincronizando rostos (Verificando cache)...";
             
-            // Cria a base de rostos usando cache ultrarrápido
             if (!faceMatcher) {
                 faceMatcher = await gerarAssinaturasFaciais();
             }
@@ -207,17 +205,14 @@
             let precisaAtualizar = false;
 
             for (const [id_funcionario, base64Image] of Object.entries(fotosSalvas)) {
-                // Checagem de Cache: Se a foto já foi processada antes, usa a memória instantânea
                 const imageHash = base64Image.substring(0, 50); 
                 
                 if (descricoesSalvas[id_funcionario] && descricoesSalvas[id_funcionario].hash === imageHash) {
-                    // Reconstrói a matemática instantaneamente
                     const arr = new Float32Array(Object.values(descricoesSalvas[id_funcionario].descriptor));
                     labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(id_funcionario, [arr]));
                     continue;
                 }
 
-                // Se a foto é nova ou mudou, o sistema roda o processo pesado
                 try {
                     const img = new Image();
                     img.src = base64Image;
@@ -226,8 +221,6 @@
                     const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
                     if (detection) {
                         labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(id_funcionario, [detection.descriptor]));
-                        
-                        // Salva no Cache para a próxima vez ser instantâneo
                         descricoesSalvas[id_funcionario] = {
                             hash: imageHash,
                             descriptor: detection.descriptor
@@ -239,7 +232,6 @@
                 }
             }
 
-            // Atualiza a memória do navegador se calculou fotos novas
             if (precisaAtualizar) {
                 localStorage.setItem('bioid_descritores', JSON.stringify(descricoesSalvas));
             }
@@ -261,7 +253,6 @@
             stepCPF.classList.add('hidden');
             stepFacial.classList.remove('hidden');
             
-            // Reseta botões iniciais
             document.getElementById('btnIniciar').classList.remove('hidden');
             document.getElementById('loadingModelsMsg').classList.add('hidden');
 
@@ -292,8 +283,12 @@
             stepFacial.classList.add('hidden');
             stepCPF.classList.add('hidden');
             stepClock.classList.remove('hidden');
+            
+            // Limpa dados para evitar erros de ID vazio
+            document.getElementById('inputFuncionarioId').value = "";
+            document.getElementById('cpfInput').value = "";
             document.getElementById('alertaFoto').classList.add('hidden');
-            document.getElementById('cpfInput').required = true;
+            document.getElementById('cpfInput').required = false;
         }
 
         // --- 6. LÓGICA DE RECONHECIMENTO AO VIVO ---
@@ -328,9 +323,9 @@
                             document.getElementById('statusMsg').classList.replace('bg-blue-50', 'bg-green-50');
                             
                             document.getElementById('inputFuncionarioId').value = bestMatch.label;
-                            document.getElementById('cpfInput').required = false; 
                             
                             salvarFotoAuditoria();
+                            capturarGeo(); // Garante o GPS no momento exato
                             
                             setTimeout(() => {
                                 document.getElementById('pontoForm').submit();
@@ -379,8 +374,23 @@
                 navigator.geolocation.getCurrentPosition(pos => {
                     document.getElementById('lat').value = pos.coords.latitude;
                     document.getElementById('lng').value = pos.coords.longitude;
-                });
+                }, err => {
+                    console.error("Erro GPS:", err);
+                }, { enableHighAccuracy: true });
             }
+        }
+
+        // --- VALIDAÇÃO DE ENVIO ---
+        function validarEnvio() {
+            capturarGeo(); // Tenta atualizar o GPS antes de enviar
+            const idFacial = document.getElementById('inputFuncionarioId').value;
+            const cpfDigitado = document.getElementById('cpfInput').value.replace(/\D/g, '');
+
+            if (!idFacial && cpfDigitado.length < 11) {
+                alert("Erro: Nenhum servidor identificado. Por favor, insira o CPF corretamente.");
+                return false;
+            }
+            return true;
         }
 
         // --- MÁSCARA CPF ---

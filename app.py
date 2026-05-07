@@ -2065,19 +2065,31 @@ def registrar_ponto_facial():
             (Funcionario.cpf == cpf_informado) | (Funcionario.cpf == cpf_limpo)
         ).first()
     else:
+        # Pega o ID vindo do reconhecimento facial
         id_facial = request.form.get("funcionario_id")
-        funcionario = db.session.get(Funcionario, id_facial)
+        
+        # --- CORREÇÃO DO ERRO ---
+        # Verifica se o id_facial é vazio, nulo ou inválido antes de consultar o banco
+        if not id_facial or id_facial == "" or id_facial == "None":
+            flash("Erro: Nenhum servidor identificado. Aguarde o reconhecimento ou use o CPF.", "error")
+            return redirect(url_for("ponto_portal"))
+        
+        try:
+            # Converte explicitamente para inteiro para evitar erro de sintaxe no Postgres
+            id_valido = int(id_facial)
+            funcionario = db.session.get(Funcionario, id_valido)
+        except (ValueError, TypeError):
+            flash("Identificação inválida recebida pelo sistema.", "error")
+            return redirect(url_for("ponto_portal"))
 
     if not funcionario:
-        flash("Servidor não localizado com este CPF.", "error")
+        flash("Servidor não localizado. Verifique os dados ou procure o RH.", "error")
         return redirect(url_for("ponto_portal"))
 
     # --- INÍCIO DA LÓGICA DE ALTERNÂNCIA E LIMITES ---
-    # Cria um intervalo de tempo exato para o dia de hoje (00:00:00 até 23:59:59)
     hoje_inicio = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     hoje_fim = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    # Busca todas as batidas do servidor no dia de hoje
     registros_hoje = (
         RegistroPonto.query.filter(
             RegistroPonto.funcionario_id == funcionario.id,
@@ -2090,44 +2102,33 @@ def registrar_ponto_facial():
 
     total_batidas = len(registros_hoje)
 
-    # Trava: Não permite mais de 4 batidas no mesmo dia
     if total_batidas >= 4:
-        flash(
-            "Limite diário atingido. Você já registrou 4 batidas de ponto hoje.",
-            "error",
-        )
+        flash("Limite diário atingido. Você já registrou 4 batidas de ponto hoje.", "error")
         return redirect(url_for("ponto_portal"))
 
-    # Alternância: Se não tem registro hoje ou o último foi saída -> Entrada. Senão -> Saída.
     ultimo_registro = registros_hoje[0] if total_batidas > 0 else None
     tipo_atual = (
         "entrada" if not ultimo_registro or ultimo_registro.tipo == "saida" else "saida"
     )
-    # --- FIM DA LÓGICA ---
 
-    # Salva a foto apenas se passou pelo bloqueio de limite diário
+    # --- SALVAMENTO DA FOTO ---
     foto_path_rel = None
     if foto_base64:
         try:
             if "," in foto_base64:
                 foto_base64 = foto_base64.split(",", 1)[1]
             foto_bytes = base64.b64decode(foto_base64)
-
             fotos_dir = os.path.join(app.root_path, "static", "ponto_fotos")
             os.makedirs(fotos_dir, exist_ok=True)
-
-            filename = (
-                f"ponto_{funcionario.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
-            )
+            filename = f"ponto_{funcionario.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
             file_path = os.path.join(fotos_dir, filename)
-
             with open(file_path, "wb") as f:
                 f.write(foto_bytes)
-
             foto_path_rel = f"ponto_fotos/{filename}"
         except Exception as e:
             print(f"Erro ao salvar foto: {e}")
 
+    # --- GRAVAÇÃO DO REGISTRO ---
     try:
         novo_registro = RegistroPonto(
             funcionario_id=funcionario.id,
