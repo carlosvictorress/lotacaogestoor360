@@ -1277,49 +1277,47 @@ def create_admin():
 
 
 def atualizar_schema():
-    """Função auxiliar para adicionar colunas novas em bancos existentes"""
+    """Função robusta para adicionar colunas no SQLite ou PostgreSQL (Railway)"""
     with app.app_context():
         with db.engine.connect() as conn:
-            colunas = [
-                ("padrinho_id", "INTEGER REFERENCES padrinho(id)"),
-                ("funcao_id", "INTEGER REFERENCES funcao(id)"),
-                ("local_trabalho_id", "INTEGER REFERENCES local_trabalho(id)"),
-                ("validado", "BOOLEAN DEFAULT 0"),
+            # 1. Colunas para a tabela 'funcionario'
+            colunas_funcionario = [
+                ("padrinho_id", "INTEGER"),
+                ("funcao_id", "INTEGER"),
+                ("local_trabalho_id", "INTEGER"),
+                ("validado", "BOOLEAN DEFAULT FALSE"),
                 ("data_expedicao_rg", "DATE"),
                 ("jornada_trabalho", "VARCHAR(50)"),
                 ("crianca_assistida", "VARCHAR(150)"),
                 ("foto_biometria", "TEXT"),
                 ("foto_path", "VARCHAR(255)"),
             ]
-            for col, tipo in colunas:
-                try:
-                    conn.execute(
-                        text(f"ALTER TABLE funcionario ADD COLUMN {col} {tipo}")
-                    )
-                    conn.commit()
-                    print(f"SCHEMA ATUALIZADO: Coluna '{col}' adicionada.")
-                except Exception:
-                    pass
-            
-            # Atualiza LocalTrabalho para Geofencing
+
+            # 2. Colunas para a tabela 'local_trabalho' (CRÍTICO PARA GEOFENCING)
             colunas_local = [
                 ("latitude", "FLOAT"),
                 ("longitude", "FLOAT"),
                 ("raio_permitido", "INTEGER DEFAULT 50"),
             ]
+
+            # Processa tabela funcionario
+            for col, tipo in colunas_funcionario:
+                try:
+                    conn.execute(text(f"ALTER TABLE funcionario ADD COLUMN {col} {tipo}"))
+                    conn.commit()
+                    print(f"SUCESSO: Coluna '{col}' adicionada em 'funcionario'.")
+                except Exception as e:
+                    # Em caso de erro (coluna já existe), faz rollback para limpar a transação
+                    conn.rollback() 
+
+            # Processa tabela local_trabalho
             for col, tipo in colunas_local:
                 try:
                     conn.execute(text(f"ALTER TABLE local_trabalho ADD COLUMN {col} {tipo}"))
                     conn.commit()
-                except Exception:
-                    pass
-
-
-# Tente configurar para PT-BR para datas por extenso
-try:
-    locale.setlocale(locale.LC_TIME, "pt_BR.utf8")
-except:
-    pass
+                    print(f"SUCESSO: Coluna '{col}' adicionada em 'local_trabalho'.")
+                except Exception as e:
+                    conn.rollback()
 
 
 @app.route("/imprimir_encaminhamento/<int:id>")
@@ -1872,46 +1870,50 @@ def registrar_ponto(token):
         flash("Servidor não encontrado ou QRCode inválido.", "error")
         return redirect(url_for("pagina_ponto", token=token))
 
-    # Recebe as coordenadas enviadas pelo telemóvel do funcionário
+    # Recebe as coordenadas enviadas pelo celular do funcionário
     lat_req = request.form.get("lat")
     lng_req = request.form.get("lng")
+    acc = request.form.get("acc") # Precisão do GPS
 
     # --- INÍCIO DA VALIDAÇÃO DE GEOFENCING ---
     local = funcionario.local_trabalho
+    
+    # Verificamos se o local existe e se tem coordenadas cadastradas
     if local and local.latitude and local.longitude:
         if not lat_req or not lng_req:
-            flash(
-                "Localização GPS não capturada. Ative o GPS para registrar o ponto.",
-                "error",
-            )
+            flash("Localização GPS não capturada. Verifique se o GPS está ativo e se você deu permissão ao navegador.", "error")
             return redirect(url_for("pagina_ponto", token=token))
 
-        # Calcula a distância entre o funcionário e a escola
         try:
-            distancia_metros = calcular_distancia(
-                float(lat_req) if lat_req else 0, 
-                float(lng_req) if lng_req else 0, 
-                local.latitude or 0, 
-                local.longitude or 0
-            )
-        except (ValueError, TypeError):
-            distancia_metros = float('inf')
-            
-        raio_limite = local.raio_permitido or 50  # 50 metros de tolerância
+            # Convertemos tudo para float para garantir a conta matemática
+            f_lat_req = float(lat_req)
+            f_lng_req = float(lng_req)
+            f_lat_loc = float(local.latitude)
+            f_lng_loc = float(local.longitude)
 
-        if distancia_metros > raio_limite:
-            flash(
-                f"Acesso Negado: Está a {int(distancia_metros)}m do local de trabalho. Aproxime-se do limite de {raio_limite}m.",
-                "error",
-            )
-            # Regista a tentativa de fraude no log de segurança de forma opcional
-            registrar_log(
-                "TENTATIVA_FORA_RAIO", f"{funcionario.nome} a {int(distancia_metros)}m"
-            )
+            distancia_metros = calcular_distancia(f_lat_req, f_lng_req, f_lat_loc, f_lng_loc)
+            raio_limite = local.raio_permitido or 50  # Padrão 50m se estiver nulo
+            
+            # LOG DE DEPURAÇÃO: Isso aparecerá no Log do Railway para você conferir os números
+            print(f"DEBUG PONTO: {funcionario.nome} | Distância: {distancia_metros:.2f}m | Limite: {raio_limite}m")
+
+            if distancia_metros > raio_limite:
+                msg_erro = f"FORA DO RAIO: Você está a {int(distancia_metros)}m da unidade. Aproxime-se para bater o ponto (Limite: {raio_limite}m)."
+                flash(msg_erro, "error")
+                registrar_log("BLOQUEIO_GEOFENCING", f"{funcionario.nome} tentou a {int(distancia_metros)}m")
+                return redirect(url_for("pagina_ponto", token=token))
+                
+        except (ValueError, TypeError) as e:
+            print(f"Erro ao calcular distância: {e}")
+            flash("Erro ao processar coordenadas de localização.", "error")
             return redirect(url_for("pagina_ponto", token=token))
+    else:
+        # Alerta opcional caso a escola não tenha GPS cadastrado no sistema
+        print(f"AVISO: {funcionario.nome} bateu ponto em local sem GPS cadastrado ({local.nome if local else 'Sem Local'}).")
+
     # --- FIM DA VALIDAÇÃO DE GEOFENCING ---
 
-    # --- LÓGICA DE ALTERNÂNCIA E LIMITES (Mantida intacta) ---
+    # --- LÓGICA DE ALTERNÂNCIA E LIMITES ---
     hoje_inicio = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
     hoje_fim = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
 
@@ -1925,19 +1927,14 @@ def registrar_ponto(token):
         .all()
     )
 
-    total_batidas = len(registros_hoje)
-
-    if total_batidas >= 4:
+    if len(registros_hoje) >= 4:
         flash("Limite diário atingido. Você já registrou 4 batidas hoje.", "error")
         return redirect(url_for("pagina_ponto", token=token))
 
-    ultimo_registro = registros_hoje[0] if total_batidas > 0 else None
-    tipo_calculado = (
-        "entrada" if not ultimo_registro or ultimo_registro.tipo == "saida" else "saida"
-    )
+    ultimo_registro = registros_hoje[0] if registros_hoje else None
+    tipo_calculado = "entrada" if not ultimo_registro or ultimo_registro.tipo == "saida" else "saida"
 
-    # --- TRATAMENTO DA FOTO (Mantido intacto) ---
-    acc = request.form.get("acc")
+    # --- TRATAMENTO DA FOTO ---
     foto_base64 = request.form.get("foto_base64")
     foto_path_rel = None
 
@@ -1949,16 +1946,18 @@ def registrar_ponto(token):
             foto_bytes = base64.b64decode(foto_base64)
             fotos_dir = os.path.join(app.root_path, "static", "ponto_fotos")
             os.makedirs(fotos_dir, exist_ok=True)
-            filename = (
-                f"{funcionario.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}.jpg"
-            )
+            
+            # Usando datetime.now() para nome de arquivo para manter consistência com o fuso local
+            filename = f"{funcionario.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
             file_path = os.path.join(fotos_dir, filename)
+            
             with open(file_path, "wb") as f:
                 f.write(foto_bytes)
             foto_path_rel = f"ponto_fotos/{filename}"
         except Exception as e:
-            print(f"Erro ao salvar foto de ponto: {e}")
+            print(f"Erro ao salvar foto: {e}")
 
+    # --- GRAVAÇÃO NO BANCO ---
     try:
         registro = RegistroPonto(
             funcionario_id=funcionario.id,
@@ -1972,10 +1971,11 @@ def registrar_ponto(token):
         db.session.add(registro)
         db.session.commit()
         flash(f"Ponto de {tipo_calculado.upper()} registrado com sucesso!", "success")
+        registrar_log(f"PONTO_{tipo_calculado.upper()}", funcionario.nome)
     except Exception as e:
         db.session.rollback()
         flash("Erro ao gravar no banco de dados.", "error")
-        print(f"Erro: {e}")
+        print(f"Erro ao salvar registro de ponto: {e}")
 
     return redirect(url_for("pagina_ponto", token=token))
 
