@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>QR Codes por Unidade - Gestoor 360</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Diretório de Unidades</h1>
+                <p class="text-sm text-gray-500">QR Codes para Ponto Eletrônico com Geofencing</p>
+            </div>
+            <a href="{{ url_for('admin_dashboard') }}" class="bg-white border border-gray-300 px-4 py-2 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-50">
+                Voltar ao Painel
+            </a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {% for local in locais %}
+            <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-200 flex flex-col items-center">
+                <div class="w-full flex justify-between items-start mb-4">
+                    <span class="bg-teal-100 text-teal-700 text-[10px] font-bold px-2 py-1 rounded">ID: {{ local.id }}</span>
+                    <i class="ph ph-buildings text-2xl text-teal-500"></i>
+                </div>
+                
+                <h2 class="text-lg font-bold text-gray-900 mb-4 uppercase text-center w-full truncate">{{ local.nome }}</h2>
+
+                <div id="qrcode-{{ local.id }}" class="bg-white p-3 border-2 border-gray-100 rounded-2xl mb-4"></div>
+
+                <p class="text-[10px] font-mono text-gray-400 mb-6 break-all text-center">
+                    /ponto-facial?local_id={{ local.id }}
+                </p>
+                
+                <div class="w-full space-y-2">
+                    <button onclick="window.print()" class="w-full bg-gray-900 text-white text-xs font-bold py-3 rounded-xl hover:bg-gray-800 transition flex items-center justify-center gap-2">
+                        <i class="ph ph-printer"></i> Imprimir Cartaz
+                    </button>
+                    <a href="/admin/ponto/escola/{{ local.id }}" class="block text-center text-teal-600 text-[10px] font-bold hover:underline">
+                        Ver Frequência desta Unidade
+                    </a>
+                </div>
+            </div>
+
+            <script>
+                // Gera o QR Code para esta unidade específica
+                new QRCode(document.getElementById("qrcode-{{ local.id }}"), {
+                    text: window.location.origin + "/ponto-facial?local_id={{ local.id }}",
+                    width: 150,
+                    height: 150,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.H
+                });
+            </script>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

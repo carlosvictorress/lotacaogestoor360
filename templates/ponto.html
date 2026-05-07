@@ -78,7 +78,7 @@
                             <ul class="list-disc list-inside space-y-1">
                                 <li>Permita o acesso à localização do dispositivo.</li>
                                 <li>Permita o acesso à câmera para registrar sua foto.</li>
-                                <li>Toque em <strong>"Bater Ponto"</strong> e aguarde a confirmação.</li>
+                                <li>Toque em <strong>"Registrar Ponto"</strong> e aguarde a confirmação.</li>
                             </ul>
                         </div>
                     </div>
@@ -87,7 +87,7 @@
                         <input type="hidden" name="lat" id="lat">
                         <input type="hidden" name="lng" id="lng">
                         <input type="hidden" name="acc" id="acc">
-                        <input type="hidden" name="tipo" id="tipo" value="entrada">
+                        <input type="hidden" name="tipo" id="tipo" value="automatico">
                         <input type="hidden" name="foto_base64" id="foto_base64">
 
                         <div class="space-y-2">
@@ -114,18 +114,12 @@
                             </div>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-3">
-                            <button type="button" class="btnTipoPonto w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold
-                                       bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    data-tipo="entrada">
-                                <i class="ph ph-sign-in text-lg"></i>
-                                <span>Entrada</span>
-                            </button>
-                            <button type="button" class="btnTipoPonto w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold
-                                       bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed"
-                                    data-tipo="saida">
-                                <i class="ph ph-sign-out text-lg"></i>
-                                <span>Saída</span>
+                        <div>
+                            <button type="button" class="btnTipoPonto w-full inline-flex items-center justify-center gap-2 px-4 py-4 rounded-2xl text-base font-bold
+                                       bg-slate-900 text-white hover:bg-black disabled:opacity-60 disabled:cursor-not-allowed shadow-md transition-all"
+                                    data-tipo="automatico">
+                                <i class="ph ph-fingerprint text-xl"></i>
+                                <span>Registrar Ponto</span>
                             </button>
                         </div>
 
@@ -139,13 +133,17 @@
                         <div class="border-t border-slate-100 pt-4 mt-2">
                             <p class="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-2">
                                 <i class="ph ph-clock-counter-clockwise text-base text-slate-500"></i>
-                                Últimos registros
+                                Últimos registros hoje
                             </p>
                             <div class="max-h-40 overflow-y-auto space-y-1 pb-4">
                                 {% for r in registros %}
-                                    <div class="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-1.5">
-                                        <span>{{ r.data_hora.strftime('%d/%m/%Y %H:%M') }}</span>
-                                        <span class="uppercase tracking-wide">{{ r.tipo }}</span>
+                                    <div class="flex items-center justify-between text-[11px] text-slate-500 bg-slate-50 rounded-xl px-3 py-2 border border-slate-100">
+                                        <span class="font-medium text-slate-700">{{ r.data_hora.strftime('%d/%m/%Y %H:%M:%S') }}</span>
+                                        {% if r.tipo == 'entrada' %}
+                                            <span class="uppercase font-bold tracking-wide text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Entrada</span>
+                                        {% else %}
+                                            <span class="uppercase font-bold tracking-wide text-slate-600 bg-slate-200 px-2 py-0.5 rounded">Saída</span>
+                                        {% endif %}
                                     </div>
                                 {% endfor %}
                             </div>
@@ -236,7 +234,7 @@
             fotoInput.value = dataUrl;
 
             botoes.forEach((b) => b.disabled = true);
-            botao.querySelector('span').textContent = 'Enviando...';
+            botao.querySelector('span').textContent = 'Processando...';
 
             document.getElementById('pontoForm').submit();
             });
@@ -245,4 +243,3 @@
     {% endif %}
 </body>
 </html>
-

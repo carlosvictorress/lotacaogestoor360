@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestão de Frequência - {{ escola.nome }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body class="bg-slate-50 min-h-screen pb-12">
+
+    <header class="bg-white border-b border-slate-200 p-6 mb-8">
+        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-black text-slate-900 tracking-tight">{{ escola.nome }}</h1>
+                <p class="text-sm text-slate-500 font-medium uppercase tracking-widest">Painel de Frequência Escolar</p>
+            </div>
+            <a href="{{ url_for('admin_dashboard') }}" class="text-sm font-bold text-slate-600 hover:text-black flex items-center gap-2">
+                <i class="ph ph-arrow-left"></i> Voltar ao Painel
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-6">
+        <!-- Filtros -->
+        <div class="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row items-end gap-4">
+            <div class="flex-1">
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Mês de Referência</label>
+                <form method="GET" id="filterForm">
+                    <input type="month" name="mes" value="{{ mes }}" onchange="document.getElementById('filterForm').submit()"
+                           class="w-full mt-1 bg-slate-50 border border-slate-200 rounded-2xl p-3 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500">
+                </form>
+            </div>
+            <div class="bg-blue-50 text-blue-700 px-6 py-3 rounded-2xl border border-blue-100 flex items-center gap-3">
+                <i class="ph ph-users-three text-2xl"></i>
+                <div>
+                    <p class="text-[10px] font-black uppercase leading-none">Servidores na Unidade</p>
+                    <p class="text-lg font-black">{{ servidores|length }}</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista de Servidores -->
+        <div class="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
+            <table class="w-full text-left">
+                <thead class="bg-slate-50 border-b border-slate-100">
+                    <tr class="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        <th class="px-8 py-5">Servidor / CPF</th>
+                        <th class="px-8 py-5">Cargo / Jornada</th>
+                        <th class="px-8 py-5 text-center">Status Mês</th>
+                        <th class="px-8 py-5 text-right">Relatório</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for s in servidores %}
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="px-8 py-5">
+                            <p class="font-bold text-slate-900 uppercase leading-tight">{{ s.nome }}</p>
+                            <p class="text-[10px] text-slate-400 font-mono">{{ s.cpf }}</p>
+                        </td>
+                        <td class="px-8 py-5">
+                            <p class="text-xs font-bold text-slate-700 uppercase">{{ s.funcao.nome if s.funcao else 'N/A' }}</p>
+                            <p class="text-[10px] text-blue-600 font-black">{{ s.jornada_trabalho }} HORAS</p>
+                        </td>
+                        <td class="px-8 py-5 text-center">
+                            <!-- Placeholder para lógica de assiduidade -->
+                            <span class="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase border border-emerald-100">
+                                Ativo no Sistema
+                            </span>
+                        </td>
+                        <td class="px-8 py-5 text-right">
+                            <button onclick="gerarRelatorioFrequencia('{{ s.id }}', '{{ s.nome }}', '{{ mes }}')" 
+                                    class="bg-black text-white px-4 py-2 rounded-xl text-[10px] font-black hover:bg-slate-800 transition shadow-lg shadow-slate-200">
+                                <i class="ph ph-file-pdf text-base align-middle mr-1"></i> ESPELHO DE PONTO
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        function gerarRelatorioFrequencia(id, nome, mes) {
+            // Removemos o alert() e ativamos o redirecionamento
+            window.location.href = `/admin/ponto/gerar_pdf/${id}?mes=${mes}`;
+        }
+    </script>
+</body>
+</html>

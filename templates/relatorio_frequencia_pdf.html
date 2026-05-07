@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { size: A4; margin: 10mm; }
+        body { font-family: 'Helvetica', sans-serif; font-size: 9pt; color: #333; }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 5px; margin-bottom: 10px; }
+        .info-box { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; border: 1px solid #ccc; padding: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #000; padding: 4px; text-align: center; }
+        th { background: #f2f2f2; font-size: 8pt; text-transform: uppercase; }
+        .falta { color: red; font-weight: bold; }
+        .resumo { margin-top: 15px; font-weight: bold; border: 1px solid #000; padding: 10px; }
+        .assinaturas { margin-top: 50px; display: flex; justify-content: space-around; }
+        .linha { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="/static/logo.jpg" style="height: 40px;">[cite: 16]
+        <h2 style="margin:0;">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h2>
+        <h3 style="margin:0;">SECRETARIA MUNICIPAL DE EDUCAÇÃO</h3>
+        <p style="margin:2px;">ESPELHO DE PONTO MENSAL - {{ resumo.mes }}</p>
+    </div>
+
+    <div class="info-box">
+        <div><strong>SERVIDOR:</strong> {{ f.nome }}</div>
+        <div><strong>CPF:</strong> {{ f.cpf }}</div>
+        <div><strong>CARGO:</strong> {{ f.funcao.nome if f.funcao else 'N/A' }}</div>
+        <div><strong>UNIDADE:</strong> {{ f.local_trabalho.nome if f.local_trabalho else 'SME' }}</div>
+        <div><strong>JORNADA:</strong> {{ f.jornada_trabalho }} HORAS</div>[cite: 16]
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Data</th>
+                <th>Dia</th>
+                <th>Entrada 1</th>
+                <th>Saída 1</th>
+                <th>Entrada 2</th>
+                <th>Saída 2</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for d in folha %}
+            <tr>
+                <td>{{ d.dia }}</td>
+                <td>{{ d.dia_nome }}</td>
+                <td>{{ d.batidas[0].data_hora.strftime('%H:%M') if d.batidas|length > 0 else '--:--' }}</td>
+                <td>{{ d.batidas[1].data_hora.strftime('%H:%M') if d.batidas|length > 1 else '--:--' }}</td>
+                <td>{{ d.batidas[2].data_hora.strftime('%H:%M') if d.batidas|length > 2 else '--:--' }}</td>
+                <td>{{ d.batidas[3].data_hora.strftime('%H:%M') if d.batidas|length > 3 else '--:--' }}</td>
+                <td class="{{ 'falta' if d.status == 'FALTA' else '' }}">{{ d.status }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="resumo">
+        RESUMO MENSAL: 
+        DIAS TRABALHADOS: {{ resumo.trabalhados }} | 
+        DIAS FALTOSOS: {{ resumo.faltas }}[cite: 12]
+    </div>
+
+    <div class="assinaturas">
+        <div class="linha">Assinatura do Servidor</div>
+        <div class="linha">Direção / Chefia Imediata</div>
+    </div>
+    
+    <script>window.onload = function() { window.print(); }</script>[cite: 13]
+</body>
+</html>

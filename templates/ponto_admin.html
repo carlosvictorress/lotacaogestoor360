@@ -2,201 +2,196 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Ponto Eletrônico - Painel SME</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auditoria de Frequência | Gestoor 360</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #FBFBFD; 
+            color: #1D1D1F;
+            -webkit-font-smoothing: antialiased;
+        }
+        .sf-card {
+            background: #FFFFFF;
+            border: 1px solid #D2D2D7;
+            border-radius: 12px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+        .sidebar-item:hover { background-color: #F5F5F7; }
+        .row-hover:hover { background-color: #F5F5F7; cursor: default; }
+        
+        /* Inputs estilo Apple */
+        .apple-input {
+            background: #F5F5F7;
+            border: 1px solid transparent;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 13px;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .apple-input:focus {
+            background: #FFFFFF;
+            border-color: #0071E3;
+            box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.1);
+            outline: none;
+        }
+        
+        .btn-primary {
+            background-color: #0071E3;
+            color: white;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover { background-color: #0077ED; opacity: 0.9; }
+    </style>
 </head>
-<body class="bg-slate-100 min-h-screen">
-    <div class="max-w-6xl mx-auto px-4 py-6">
-        <div class="flex items-center justify-between mb-4">
-            <div>
-                <h1 class="text-xl font-bold text-slate-900">Registros de Ponto</h1>
-                <p class="text-xs text-slate-500 mt-1">
-                    Últimos registros de entrada/saída de todos os servidores (limite 200).
-                </p>
-            </div>
-            <a href="{{ url_for('admin_dashboard') }}" class="text-xs text-slate-600 hover:text-black flex items-center gap-1">
-                <i class="ph ph-arrow-left"></i> Voltar ao Painel
+<body class="bg-[#FBFBFD]">
+
+    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-xl border-b border-[#D2D2D7] px-6 h-14 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <a href="/admin" class="group flex items-center gap-2 text-[#0071E3] text-sm font-medium transition-all hover:opacity-80">
+                <i class="ph ph-caret-left-bold text-base transition-transform group-hover:-translate-x-0.5"></i>
+                Dashboard
             </a>
+            <div class="h-4 w-[1px] bg-[#D2D2D7]"></div>
+            <h1 class="text-sm font-semibold tracking-tight">Auditoria de Ponto</h1>
         </div>
+        
+        <div class="flex items-center gap-3">
+            <span class="text-[11px] font-bold text-[#86868B] uppercase tracking-wider">Mês de Referência: {{ mes }}</span>
+        </div>
+    </nav>
 
-        <form method="GET" class="bg-white border border-slate-200 rounded-2xl px-4 py-3 mb-4 flex flex-col md:flex-row gap-3 items-end">
-            <div class="flex-1">
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Nome do Servidor</label>
-                <input type="text" name="busca_nome" value="{{ filtro_nome }}"
-                       class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-black">
+    <main class="max-w-[1600px] mx-auto p-6 grid grid-cols-12 gap-6">
+        
+        <aside class="col-span-12 lg:col-span-3 space-y-6">
+            
+            <div class="sf-card p-5">
+                <h3 class="text-xs font-bold text-[#86868B] uppercase tracking-widest mb-4">Filtrar Auditoria</h3>
+                <form method="GET" class="space-y-4">
+                    <div>
+                        <label class="text-[10px] font-bold text-[#1D1D1F] uppercase mb-1.5 block ml-1">Servidor</label>
+                        <input type="text" name="busca_nome" value="{{ filtro_nome }}" placeholder="Nome ou CPF" class="w-full apple-input">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-[#1D1D1F] uppercase mb-1.5 block ml-1">Unidade / Secretaria</label>
+                        <select name="secretaria_id" class="w-full apple-input appearance-none">
+                            <option value="">Todas</option>
+                            {% for sec in secretarias %}
+                            <option value="{{ sec.id }}" {{ 'selected' if filtro_secretaria == sec.id|string }}>{{ sec.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full btn-primary py-2 rounded-lg text-sm">Aplicar</button>
+                </form>
             </div>
-            <div class="w-full md:w-64">
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Secretaria</label>
-                <select name="secretaria_id"
-                        class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-black">
-                    <option value="">Todas</option>
-                    {% for sec in secretarias %}
-                        <option value="{{ sec.id }}" {% if filtro_secretaria == sec.id|string %}selected{% endif %}>
-                            {{ sec.nome }}
-                        </option>
+
+            <div class="sf-card overflow-hidden">
+                <div class="p-4 border-b border-[#D2D2D7] bg-[#F5F5F7]">
+                    <h3 class="text-[10px] font-bold text-[#86868B] uppercase tracking-widest">Ranking de Absenteísmo</h3>
+                </div>
+                <div class="divide-y divide-[#D2D2D7] max-h-[400px] overflow-y-auto">
+                    {% for s in resumo_servidores %}
+                    <div class="p-3 sidebar-item transition-colors flex justify-between items-center">
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-[#1D1D1F] truncate uppercase">{{ s.nome }}</p>
+                            <p class="text-[10px] text-[#86868B]">Total no mês</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs font-bold text-[#FF3B30]">{{ s.total_horas }}h</p>
+                        </div>
+                    </div>
                     {% endfor %}
-                </select>
-            </div>
-            <div class="w-full md:w-44">
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Mês</label>
-                <input type="month" name="mes" value="{{ mes }}"
-                       class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-black">
-            </div>
-            <div class="w-full md:w-40">
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Entrada 1 (20h)</label>
-                <input type="time" name="inicio_20" value="{{ inicio_20 }}"
-                       class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-black">
-            </div>
-            <div class="w-full md:w-40">
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Entrada 1 (40h)</label>
-                <input type="time" name="inicio_40" value="{{ inicio_40 }}"
-                       class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-black">
-            </div>
-            <div class="w-full md:w-40">
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Entrada 2 (retorno)</label>
-                <input type="time" name="entrada_2" value="{{ entrada_2 }}"
-                       class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-black">
-            </div>
-            <div class="w-full md:w-40">
-                <label class="block text-[11px] font-semibold text-slate-500 uppercase mb-1">Tolerância (min)</label>
-                <input type="number" min="0" name="tolerancia_min" value="{{ tolerancia_min }}"
-                       class="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-black">
-            </div>
-            <button class="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-black text-white hover:bg-slate-800">
-                <i class="ph ph-magnifying-glass"></i>
-                Filtrar
-            </button>
-        </form>
-
-        <div class="mb-4 bg-white border border-slate-200 rounded-2xl px-4 py-3">
-            <div class="text-[11px] font-semibold text-slate-500 uppercase mb-1">Resumo do mês (atraso nas entradas)</div>
-            <div class="flex flex-col md:flex-row md:items-center md:gap-4">
-                <div class="text-sm font-bold text-slate-900">
-                    Total geral: {{ atraso_total_geral_min }} min ({{ atraso_total_geral_horas }} h)
-                </div>
-                <div class="text-[11px] text-slate-500 mt-1 md:mt-0">
-                    Considera atraso na primeira entrada do dia e no retorno (segunda entrada).
                 </div>
             </div>
-        </div>
+        </aside>
 
-        <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-slate-50 text-[11px] uppercase text-slate-500">
-                    <tr>
-                        <th class="px-4 py-3 text-left">Data / Hora</th>
-                        <th class="px-4 py-3 text-left">Servidor</th>
-                        <th class="px-4 py-3 text-left">Lotação / Local</th>
-                        <th class="px-4 py-3 text-center">Tipo</th>
-                        <th class="px-4 py-3 text-center">Atraso</th>
-                        <th class="px-4 py-3 text-left">Geo</th>
-                        <th class="px-4 py-3 text-center">Foto</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    {% for r in registros %}
-                        <tr class="hover:bg-slate-50">
-                            <td class="px-4 py-2 align-top whitespace-nowrap text-xs text-slate-600">
-                                {{ r.data_hora.strftime('%d/%m/%Y %H:%M:%S') }}
-                            </td>
-                            <td class="px-4 py-2 align-top">
-                                <p class="text-sm font-semibold text-slate-900">{{ r.funcionario.nome }}</p>
-                                <p class="text-[11px] text-slate-500">
-                                    {{ r.funcionario.funcao.nome if r.funcionario.funcao else 'Função não informada' }}
-                                </p>
-                            </td>
-                            <td class="px-4 py-2 align-top">
-                                <p class="text-xs font-medium text-slate-800">
-                                    {{ r.funcionario.secretaria.nome if r.funcionario.secretaria else 'Secretaria não informada' }}
-                                </p>
-                                <p class="text-[11px] text-slate-500">
-                                    {{ r.funcionario.local_trabalho.nome if r.funcionario.local_trabalho else 'Local não informado' }}
-                                </p>
-                            </td>
-                            <td class="px-4 py-2 align-top text-center whitespace-nowrap text-[11px]">
-                                {% if r.tipo == 'entrada' %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold">ENTRADA</span>
-                                {% elif r.tipo == 'saida' %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold">SAÍDA</span>
-                                {% else %}
-                                    <span class="inline-flex items-center px-2 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 font-semibold">{{ r.tipo|upper }}</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-4 py-2 align-top text-center text-[11px] whitespace-nowrap">
-                                {% if r.tipo == 'entrada' %}
-                                    {% if r.atraso_minutos and r.atraso_minutos > 0 %}
-                                        <span class="font-semibold text-red-700">{{ r.atraso_minutos }} min</span>
-                                    {% else %}
-                                        <span class="text-emerald-700 font-semibold">0 min</span>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="text-slate-400">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-4 py-2 align-top text-[11px] text-slate-600">
-                                {% if r.latitude and r.longitude %}
-                                    <div>
-                                        {{ '%.5f' % r.latitude }}, {{ '%.5f' % r.longitude }}
-                                    </div>
-                                    {% if r.precisao %}
-                                        <div>± {{ r.precisao|round(0) }} m</div>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="text-slate-400">Sem dados</span>
-                                {% endif %}
-                            </td>
-                            <td class="px-4 py-2 align-top text-center">
-                                {% if r.foto_path %}
-                                    <a href="{{ url_for('static', filename=r.foto_path) }}"
-                                       target="_blank"
-                                       class="inline-flex items-center justify-center w-10 h-10 rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
-                                        <img src="{{ url_for('static', filename=r.foto_path) }}"
-                                             alt="Foto ponto"
-                                             class="w-full h-full object-cover">
-                                    </a>
-                                {% else %}
-                                    <span class="text-[11px] text-slate-400">Sem foto</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% else %}
-                        <tr>
-                            <td colspan="7" class="px-4 py-6 text-center text-sm text-slate-500">
-                                Nenhum registro de ponto encontrado.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        {% if resumo_servidores %}
-            <div class="mt-6 bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                <div class="px-4 py-3 border-b border-slate-100">
-                    <div class="text-[11px] font-semibold text-slate-500 uppercase mb-1">Atraso por servidor</div>
+        <section class="col-span-12 lg:col-span-9">
+            
+            <div class="sf-card overflow-hidden bg-white">
+                <div class="p-4 border-b border-[#D2D2D7] flex justify-between items-center">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 bg-[#34C759] rounded-full"></div>
+                        <span class="text-xs font-bold text-[#1D1D1F] uppercase">Logs de Frequência</span>
+                    </div>
+                    <span class="text-[10px] text-[#86868B] font-medium">Mostrando os últimos {{ registros|length }} registros</span>
                 </div>
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-50 text-[11px] uppercase text-slate-500">
-                        <tr>
-                            <th class="px-4 py-3 text-left">Servidor</th>
-                            <th class="px-4 py-3 text-center">Total atraso</th>
-                            <th class="px-4 py-3 text-center">Equivalente</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        {% for s in resumo_servidores %}
-                            <tr class="hover:bg-slate-50">
-                                <td class="px-4 py-2 text-sm font-semibold text-slate-900">{{ s.nome }}</td>
-                                <td class="px-4 py-2 text-center text-[11px] text-slate-700 font-semibold">{{ s.total_minutos }} min</td>
-                                <td class="px-4 py-2 text-center text-[11px] text-slate-500">{{ s.total_horas }} h</td>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-[#F5F5F7] text-[10px] text-[#86868B] font-bold uppercase tracking-wider border-b border-[#D2D2D7]">
+                                <th class="px-6 py-3">Horário</th>
+                                <th class="px-6 py-3">Servidor / Unidade</th>
+                                <th class="px-6 py-3">Evento</th>
+                                <th class="px-6 py-3">Situação</th>
+                                <th class="px-6 py-3 text-center">Verificação</th>
                             </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody class="divide-y divide-[#D2D2D7]">
+                            {% for r in registros %}
+                            <tr class="row-hover transition-colors">
+                                <td class="px-6 py-3">
+                                    <p class="text-xs font-semibold text-[#1D1D1F]">{{ r.data_hora.strftime('%d/%m/%Y') }}</p>
+                                    <p class="text-[10px] text-[#0071E3] font-mono">{{ r.data_hora.strftime('%H:%M:%S') }}</p>
+                                </td>
+                                <td class="px-6 py-3">
+                                    <p class="text-xs font-bold text-[#1D1D1F] uppercase">{{ r.funcionario.nome }}</p>
+                                    <p class="text-[9px] text-[#86868B] uppercase">{{ r.funcionario.local_trabalho.nome if r.funcionario.local_trabalho else '---' }}</p>
+                                </td>
+                                <td class="px-6 py-3">
+                                    {% if r.tipo == 'entrada' %}
+                                    <span class="text-[9px] font-bold text-[#34C759] border border-[#34C759]/30 px-2 py-0.5 rounded uppercase">Entrada</span>
+                                    {% else %}
+                                    <span class="text-[9px] font-bold text-[#86868B] border border-[#D2D2D7] px-2 py-0.5 rounded uppercase">Saída</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-3">
+                                    {% if r.atraso_minutos > 0 %}
+                                    <div class="flex items-center gap-1">
+                                        <div class="w-1.5 h-1.5 bg-[#FF3B30] rounded-full"></div>
+                                        <span class="text-[11px] font-bold text-[#FF3B30]">+{{ r.atraso_minutos }}min</span>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-[10px] text-[#34C759] font-bold">REGULAR</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-6 py-3 text-center">
+                                    {% if r.foto_path %}
+                                    <button onclick="abrirQuickLook('{{ url_for('static', filename=r.foto_path) }}')" class="text-[#0071E3] hover:bg-[#0071E3]/10 p-1.5 rounded-md transition-colors">
+                                        <i class="ph ph-eye text-lg"></i>
+                                    </button>
+                                    {% else %}
+                                    <i class="ph ph-minus text-[#D2D2D7]"></i>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
-        {% endif %}
+        </section>
+    </main>
+
+    <div id="quickLook" class="fixed inset-0 bg-white/60 backdrop-blur-md hidden z-[100] flex items-center justify-center p-4 transition-all" onclick="this.classList.add('hidden')">
+        <div class="bg-white rounded-2xl shadow-2xl border border-[#D2D2D7] overflow-hidden max-w-sm w-full" onclick="event.stopPropagation()">
+            <div class="p-3 border-b border-[#D2D2D7] flex justify-between items-center">
+                <span class="text-[10px] font-bold text-[#86868B] uppercase">Evidência Facial</span>
+                <button onclick="document.getElementById('quickLook').classList.add('hidden')" class="text-xs font-bold text-[#0071E3]">OK</button>
+            </div>
+            <img id="quickLookImg" src="" class="w-full aspect-[3/4] object-cover">
+        </div>
     </div>
+
+    <script>
+        function abrirQuickLook(url) {
+            document.getElementById('quickLookImg').src = url;
+            document.getElementById('quickLook').classList.remove('hidden');
+        }
+    </script>
 </body>
 </html>
-

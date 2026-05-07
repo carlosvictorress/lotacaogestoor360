@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="p-8">
+    <h1 class="text-2xl font-bold mb-6 text-gray-800">Acesso Rápido - Frequência por Unidade</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {% for escola in escolas %}
+        <a href="{{ url_for('ponto_escola', escola_id=escola.id) }}" 
+           class="p-6 bg-white rounded-xl shadow-sm border border-gray-200 hover:border-blue-500 hover:shadow-md transition-all group">
+            <div class="flex items-center justify-between">
+                <div>
+                    <span class="text-xs font-bold text-blue-600 uppercase">ID: {{ escola.id }}</span>
+                    <h2 class="text-lg font-semibold text-gray-900 group-hover:text-blue-600">{{ escola.nome }}</h2>
+                </div>
+                <i class="ph ph-arrow-square-out text-2xl text-gray-400 group-hover:text-blue-500"></i>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
