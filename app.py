@@ -2260,6 +2260,24 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
     )
     return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
+@app.route("/admin/salvar_biometria", methods=["POST"])
+@login_required
+def salvar_biometria():
+    if not current_user.is_admin:
+        return {"error": "Não autorizado"}, 403
+    
+    dados = request.json
+    funcionario_id = dados.get("id")
+    foto_base64 = dados.get("foto") 
+
+    funcionario = db.session.get(Funcionario, funcionario_id)
+    if funcionario:
+        funcionario.foto_biometria = foto_base64 # Salva a string da imagem
+        db.session.commit()
+        registrar_log("MAPEAMENTO_FACIAL", funcionario.nome)
+        return {"status": "sucesso"}
+    return {"error": "Funcionário não encontrado"}, 404
+
 
 @app.route("/ponto-facial")
 def ponto_portal():

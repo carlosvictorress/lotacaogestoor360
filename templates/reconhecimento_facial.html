@@ -19,16 +19,16 @@
                     },
                     colors: {
                         app: {
-                            bg: '#f5f5f7', // Fundo cinza claro para contraste
-                            card: '#ffffff', // Cards em branco puro para destaque
-                            border: '#d2d2d7', // Borda mais definida
+                            bg: '#f5f5f7',
+                            card: '#ffffff',
+                            border: '#d2d2d7',
                             'input-bg': '#ffffff',
                             text: '#1d1d1f',
-                            'text-sec': '#48484a', // Cinza mais escuro para melhor leitura
+                            'text-sec': '#48484a',
                         },
                         system: {
-                            green: '#248a3d', // Verde com contraste maior
-                            yellow: '#a68a00', // Amarelo com tom mais escuro para leitura
+                            green: '#248a3d',
+                            yellow: '#a68a00',
                         }
                     },
                     animation: { 'scan': 'scan 2.5s linear infinite' },
@@ -121,17 +121,18 @@
                 <div class="relative aspect-square overflow-hidden bg-gray-100 rounded-lg border border-gray-200">
                     <div class="scanner-line animate-scan hidden group-hover:block"></div>
                     
-                    <label class="absolute inset-0 cursor-pointer z-30 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm">
-                        <i class="ph ph-camera-plus text-2xl text-black mb-1"></i>
-                        <span class="text-[8px] font-black uppercase text-black">Upload</span>
-                        <input type="file" class="hidden" accept="image/*" onchange="uploadFoto(this, '{{ f.id }}')">
-                    </label>
+                    <div class="absolute inset-0 cursor-pointer z-30 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm"
+                         onclick="capturarFotoSistema('{{ f.id }}')">
+                        <i class="ph ph-camera text-2xl text-black mb-1"></i>
+                        <span class="text-[8px] font-black uppercase text-black text-center">Capturar<br>Biometria</span>
+                    </div>
 
-                    <img id="img-{{ f.id }}" src="https://ui-avatars.com/api/?name={{ f.nome }}&background=e5e7eb&color=374151&size=256" 
+                    <img id="img-{{ f.id }}" 
+                         src="{{ f.foto_biometria if f.foto_biometria else 'https://ui-avatars.com/api/?name=' ~ f.nome ~ '&background=e5e7eb&color=374151&size=256' }}" 
                          class="profile-pic w-full h-full object-cover">
                     
                     <div class="absolute bottom-1.5 right-1.5 z-10">
-                        <i class="ph ph-fingerprint text-system-green text-xs"></i>
+                        <i class="ph ph-fingerprint {{ 'text-system-green' if f.foto_biometria else 'text-gray-300' }} text-xs"></i>
                     </div>
                 </div>
 
@@ -151,25 +152,63 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
-            Object.keys(fotosSalvas).forEach(id => {
-                const img = document.getElementById(`img-${id}`);
-                if(img) img.src = fotosSalvas[id];
+            // Sincroniza o localStorage com o que veio do banco de dados para o Portal do Ponto funcionar offline
+            const fotosParaCache = {};
+            document.querySelectorAll('.card-servidor').forEach(card => {
+                const img = card.querySelector('.profile-pic');
+                const id = img.id.replace('img-', '');
+                if (img.src.startsWith('data:image')) {
+                    fotosParaCache[id] = img.src;
+                }
             });
+            localStorage.setItem('bioid_fotos', JSON.stringify(fotosParaCache));
             atualizarContador();
         });
 
-        function uploadFoto(input, id) {
-            if (input.files && input.files[0]) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = document.getElementById(`img-${id}`);
-                    img.src = e.target.result;
-                    const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
-                    fotosSalvas[id] = e.target.result;
-                    localStorage.setItem('bioid_fotos', JSON.stringify(fotosSalvas));
-                }
-                reader.readAsDataURL(input.files[0]);
+        async function capturarFotoSistema(id) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                
+                // Cria interface temporária de captura
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                await video.play();
+
+                const canvas = document.createElement('canvas');
+                canvas.width = 300;
+                canvas.height = 300;
+                const ctx = canvas.getContext('2d');
+
+                // Simula um delay para o usuário se posicionar
+                setTimeout(async () => {
+                    ctx.drawImage(video, 0, 0, 300, 300);
+                    const fotoComprimida = canvas.toDataURL('image/jpeg', 0.5); // JPEG 50% = Míseros KB
+
+                    // Envia para o servidor para salvar no banco
+                    const response = await fetch('/admin/salvar_biometria', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: id, foto: fotoComprimida })
+                    });
+
+                    if (response.ok) {
+                        document.getElementById(`img-${id}`).src = fotoComprimida;
+                        
+                        // Atualiza o cache local imediatamente
+                        const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
+                        fotosSalvas[id] = fotoComprimida;
+                        localStorage.setItem('bioid_fotos', JSON.stringify(fotosSalvas));
+                        
+                        alert("Biometria mapeada e salva no sistema!");
+                    } else {
+                        alert("Erro ao salvar no servidor.");
+                    }
+
+                    stream.getTracks().forEach(t => t.stop());
+                }, 1500);
+
+            } catch (err) {
+                alert("Erro ao acessar câmera: " + err.message);
             }
         }
 
