@@ -2268,11 +2268,11 @@ def salvar_biometria():
     
     dados = request.json
     funcionario_id = dados.get("id")
-    foto_base64 = dados.get("foto") 
+    foto_base64 = dados.get("foto")
 
     funcionario = db.session.get(Funcionario, funcionario_id)
     if funcionario:
-        funcionario.foto_biometria = foto_base64 # Salva a string da imagem
+        funcionario.foto_biometria = foto_base64
         db.session.commit()
         registrar_log("MAPEAMENTO_FACIAL", funcionario.nome)
         return {"status": "sucesso"}

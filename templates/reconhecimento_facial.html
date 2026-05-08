@@ -69,9 +69,37 @@
 
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #d2d2d7; border-radius: 2px; }
+
+        /* Estilo para o Modal de Opções */
+        #modalOpcoes {
+            backdrop-filter: blur(4px);
+            display: none;
+        }
     </style>
 </head>
 <body class="min-h-screen pb-16">
+
+    <div id="modalOpcoes" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+        <div class="w-full max-w-xs bg-white rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+            <div class="p-6 text-center border-b border-gray-100">
+                <h3 class="font-extrabold text-gray-900">Atualizar Biometria</h3>
+                <p class="text-xs text-gray-500 mt-1" id="nomeServidorModal">Selecione uma opção</p>
+            </div>
+            <div class="p-2 space-y-2">
+                <button onclick="dispararCamera()" class="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-2xl transition-colors text-sm font-bold text-blue-600">
+                    <i class="ph ph-camera text-2xl"></i> Abrir Câmera
+                </button>
+                <button onclick="document.getElementById('inputArquivo').click()" class="w-full flex items-center gap-4 p-4 hover:bg-gray-50 rounded-2xl transition-colors text-sm font-bold text-gray-700">
+                    <i class="ph ph-image text-2xl"></i> Escolher da Galeria
+                </button>
+            </div>
+            <button onclick="fecharModal()" class="w-full p-4 text-xs font-black text-red-500 border-t border-gray-100 hover:bg-red-50 transition-colors">
+                CANCELAR
+            </button>
+        </div>
+    </div>
+
+    <input type="file" id="inputArquivo" class="hidden" accept="image/*" onchange="processarArquivo(this)">
 
     <header class="sticky top-0 z-50 border-b border-gray-200 bg-white/80 backdrop-blur-md no-print">
         <div class="max-w-[1600px] mx-auto px-6 py-3 flex items-center justify-between">
@@ -91,7 +119,6 @@
     </header>
 
     <main class="max-w-[1600px] mx-auto px-6 mt-8">
-        
         <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mb-8 p-3 bg-white rounded-2xl border border-gray-200 shadow-sm">
             <div class="md:col-span-3 relative">
                 <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-500"></i>
@@ -122,9 +149,9 @@
                     <div class="scanner-line animate-scan hidden group-hover:block"></div>
                     
                     <div class="absolute inset-0 cursor-pointer z-30 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm"
-                         onclick="capturarFotoSistema('{{ f.id }}')">
+                         onclick="abrirMenuOpcoes('{{ f.id }}', '{{ f.nome }}')">
                         <i class="ph ph-camera text-2xl text-black mb-1"></i>
-                        <span class="text-[8px] font-black uppercase text-black text-center">Capturar<br>Biometria</span>
+                        <span class="text-[8px] font-black uppercase text-black text-center">Atualizar<br>Biometria</span>
                     </div>
 
                     <img id="img-{{ f.id }}" 
@@ -151,8 +178,92 @@
     </main>
 
     <script>
+        let servidorSelecionadoId = null;
+
+        function abrirMenuOpcoes(id, nome) {
+            servidorSelecionadoId = id;
+            document.getElementById('nomeServidorModal').innerText = nome;
+            document.getElementById('modalOpcoes').style.display = 'flex';
+        }
+
+        function fecharModal() {
+            document.getElementById('modalOpcoes').style.display = 'none';
+        }
+
+        // OPÇÃO 1: DISPARAR CÂMERA (Antigo capturarFotoSistema agora com controle manual)
+        async function dispararCamera() {
+            fecharModal();
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                await video.play();
+
+                const canvas = document.createElement('canvas');
+                canvas.width = 400;
+                canvas.height = 400;
+                const ctx = canvas.getContext('2d');
+
+                // Delay curto para focar
+                setTimeout(async () => {
+                    ctx.drawImage(video, 0, 0, 400, 400);
+                    const fotoComprimida = canvas.toDataURL('image/jpeg', 0.6);
+                    enviarAoServidor(servidorSelecionadoId, fotoComprimida);
+                    stream.getTracks().forEach(t => t.stop());
+                }, 1000);
+
+            } catch (err) {
+                alert("Erro ao acessar câmera: " + err.message);
+            }
+        }
+
+        // OPÇÃO 2: PROCESSAR ARQUIVO DA GALERIA
+        function processarArquivo(input) {
+            fecharModal();
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 400;
+                        canvas.height = 400;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, 400, 400);
+                        const fotoComprimida = canvas.toDataURL('image/jpeg', 0.6);
+                        enviarAoServidor(servidorSelecionadoId, fotoComprimida);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // FUNÇÃO DE ENVIO COMUM
+        async function enviarAoServidor(id, foto) {
+            try {
+                const response = await fetch('/admin/salvar_biometria', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id, foto: foto })
+                });
+
+                if (response.ok) {
+                    document.getElementById(`img-${id}`).src = foto;
+                    const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
+                    fotosSalvas[id] = foto;
+                    localStorage.setItem('bioid_fotos', JSON.stringify(fotosSalvas));
+                    alert("Biometria atualizada com sucesso!");
+                } else {
+                    alert("Erro ao salvar no servidor.");
+                }
+            } catch (err) {
+                alert("Erro na conexão: " + err.message);
+            }
+        }
+
+        // RESTANTE DAS FUNÇÕES (FILTRO E CONTADOR)
         document.addEventListener('DOMContentLoaded', () => {
-            // Sincroniza o localStorage com o que veio do banco de dados para o Portal do Ponto funcionar offline
             const fotosParaCache = {};
             document.querySelectorAll('.card-servidor').forEach(card => {
                 const img = card.querySelector('.profile-pic');
@@ -165,58 +276,10 @@
             atualizarContador();
         });
 
-        async function capturarFotoSistema(id) {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-                
-                // Cria interface temporária de captura
-                const video = document.createElement('video');
-                video.srcObject = stream;
-                await video.play();
-
-                const canvas = document.createElement('canvas');
-                canvas.width = 300;
-                canvas.height = 300;
-                const ctx = canvas.getContext('2d');
-
-                // Simula um delay para o usuário se posicionar
-                setTimeout(async () => {
-                    ctx.drawImage(video, 0, 0, 300, 300);
-                    const fotoComprimida = canvas.toDataURL('image/jpeg', 0.5); // JPEG 50% = Míseros KB
-
-                    // Envia para o servidor para salvar no banco
-                    const response = await fetch('/admin/salvar_biometria', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ id: id, foto: fotoComprimida })
-                    });
-
-                    if (response.ok) {
-                        document.getElementById(`img-${id}`).src = fotoComprimida;
-                        
-                        // Atualiza o cache local imediatamente
-                        const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
-                        fotosSalvas[id] = fotoComprimida;
-                        localStorage.setItem('bioid_fotos', JSON.stringify(fotosSalvas));
-                        
-                        alert("Biometria mapeada e salva no sistema!");
-                    } else {
-                        alert("Erro ao salvar no servidor.");
-                    }
-
-                    stream.getTracks().forEach(t => t.stop());
-                }, 1500);
-
-            } catch (err) {
-                alert("Erro ao acessar câmera: " + err.message);
-            }
-        }
-
         function filtrarGaleria() {
             const busca = document.getElementById('filtroGeral').value.toUpperCase();
             const local = document.getElementById('filtroLocal').value.toUpperCase();
             const cards = document.getElementsByClassName('card-servidor');
-            
             for (let card of cards) {
                 const dados = card.dataset.nome.toUpperCase() + card.dataset.cpf + card.dataset.funcao.toUpperCase();
                 const localCard = card.dataset.local.toUpperCase();
