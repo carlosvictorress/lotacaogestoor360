@@ -9,7 +9,8 @@ import pandas as pd
 import math
 import re  # <--- ADICIONE ESTA LINHA AQUI
 import base64
-
+import pytz
+from datetime import datetime
 import sqlite3
 
 from datetime import date
@@ -1870,6 +1871,10 @@ def registrar_ponto(token):
         flash("Servidor não encontrado ou QRCode inválido.", "error")
         return redirect(url_for("pagina_ponto", token=token))
 
+    # --- AJUSTE DE HORÁRIO BRASÍLIA ---
+    fuso_br = pytz.timezone('America/Sao_Paulo')
+    agora_br = datetime.now(fuso_br).replace(tzinfo=None)
+
     # Recebe as coordenadas enviadas pelo celular do funcionário
     lat_req = request.form.get("lat")
     lng_req = request.form.get("lng")
@@ -1878,23 +1883,20 @@ def registrar_ponto(token):
     # --- INÍCIO DA VALIDAÇÃO DE GEOFENCING ---
     local = funcionario.local_trabalho
     
-    # Verificamos se o local existe e se tem coordenadas cadastradas
     if local and local.latitude and local.longitude:
         if not lat_req or not lng_req:
             flash("Localização GPS não capturada. Verifique se o GPS está ativo e se você deu permissão ao navegador.", "error")
             return redirect(url_for("pagina_ponto", token=token))
 
         try:
-            # Convertemos tudo para float para garantir a conta matemática
             f_lat_req = float(lat_req)
             f_lng_req = float(lng_req)
             f_lat_loc = float(local.latitude)
             f_lng_loc = float(local.longitude)
 
             distancia_metros = calcular_distancia(f_lat_req, f_lng_req, f_lat_loc, f_lng_loc)
-            raio_limite = local.raio_permitido or 50  # Padrão 50m se estiver nulo
+            raio_limite = local.raio_permitido or 50 
             
-            # LOG DE DEPURAÇÃO: Isso aparecerá no Log do Railway para você conferir os números
             print(f"DEBUG PONTO: {funcionario.nome} | Distância: {distancia_metros:.2f}m | Limite: {raio_limite}m")
 
             if distancia_metros > raio_limite:
@@ -1908,14 +1910,11 @@ def registrar_ponto(token):
             flash("Erro ao processar coordenadas de localização.", "error")
             return redirect(url_for("pagina_ponto", token=token))
     else:
-        # Alerta opcional caso a escola não tenha GPS cadastrado no sistema
-        print(f"AVISO: {funcionario.nome} bateu ponto em local sem GPS cadastrado ({local.nome if local else 'Sem Local'}).")
+        print(f"AVISO: {funcionario.nome} bateu ponto em local sem GPS cadastrado.")
 
-    # --- FIM DA VALIDAÇÃO DE GEOFENCING ---
-
-    # --- LÓGICA DE ALTERNÂNCIA E LIMITES ---
-    hoje_inicio = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    hoje_fim = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
+    # --- LÓGICA DE ALTERNÂNCIA E LIMITES COM HORÁRIO CORRETO ---
+    hoje_inicio = agora_br.replace(hour=0, minute=0, second=0, microsecond=0)
+    hoje_fim = agora_br.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     registros_hoje = (
         RegistroPonto.query.filter(
@@ -1947,8 +1946,8 @@ def registrar_ponto(token):
             fotos_dir = os.path.join(app.root_path, "static", "ponto_fotos")
             os.makedirs(fotos_dir, exist_ok=True)
             
-            # Usando datetime.now() para nome de arquivo para manter consistência com o fuso local
-            filename = f"{funcionario.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
+            # Nome do arquivo usando o timestamp de Brasília
+            filename = f"{funcionario.id}_{agora_br.strftime('%Y%m%d%H%M%S')}.jpg"
             file_path = os.path.join(fotos_dir, filename)
             
             with open(file_path, "wb") as f:
@@ -1961,7 +1960,7 @@ def registrar_ponto(token):
     try:
         registro = RegistroPonto(
             funcionario_id=funcionario.id,
-            data_hora=datetime.now(),
+            data_hora=agora_br, # Salvando com o horário corrigido
             tipo=tipo_calculado,
             latitude=float(lat_req) if lat_req else None,
             longitude=float(lng_req) if lng_req else None,
@@ -1970,8 +1969,9 @@ def registrar_ponto(token):
         )
         db.session.add(registro)
         db.session.commit()
-        flash(f"Ponto de {tipo_calculado.upper()} registrado com sucesso!", "success")
+        
         registrar_log(f"PONTO_{tipo_calculado.upper()}", funcionario.nome)
+        flash(f"Ponto de {tipo_calculado.upper()} registrado com sucesso!", "success")
     except Exception as e:
         db.session.rollback()
         flash("Erro ao gravar no banco de dados.", "error")
@@ -2059,6 +2059,10 @@ def registrar_ponto_facial():
     lng = request.form.get("lng")
     foto_base64 = request.form.get("foto_base64")
 
+    # --- AJUSTE DE HORÁRIO BRASÍLIA ---
+    fuso_br = pytz.timezone('America/Sao_Paulo')
+    agora_br = datetime.now(fuso_br).replace(tzinfo=None)
+
     if cpf_informado:
         cpf_limpo = "".join(filter(str.isdigit, cpf_informado))
         funcionario = Funcionario.query.filter(
@@ -2068,14 +2072,11 @@ def registrar_ponto_facial():
         # Pega o ID vindo do reconhecimento facial
         id_facial = request.form.get("funcionario_id")
         
-        # --- CORREÇÃO DO ERRO ---
-        # Verifica se o id_facial é vazio, nulo ou inválido antes de consultar o banco
         if not id_facial or id_facial == "" or id_facial == "None":
             flash("Erro: Nenhum servidor identificado. Aguarde o reconhecimento ou use o CPF.", "error")
             return redirect(url_for("ponto_portal"))
         
         try:
-            # Converte explicitamente para inteiro para evitar erro de sintaxe no Postgres
             id_valido = int(id_facial)
             funcionario = db.session.get(Funcionario, id_valido)
         except (ValueError, TypeError):
@@ -2086,9 +2087,9 @@ def registrar_ponto_facial():
         flash("Servidor não localizado. Verifique os dados ou procure o RH.", "error")
         return redirect(url_for("ponto_portal"))
 
-    # --- INÍCIO DA LÓGICA DE ALTERNÂNCIA E LIMITES ---
-    hoje_inicio = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    hoje_fim = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
+    # --- LÓGICA DE ALTERNÂNCIA E LIMITES COM HORÁRIO CORRETO ---
+    hoje_inicio = agora_br.replace(hour=0, minute=0, second=0, microsecond=0)
+    hoje_fim = agora_br.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     registros_hoje = (
         RegistroPonto.query.filter(
@@ -2106,10 +2107,8 @@ def registrar_ponto_facial():
         flash("Limite diário atingido. Você já registrou 4 batidas de ponto hoje.", "error")
         return redirect(url_for("ponto_portal"))
 
-    ultimo_registro = registros_hoje[0] if total_batidas > 0 else None
-    tipo_atual = (
-        "entrada" if not ultimo_registro or ultimo_registro.tipo == "saida" else "saida"
-    )
+    # Define se é entrada ou saída com base no último registro de HOJE
+    tipo_atual = "entrada" if not registros_hoje or registros_hoje[0].tipo == "saida" else "saida"
 
     # --- SALVAMENTO DA FOTO ---
     foto_path_rel = None
@@ -2120,7 +2119,8 @@ def registrar_ponto_facial():
             foto_bytes = base64.b64decode(foto_base64)
             fotos_dir = os.path.join(app.root_path, "static", "ponto_fotos")
             os.makedirs(fotos_dir, exist_ok=True)
-            filename = f"ponto_{funcionario.id}_{datetime.now().strftime('%Y%m%d%H%M%S')}.jpg"
+            # Nome do arquivo com timestamp correto
+            filename = f"ponto_{funcionario.id}_{agora_br.strftime('%Y%m%d%H%M%S')}.jpg"
             file_path = os.path.join(fotos_dir, filename)
             with open(file_path, "wb") as f:
                 f.write(foto_bytes)
@@ -2132,7 +2132,7 @@ def registrar_ponto_facial():
     try:
         novo_registro = RegistroPonto(
             funcionario_id=funcionario.id,
-            data_hora=datetime.now(),
+            data_hora=agora_br, # Salvando com o horário de Brasília
             tipo=tipo_atual,
             latitude=float(lat) if lat else None,
             longitude=float(lng) if lng else None,
