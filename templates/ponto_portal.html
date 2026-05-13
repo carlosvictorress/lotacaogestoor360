@@ -1,18 +1,20 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Portal do Servidor - Ponto Eletrônico SME</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    
+
     <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
-    
+
     <style>
         .clock-gradient {
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
         }
+
         .scanner-line {
             height: 2px;
             background: #10b981;
@@ -22,54 +24,81 @@
             z-index: 10;
             animation: scan 2.5s linear infinite;
         }
+
         @keyframes scan {
-            0% { top: 0%; opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { top: 100%; opacity: 0; }
+            0% {
+                top: 0%;
+                opacity: 0;
+            }
+
+            10% {
+                opacity: 1;
+            }
+
+            90% {
+                opacity: 1;
+            }
+
+            100% {
+                top: 100%;
+                opacity: 0;
+            }
         }
+
         /* Espelha a câmera para parecer um espelho real */
-        video { transform: scaleX(-1); object-fit: cover; }
-        canvas { position: absolute; top: 0; left: 0; transform: scaleX(-1); }
+        video {
+            transform: scaleX(-1);
+            object-fit: cover;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform: scaleX(-1);
+        }
     </style>
 </head>
+
 <body class="bg-slate-100 min-h-screen flex items-center justify-center p-4 relative">
 
     {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div id="toast-container" class="fixed top-6 right-6 z-50 flex flex-col gap-3">
-                {% for category, message in messages %}
-                    <div class="toast-msg px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold text-white transition-opacity duration-500 {{ 'bg-emerald-500' if category == 'success' else 'bg-red-500' }}">
-                        {% if category == 'success' %}
-                            <i class="ph ph-check-circle text-2xl"></i>
-                        {% else %}
-                            <i class="ph ph-warning-circle text-2xl"></i>
-                        {% endif %}
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-            
-            <script>
-                // Faz as mensagens sumirem sozinhas após 5 segundos
-                setTimeout(() => {
-                    const toasts = document.querySelectorAll('.toast-msg');
-                    toasts.forEach(toast => {
-                        toast.style.opacity = '0';
-                        setTimeout(() => toast.remove(), 500);
-                    });
-                }, 5000);
-            </script>
-        {% endif %}
+    {% if messages %}
+    <div id="toast-container" class="fixed top-6 right-6 z-50 flex flex-col gap-3">
+        {% for category, message in messages %}
+        <div
+            class="toast-msg px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold text-white transition-opacity duration-500 {{ 'bg-emerald-500' if category == 'success' else 'bg-red-500' }}">
+            {% if category == 'success' %}
+            <i class="ph ph-check-circle text-2xl"></i>
+            {% else %}
+            <i class="ph ph-warning-circle text-2xl"></i>
+            {% endif %}
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        // Faz as mensagens sumirem sozinhas após 5 segundos
+        setTimeout(() => {
+            const toasts = document.querySelectorAll('.toast-msg');
+            toasts.forEach(toast => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 500);
+            });
+        }, 5000);
+    </script>
+    {% endif %}
     {% endwith %}
 
-    <div class="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden transition-all" id="mainContainer">
-        
+    <div class="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden transition-all"
+        id="mainContainer">
+
         <div id="stepClock" class="p-8 text-center space-y-6">
             <div class="flex justify-center mb-4">
                 <img src="/static/logo.jpg" alt="Brasão Valença" class="h-20">
             </div>
-            
+
             <div class="clock-gradient rounded-3xl p-6 text-white shadow-inner">
                 <p class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Hora Oficial</p>
                 <div id="clock" class="text-5xl font-black font-mono">00:00:00</div>
@@ -81,11 +110,13 @@
                 <p class="text-slate-500 text-sm mt-2">Pronto para registrar sua frequência?</p>
             </div>
 
-            <button onclick="iniciarAppFacial()" id="btnIniciar" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-bold text-lg shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-3">
+            <button onclick="iniciarAppFacial()" id="btnIniciar"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-bold text-lg shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-3">
                 <i class="ph ph-fingerprint text-2xl"></i>
                 REGISTRAR PONTO
             </button>
-            <p id="loadingModelsMsg" class="text-xs font-bold text-blue-600 hidden animate-pulse">Carregando Inteligência Artificial...</p>
+            <p id="loadingModelsMsg" class="text-xs font-bold text-blue-600 hidden animate-pulse">Carregando
+                Inteligência Artificial...</p>
         </div>
 
         <div id="stepFacial" class="hidden p-8 text-center space-y-6">
@@ -96,7 +127,8 @@
                 <h2 class="font-bold text-slate-800">Validação Biométrica</h2>
             </div>
 
-            <div class="relative w-full aspect-square bg-black rounded-3xl overflow-hidden border-4 border-slate-100 shadow-lg" id="videoContainer">
+            <div class="relative w-full aspect-square bg-black rounded-3xl overflow-hidden border-4 border-slate-100 shadow-lg"
+                id="videoContainer">
                 <div id="scannerLine" class="scanner-line hidden"></div>
                 <video id="video" autoplay playsinline muted class="w-full h-full"></video>
             </div>
@@ -111,37 +143,44 @@
         </div>
 
         <div id="stepCPF" class="hidden p-8 text-center space-y-4">
-            
-            <div id="alertaFoto" class="hidden bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl text-left shadow-sm flex items-start gap-3">
+
+            <div id="alertaFoto"
+                class="hidden bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl text-left shadow-sm flex items-start gap-3">
                 <i class="ph ph-warning-circle text-2xl mt-0.5"></i>
                 <div>
                     <h3 class="font-bold text-sm">Rosto não reconhecido!</h3>
-                    <p class="text-xs mt-1 font-medium opacity-90">Servidor, por favor, dirija-se ao setor responsável para atualizar sua foto no módulo "Reconhecimento Facial".</p>
+                    <p class="text-xs mt-1 font-medium opacity-90">Servidor, por favor, dirija-se ao setor responsável
+                        para atualizar sua foto no módulo "Reconhecimento Facial".</p>
                 </div>
             </div>
 
             <h2 class="text-xl font-black text-slate-900 mt-4">Registro Manual</h2>
             <p class="text-sm text-slate-500 mb-4">Para não ficar com falta, registre o ponto pelo seu CPF abaixo.</p>
 
-            <form id="pontoForm" method="POST" action="/ponto/registrar_facial" class="space-y-4" onsubmit="return validarEnvio()">
+            <form id="pontoForm" method="POST" action="/ponto/registrar_facial" class="space-y-4"
+                onsubmit="return validarEnvio()">
                 <input type="hidden" name="lat" id="lat">
                 <input type="hidden" name="lng" id="lng">
                 <input type="hidden" name="foto_base64" id="foto_base64">
-                <input type="hidden" name="tipo" value="automatico"> 
+                <input type="hidden" name="tipo" value="automatico">
                 <input type="hidden" name="funcionario_id" id="inputFuncionarioId">
+
+                <input type="hidden" name="local_id" value="{{ local_id_selecionado }}">
 
                 <div class="text-left">
                     <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Informe seu CPF</label>
-                    <input type="text" name="cpf" id="cpfInput" placeholder="000.000.000-00" 
-                           class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                    <input type="text" name="cpf" id="cpfInput" placeholder="000.000.000-00"
+                        class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all">
                 </div>
 
-                <button type="submit" id="btnConfirmarCPF" class="w-full bg-black text-white py-5 rounded-2xl font-bold shadow-xl transition-all active:scale-95">
+                <button type="submit" id="btnConfirmarCPF"
+                    class="w-full bg-black text-white py-5 rounded-2xl font-bold shadow-xl transition-all active:scale-95">
                     CONFIRMAR PONTO
                 </button>
             </form>
-            
-            <button onclick="voltarRelogio()" class="text-xs font-bold text-slate-400 hover:text-black transition-colors mt-4">
+
+            <button onclick="voltarRelogio()"
+                class="text-xs font-bold text-slate-400 hover:text-black transition-colors mt-4">
                 Cancelar e voltar ao início
             </button>
         </div>
@@ -183,13 +222,13 @@
 
             if (!isModelsLoaded) {
                 loadingMsg.innerText = "Iniciando redes neurais...";
-                while(!isModelsLoaded) {
+                while (!isModelsLoaded) {
                     await new Promise(r => setTimeout(r, 500));
                 }
             }
 
             loadingMsg.innerText = "Sincronizando rostos (Verificando cache)...";
-            
+
             if (!faceMatcher) {
                 faceMatcher = await gerarAssinaturasFaciais();
             }
@@ -205,8 +244,8 @@
             let precisaAtualizar = false;
 
             for (const [id_funcionario, base64Image] of Object.entries(fotosSalvas)) {
-                const imageHash = base64Image.substring(0, 50); 
-                
+                const imageHash = base64Image.substring(0, 50);
+
                 if (descricoesSalvas[id_funcionario] && descricoesSalvas[id_funcionario].hash === imageHash) {
                     const arr = new Float32Array(Object.values(descricoesSalvas[id_funcionario].descriptor));
                     labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(id_funcionario, [arr]));
@@ -239,7 +278,7 @@
             if (labeledDescriptors.length > 0) {
                 return new faceapi.FaceMatcher(labeledDescriptors, 0.6);
             }
-            return null; 
+            return null;
         }
 
         // --- 5. FLUXO DE TELAS E CÂMERA ---
@@ -252,7 +291,7 @@
             stepClock.classList.add('hidden');
             stepCPF.classList.add('hidden');
             stepFacial.classList.remove('hidden');
-            
+
             document.getElementById('btnIniciar').classList.remove('hidden');
             document.getElementById('loadingModelsMsg').classList.add('hidden');
 
@@ -267,7 +306,7 @@
                 document.getElementById('scannerLine').classList.remove('hidden');
             } catch (err) {
                 alert("Erro ao acessar a câmera: " + err.message + "\nRedirecionando para registro manual.");
-                irParaCPF(false); 
+                irParaCPF(false);
             }
         }
 
@@ -275,7 +314,7 @@
             if (stream) { stream.getTracks().forEach(t => t.stop()); }
             clearInterval(detectionInterval);
             const oldCanvas = document.querySelector('canvas.face-api-canvas');
-            if(oldCanvas) oldCanvas.remove();
+            if (oldCanvas) oldCanvas.remove();
         }
 
         function voltarRelogio() {
@@ -283,7 +322,7 @@
             stepFacial.classList.add('hidden');
             stepCPF.classList.add('hidden');
             stepClock.classList.remove('hidden');
-            
+
             // Limpa dados para evitar erros de ID vazio
             document.getElementById('inputFuncionarioId').value = "";
             document.getElementById('cpfInput').value = "";
@@ -300,10 +339,10 @@
             faceapi.matchDimensions(canvas, displaySize);
 
             let tentativas = 0;
-            const maxTentativas = 15; 
+            const maxTentativas = 15;
 
             detectionInterval = setInterval(async () => {
-                if(stepFacial.classList.contains('hidden')) return;
+                if (stepFacial.classList.contains('hidden')) return;
 
                 const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
 
@@ -314,19 +353,19 @@
 
                     if (faceMatcher) {
                         const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
-                        
+
                         if (bestMatch.label !== 'unknown') {
                             clearInterval(detectionInterval);
                             document.getElementById('scannerLine').classList.add('hidden');
                             document.getElementById('statusMsg').innerText = "Rosto Reconhecido! Salvando...";
                             document.getElementById('statusMsg').classList.replace('text-blue-600', 'text-green-600');
                             document.getElementById('statusMsg').classList.replace('bg-blue-50', 'bg-green-50');
-                            
+
                             document.getElementById('inputFuncionarioId').value = bestMatch.label;
-                            
+
                             salvarFotoAuditoria();
                             capturarGeo(); // Garante o GPS no momento exato
-                            
+
                             setTimeout(() => {
                                 document.getElementById('pontoForm').submit();
                             }, 1000);
@@ -338,16 +377,16 @@
                 tentativas++;
                 if (tentativas >= maxTentativas) {
                     clearInterval(detectionInterval);
-                    irParaCPF(true); 
+                    irParaCPF(true);
                 }
             }, 300);
         });
 
         // --- 7. FALLBACK PARA O CPF E MENSAGEM ---
         function irParaCPF(mostrarAviso) {
-            salvarFotoAuditoria(); 
+            salvarFotoAuditoria();
             pararCamera();
-            
+
             stepFacial.classList.add('hidden');
             stepCPF.classList.remove('hidden');
 
@@ -403,4 +442,5 @@
         });
     </script>
 </body>
+
 </html>

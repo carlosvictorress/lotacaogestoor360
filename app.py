@@ -2058,36 +2058,61 @@ def registrar_ponto_facial():
     lat = request.form.get("lat")
     lng = request.form.get("lng")
     foto_base64 = request.form.get("foto_base64")
+    
+    # PEGA O LOCAL ONDE O PONTO ESTÁ SENDO BATIDO (vindo do formulário/QR Code)
+    local_batida_id = request.form.get("local_id")
 
     # --- AJUSTE DE HORÁRIO BRASÍLIA ---
     fuso_br = pytz.timezone('America/Sao_Paulo')
     agora_br = datetime.now(fuso_br).replace(tzinfo=None)
 
+    # 1. Identificação do Funcionário
     if cpf_informado:
         cpf_limpo = "".join(filter(str.isdigit, cpf_informado))
         funcionario = Funcionario.query.filter(
             (Funcionario.cpf == cpf_informado) | (Funcionario.cpf == cpf_limpo)
         ).first()
     else:
-        # Pega o ID vindo do reconhecimento facial
         id_facial = request.form.get("funcionario_id")
-        
         if not id_facial or id_facial == "" or id_facial == "None":
             flash("Erro: Nenhum servidor identificado. Aguarde o reconhecimento ou use o CPF.", "error")
-            return redirect(url_for("ponto_portal"))
+            return redirect(url_for("ponto_portal", local_id=local_batida_id))
         
         try:
             id_valido = int(id_facial)
             funcionario = db.session.get(Funcionario, id_valido)
         except (ValueError, TypeError):
             flash("Identificação inválida recebida pelo sistema.", "error")
-            return redirect(url_for("ponto_portal"))
+            return redirect(url_for("ponto_portal", local_id=local_batida_id))
 
     if not funcionario:
         flash("Servidor não localizado. Verifique os dados ou procure o RH.", "error")
-        return redirect(url_for("ponto_portal"))
+        return redirect(url_for("ponto_portal", local_id=local_batida_id))
 
-    # --- LÓGICA DE ALTERNÂNCIA E LIMITES COM HORÁRIO CORRETO ---
+    # --- NOVA TRAVA DE SEGURANÇA: VÍNCULO DE UNIDADE ---
+    local_batida = db.session.get(LocalTrabalho, local_batida_id) if local_batida_id else None
+    
+    if local_batida:
+        # Verifica se o servidor pertence a esta unidade específica
+        if funcionario.local_trabalho_id != local_batida.id:
+            flash(f"Acesso Negado: Seu vínculo é em '{funcionario.local_trabalho.nome if funcionario.local_trabalho else 'outra unidade'}'. Você não pode bater ponto em '{local_batida.nome}'.", "error")
+            return redirect(url_for("ponto_portal", local_id=local_batida_id))
+
+        # --- VALIDAÇÃO DE GEOFENCING (Fisicamente no local) ---
+        if local_batida.latitude and local_batida.longitude:
+            if not lat or not lng:
+                flash("GPS não detectado. Ative a localização para registrar o ponto.", "error")
+                return redirect(url_for("ponto_portal", local_id=local_batida_id))
+                
+            distancia = calcular_distancia(float(lat), float(lng), local_batida.latitude, local_batida.longitude)
+            raio = local_batida.raio_permitido or 50
+            
+            if distancia > raio:
+                flash(f"Fora do Raio: Você está a {int(distancia)}m desta unidade. O limite permitido é {raio}m.", "error")
+                registrar_log("TENTATIVA_FORA_RAIO", f"{funcionario.nome} em {local_batida.nome}")
+                return redirect(url_for("ponto_portal", local_id=local_batida_id))
+
+    # --- LÓGICA DE ALTERNÂNCIA E LIMITES ---
     hoje_inicio = agora_br.replace(hour=0, minute=0, second=0, microsecond=0)
     hoje_fim = agora_br.replace(hour=23, minute=59, second=59, microsecond=999999)
 
@@ -2101,13 +2126,10 @@ def registrar_ponto_facial():
         .all()
     )
 
-    total_batidas = len(registros_hoje)
-
-    if total_batidas >= 4:
+    if len(registros_hoje) >= 4:
         flash("Limite diário atingido. Você já registrou 4 batidas de ponto hoje.", "error")
-        return redirect(url_for("ponto_portal"))
+        return redirect(url_for("ponto_portal", local_id=local_batida_id))
 
-    # Define se é entrada ou saída com base no último registro de HOJE
     tipo_atual = "entrada" if not registros_hoje or registros_hoje[0].tipo == "saida" else "saida"
 
     # --- SALVAMENTO DA FOTO ---
@@ -2119,7 +2141,6 @@ def registrar_ponto_facial():
             foto_bytes = base64.b64decode(foto_base64)
             fotos_dir = os.path.join(app.root_path, "static", "ponto_fotos")
             os.makedirs(fotos_dir, exist_ok=True)
-            # Nome do arquivo com timestamp correto
             filename = f"ponto_{funcionario.id}_{agora_br.strftime('%Y%m%d%H%M%S')}.jpg"
             file_path = os.path.join(fotos_dir, filename)
             with open(file_path, "wb") as f:
@@ -2132,7 +2153,7 @@ def registrar_ponto_facial():
     try:
         novo_registro = RegistroPonto(
             funcionario_id=funcionario.id,
-            data_hora=agora_br, # Salvando com o horário de Brasília
+            data_hora=agora_br,
             tipo=tipo_atual,
             latitude=float(lat) if lat else None,
             longitude=float(lng) if lng else None,
@@ -2141,14 +2162,14 @@ def registrar_ponto_facial():
         db.session.add(novo_registro)
         db.session.commit()
 
-        registrar_log(f"PONTO {tipo_atual.upper()}", f"{funcionario.nome}")
+        registrar_log(f"PONTO {tipo_atual.upper()}", f"{funcionario.nome} em {local_batida.nome if local_batida else 'Unidade'}")
         flash(f"Ponto de {tipo_atual.upper()} registrado com sucesso!", "success")
     except Exception as e:
         db.session.rollback()
         flash("Erro ao gravar no banco de dados.", "error")
         print(f"Erro: {e}")
 
-    return redirect(url_for("ponto_portal"))
+    return redirect(url_for("ponto_portal", local_id=local_batida_id))
 
 
 @app.route("/admin/ponto/escola/<int:local_id>")
@@ -2282,10 +2303,36 @@ def salvar_biometria():
 @app.route("/ponto-facial")
 def ponto_portal():
     """Página principal do portal de ponto facial/coletivo."""
-    local_id = request.args.get('local_id') # Captura o ID do QR Code
+    # 1. Captura o ID do local vindo da URL (ex: /ponto-facial?local_id=5)
+    local_id = request.args.get('local_id')
+    
+    # 2. Busca todos os locais para alimentar o seletor manual (caso o admin queira mudar)
     locais = LocalTrabalho.query.order_by(LocalTrabalho.nome).all()
-    servidores = Funcionario.query.order_by(Funcionario.nome).all()
-    return render_template("ponto_portal.html", servidores=servidores, locais=locais, local_id_selecionado=local_id)
+    
+    # 3. Lógica de filtragem de servidores
+    if local_id:
+        # Se um local foi identificado pelo QR Code, mostra apenas os servidores daquela unidade
+        servidores = Funcionario.query.filter_by(local_trabalho_id=local_id).order_by(Funcionario.nome).all()
+        
+        # Opcional: Verificar se o local_id existe para evitar erros de banco
+        local_atual = db.session.get(LocalTrabalho, local_id)
+        if not local_atual:
+            flash("Unidade de trabalho não encontrada ou QR Code inválido.", "error")
+            # Se o local for inválido, limpa o local_id para não quebrar o formulário
+            local_id = None 
+            servidores = Funcionario.query.order_by(Funcionario.nome).all()
+    else:
+        # Se não houver QR Code, carrega todos os servidores (comportamento padrão)
+        servidores = Funcionario.query.order_by(Funcionario.nome).all()
+
+    # 4. Retorna o template com os dados necessários
+    # local_id_selecionado será usado no formulário hidden no HTML para a trava de segurança
+    return render_template(
+        "ponto_portal.html", 
+        servidores=servidores, 
+        locais=locais, 
+        local_id_selecionado=local_id
+    )
 
 @app.route("/admin/escolas/atalhos")
 @login_required
