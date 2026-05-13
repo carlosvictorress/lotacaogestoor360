@@ -188,259 +188,264 @@
     </div>
 
     <script>
-        // --- 1. RELÓGIO ---
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('clock').innerText = now.toLocaleTimeString('pt-BR');
-            const options = { day: 'numeric', month: 'long', year: 'numeric' };
-            document.getElementById('dateText').innerText = now.toLocaleDateString('pt-BR', options);
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
+    // --- 1. RELÓGIO ---
+    function updateClock() {
+        const now = new Date();
+        document.getElementById('clock').innerText = now.toLocaleTimeString('pt-BR');
+        const options = { day: 'numeric', month: 'long', year: 'numeric' };
+        document.getElementById('dateText').innerText = now.toLocaleDateString('pt-BR', options);
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
 
-        // --- Variáveis Globais da IA ---
-        let faceMatcher = null;
-        let stream = null;
-        let isModelsLoaded = false;
-        let detectionInterval;
+    // --- Variáveis Globais da IA ---
+    let faceMatcher = null;
+    let stream = null;
+    let isModelsLoaded = false;
+    let detectionInterval;
 
-        // --- 2. CARREGAMENTO FANTASMA DA INTELIGÊNCIA ---
-        Promise.all([
-            faceapi.nets.ssdMobilenetv1.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
-            faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
-            faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/')
-        ]).then(() => {
-            isModelsLoaded = true;
-            console.log("Modelos de IA carregados no fundo.");
-        });
+    // --- 2. CARREGAMENTO DOS MODELOS TINY (Ultra-rápido) ---
+    Promise.all([
+        // Trocamos o modelo pesado pelo TinyFaceDetector
+        faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
+        faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
+        faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/')
+    ]).then(() => {
+        isModelsLoaded = true;
+        console.log("Modelos Tiny IA carregados.");
+    });
 
-        // --- 3. INICIAR FLUXO AO CLICAR NO BOTÃO ---
-        async function iniciarAppFacial() {
-            document.getElementById('btnIniciar').classList.add('hidden');
-            const loadingMsg = document.getElementById('loadingModelsMsg');
-            loadingMsg.classList.remove('hidden');
+    // --- 3. INICIAR FLUXO AO CLICAR NO BOTÃO ---
+    async function iniciarAppFacial() {
+        document.getElementById('btnIniciar').classList.add('hidden');
+        const loadingMsg = document.getElementById('loadingModelsMsg');
+        loadingMsg.classList.remove('hidden');
 
-            if (!isModelsLoaded) {
-                loadingMsg.innerText = "Iniciando redes neurais...";
-                while (!isModelsLoaded) {
-                    await new Promise(r => setTimeout(r, 500));
-                }
+        if (!isModelsLoaded) {
+            loadingMsg.innerText = "Iniciando redes neurais...";
+            while (!isModelsLoaded) {
+                await new Promise(r => setTimeout(r, 500));
             }
-
-            loadingMsg.innerText = "Sincronizando rostos (Verificando cache)...";
-
-            if (!faceMatcher) {
-                faceMatcher = await gerarAssinaturasFaciais();
-            }
-
-            irParaCaptura();
         }
 
-        // --- 4. CONVERTE AS FOTOS COM CACHE DE ALTA PERFORMANCE ---
-        async function gerarAssinaturasFaciais() {
-            const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
-            const descricoesSalvas = JSON.parse(localStorage.getItem('bioid_descritores') || '{}');
-            const labeledDescriptors = [];
-            let precisaAtualizar = false;
+        loadingMsg.innerText = "Sincronizando rostos (Verificando cache)...";
 
-            for (const [id_funcionario, base64Image] of Object.entries(fotosSalvas)) {
-                const imageHash = base64Image.substring(0, 50);
-
-                if (descricoesSalvas[id_funcionario] && descricoesSalvas[id_funcionario].hash === imageHash) {
-                    const arr = new Float32Array(Object.values(descricoesSalvas[id_funcionario].descriptor));
-                    labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(id_funcionario, [arr]));
-                    continue;
-                }
-
-                try {
-                    const img = new Image();
-                    img.src = base64Image;
-                    await new Promise((resolve) => { img.onload = resolve; });
-
-                    const detection = await faceapi.detectSingleFace(img).withFaceLandmarks().withFaceDescriptor();
-                    if (detection) {
-                        labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(id_funcionario, [detection.descriptor]));
-                        descricoesSalvas[id_funcionario] = {
-                            hash: imageHash,
-                            descriptor: detection.descriptor
-                        };
-                        precisaAtualizar = true;
-                    }
-                } catch (e) {
-                    console.error("Erro ao processar foto do ID:", id_funcionario);
-                }
-            }
-
-            if (precisaAtualizar) {
-                localStorage.setItem('bioid_descritores', JSON.stringify(descricoesSalvas));
-            }
-
-            if (labeledDescriptors.length > 0) {
-                return new faceapi.FaceMatcher(labeledDescriptors, 0.6);
-            }
-            return null;
+        if (!faceMatcher) {
+            faceMatcher = await gerarAssinaturasFaciais();
         }
 
-        // --- 5. FLUXO DE TELAS E CÂMERA ---
-        const stepClock = document.getElementById('stepClock');
-        const stepFacial = document.getElementById('stepFacial');
-        const stepCPF = document.getElementById('stepCPF');
-        const video = document.getElementById('video');
+        irParaCaptura();
+    }
 
-        function irParaCaptura() {
-            stepClock.classList.add('hidden');
-            stepCPF.classList.add('hidden');
-            stepFacial.classList.remove('hidden');
+    // --- 4. CONVERTE AS FOTOS COM CACHE DE ALTA PERFORMANCE ---
+    async function gerarAssinaturasFaciais() {
+        const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
+        const descricoesSalvas = JSON.parse(localStorage.getItem('bioid_descritores') || '{}');
+        const labeledDescriptors = [];
+        let precisaAtualizar = false;
 
-            document.getElementById('btnIniciar').classList.remove('hidden');
-            document.getElementById('loadingModelsMsg').classList.add('hidden');
+        for (const [id_funcionario, base64Image] of Object.entries(fotosSalvas)) {
+            const imageHash = base64Image.substring(0, 50);
 
-            capturarGeo();
-            abrirCamera();
-        }
+            if (descricoesSalvas[id_funcionario] && descricoesSalvas[id_funcionario].hash === imageHash) {
+                const arr = new Float32Array(Object.values(descricoesSalvas[id_funcionario].descriptor));
+                labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(id_funcionario, [arr]));
+                continue;
+            }
 
-        async function abrirCamera() {
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 400, height: 400 } });
-                video.srcObject = stream;
-                document.getElementById('scannerLine').classList.remove('hidden');
-            } catch (err) {
-                alert("Erro ao acessar a câmera: " + err.message + "\nRedirecionando para registro manual.");
-                irParaCPF(false);
-            }
-        }
+                const img = new Image();
+                img.src = base64Image;
+                await new Promise((resolve) => { img.onload = resolve; });
 
-        function pararCamera() {
-            if (stream) { stream.getTracks().forEach(t => t.stop()); }
-            clearInterval(detectionInterval);
-            const oldCanvas = document.querySelector('canvas.face-api-canvas');
-            if (oldCanvas) oldCanvas.remove();
-        }
-
-        function voltarRelogio() {
-            pararCamera();
-            stepFacial.classList.add('hidden');
-            stepCPF.classList.add('hidden');
-            stepClock.classList.remove('hidden');
-
-            // Limpa dados para evitar erros de ID vazio
-            document.getElementById('inputFuncionarioId').value = "";
-            document.getElementById('cpfInput').value = "";
-            document.getElementById('alertaFoto').classList.add('hidden');
-            document.getElementById('cpfInput').required = false;
-        }
-
-        // --- 6. LÓGICA DE RECONHECIMENTO AO VIVO ---
-        video.addEventListener('play', () => {
-            const canvas = faceapi.createCanvasFromMedia(video);
-            canvas.classList.add('face-api-canvas');
-            document.getElementById('videoContainer').append(canvas);
-            const displaySize = { width: video.width || 400, height: video.height || 400 };
-            faceapi.matchDimensions(canvas, displaySize);
-
-            let tentativas = 0;
-            const maxTentativas = 15;
-
-            detectionInterval = setInterval(async () => {
-                if (stepFacial.classList.contains('hidden')) return;
-
-                const detection = await faceapi.detectSingleFace(video).withFaceLandmarks().withFaceDescriptor();
-
+                // Detecção inicial também usando Tiny para ser coerente
+                const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
                 if (detection) {
-                    const resizedDetections = faceapi.resizeResults(detection, displaySize);
-                    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
-                    faceapi.draw.drawDetections(canvas, resizedDetections);
+                    labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(id_funcionario, [detection.descriptor]));
+                    descricoesSalvas[id_funcionario] = {
+                        hash: imageHash,
+                        descriptor: detection.descriptor
+                    };
+                    precisaAtualizar = true;
+                }
+            } catch (e) {
+                console.error("Erro ao processar foto do ID:", id_funcionario);
+            }
+        }
 
-                    if (faceMatcher) {
-                        const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+        if (precisaAtualizar) {
+            localStorage.setItem('bioid_descritores', JSON.stringify(descricoesSalvas));
+        }
 
-                        if (bestMatch.label !== 'unknown') {
-                            clearInterval(detectionInterval);
-                            document.getElementById('scannerLine').classList.add('hidden');
-                            document.getElementById('statusMsg').innerText = "Rosto Reconhecido! Salvando...";
-                            document.getElementById('statusMsg').classList.replace('text-blue-600', 'text-green-600');
-                            document.getElementById('statusMsg').classList.replace('bg-blue-50', 'bg-green-50');
+        if (labeledDescriptors.length > 0) {
+            return new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+        }
+        return null;
+    }
 
-                            document.getElementById('inputFuncionarioId').value = bestMatch.label;
+    // --- 5. FLUXO DE TELAS E CÂMERA ---
+    const stepClock = document.getElementById('stepClock');
+    const stepFacial = document.getElementById('stepFacial');
+    const stepCPF = document.getElementById('stepCPF');
+    const video = document.getElementById('video');
 
-                            salvarFotoAuditoria();
-                            capturarGeo(); // Garante o GPS no momento exato
+    function irParaCaptura() {
+        stepClock.classList.add('hidden');
+        stepCPF.classList.add('hidden');
+        stepFacial.classList.remove('hidden');
 
-                            setTimeout(() => {
-                                document.getElementById('pontoForm').submit();
-                            }, 1000);
-                            return;
-                        }
+        document.getElementById('btnIniciar').classList.remove('hidden');
+        document.getElementById('loadingModelsMsg').classList.add('hidden');
+
+        capturarGeo();
+        abrirCamera();
+    }
+
+    async function abrirCamera() {
+        try {
+            // Resolução reduzida para 250x250 para aumentar a performance
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { width: 250, height: 250, facingMode: "user" } 
+            });
+            video.srcObject = stream;
+            document.getElementById('scannerLine').classList.remove('hidden');
+        } catch (err) {
+            alert("Erro ao acessar a câmera: " + err.message + "\nRedirecionando para registro manual.");
+            irParaCPF(false);
+        }
+    }
+
+    function pararCamera() {
+        if (stream) { stream.getTracks().forEach(t => t.stop()); }
+        clearInterval(detectionInterval);
+        const oldCanvas = document.querySelector('canvas.face-api-canvas');
+        if (oldCanvas) oldCanvas.remove();
+    }
+
+    function voltarRelogio() {
+        pararCamera();
+        stepFacial.classList.add('hidden');
+        stepCPF.classList.add('hidden');
+        stepClock.classList.remove('hidden');
+
+        document.getElementById('inputFuncionarioId').value = "";
+        document.getElementById('cpfInput').value = "";
+        document.getElementById('alertaFoto').classList.add('hidden');
+        document.getElementById('cpfInput').required = false;
+    }
+
+    // --- 6. LÓGICA DE RECONHECIMENTO AO VIVO (OTIMIZADA) ---
+    video.addEventListener('play', () => {
+        const canvas = faceapi.createCanvasFromMedia(video);
+        canvas.classList.add('face-api-canvas');
+        document.getElementById('videoContainer').append(canvas);
+        const displaySize = { width: 250, height: 250 };
+        faceapi.matchDimensions(canvas, displaySize);
+
+        let tentativas = 0;
+        const maxTentativas = 20;
+
+        detectionInterval = setInterval(async () => {
+            if (stepFacial.classList.contains('hidden')) return;
+
+            // Execução usando TinyFaceDetectorOptions para velocidade máxima
+            const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+
+            if (detection) {
+                const resizedDetections = faceapi.resizeResults(detection, displaySize);
+                canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+                faceapi.draw.drawDetections(canvas, resizedDetections);
+
+                if (faceMatcher) {
+                    const bestMatch = faceMatcher.findBestMatch(detection.descriptor);
+
+                    if (bestMatch.label !== 'unknown') {
+                        clearInterval(detectionInterval);
+                        document.getElementById('scannerLine').classList.add('hidden');
+                        document.getElementById('statusMsg').innerText = "Rosto Reconhecido! Salvando...";
+                        document.getElementById('statusMsg').classList.replace('text-blue-600', 'text-green-600');
+                        document.getElementById('statusMsg').classList.replace('bg-blue-50', 'bg-green-50');
+
+                        document.getElementById('inputFuncionarioId').value = bestMatch.label;
+
+                        salvarFotoAuditoria();
+                        capturarGeo(); 
+
+                        setTimeout(() => {
+                            document.getElementById('pontoForm').submit();
+                        }, 500); // Reduzi o delay para 500ms
+                        return;
                     }
                 }
-
-                tentativas++;
-                if (tentativas >= maxTentativas) {
-                    clearInterval(detectionInterval);
-                    irParaCPF(true);
-                }
-            }, 300);
-        });
-
-        // --- 7. FALLBACK PARA O CPF E MENSAGEM ---
-        function irParaCPF(mostrarAviso) {
-            salvarFotoAuditoria();
-            pararCamera();
-
-            stepFacial.classList.add('hidden');
-            stepCPF.classList.remove('hidden');
-
-            if (mostrarAviso) {
-                document.getElementById('alertaFoto').classList.remove('hidden');
             }
-        }
 
-        function salvarFotoAuditoria() {
-            try {
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = video.videoWidth || 400;
-                tempCanvas.height = video.videoHeight || 400;
-                tempCanvas.getContext('2d').drawImage(video, 0, 0);
-                document.getElementById('foto_base64').value = tempCanvas.toDataURL('image/jpeg', 0.7);
-            } catch (e) {
-                console.log("Câmera indisponível para auditoria.");
+            tentativas++;
+            if (tentativas >= maxTentativas) {
+                clearInterval(detectionInterval);
+                irParaCPF(true);
             }
+        }, 400); // Intervalo de 400ms ideal para processadores mobile
+    });
+
+    // --- 7. FALLBACK PARA O CPF E MENSAGEM ---
+    function irParaCPF(mostrarAviso) {
+        salvarFotoAuditoria();
+        pararCamera();
+
+        stepFacial.classList.add('hidden');
+        stepCPF.classList.remove('hidden');
+
+        if (mostrarAviso) {
+            document.getElementById('alertaFoto').classList.remove('hidden');
         }
+    }
 
-        // --- GEOLOCALIZAÇÃO ---
-        function capturarGeo() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(pos => {
-                    document.getElementById('lat').value = pos.coords.latitude;
-                    document.getElementById('lng').value = pos.coords.longitude;
-                }, err => {
-                    console.error("Erro GPS:", err);
-                }, { enableHighAccuracy: true });
-            }
+    function salvarFotoAuditoria() {
+        try {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = 250;
+            tempCanvas.height = 250;
+            tempCanvas.getContext('2d').drawImage(video, 0, 0, 250, 250);
+            document.getElementById('foto_base64').value = tempCanvas.toDataURL('image/jpeg', 0.6);
+        } catch (e) {
+            console.log("Câmera indisponível para auditoria.");
         }
+    }
 
-        // --- VALIDAÇÃO DE ENVIO ---
-        function validarEnvio() {
-            capturarGeo(); // Tenta atualizar o GPS antes de enviar
-            const idFacial = document.getElementById('inputFuncionarioId').value;
-            const cpfDigitado = document.getElementById('cpfInput').value.replace(/\D/g, '');
-
-            if (!idFacial && cpfDigitado.length < 11) {
-                alert("Erro: Nenhum servidor identificado. Por favor, insira o CPF corretamente.");
-                return false;
-            }
-            return true;
+    // --- GEOLOCALIZAÇÃO ---
+    function capturarGeo() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(pos => {
+                document.getElementById('lat').value = pos.coords.latitude;
+                document.getElementById('lng').value = pos.coords.longitude;
+            }, err => {
+                console.error("Erro GPS:", err);
+            }, { enableHighAccuracy: true });
         }
+    }
 
-        // --- MÁSCARA CPF ---
-        document.getElementById('cpfInput').addEventListener('input', function (e) {
-            let v = e.target.value.replace(/\D/g, '');
-            v = v.replace(/(\d{3})(\d)/, '$1.$2');
-            v = v.replace(/(\d{3})(\d)/, '$1.$2');
-            v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
-            e.target.value = v;
-        });
-    </script>
+    // --- VALIDAÇÃO DE ENVIO ---
+    function validarEnvio() {
+        capturarGeo(); 
+        const idFacial = document.getElementById('inputFuncionarioId').value;
+        const cpfDigitado = document.getElementById('cpfInput').value.replace(/\D/g, '');
+
+        if (!idFacial && cpfDigitado.length < 11) {
+            alert("Erro: Nenhum servidor identificado. Por favor, insira o CPF corretamente.");
+            return false;
+        }
+        return true;
+    }
+
+    // --- MÁSCARA CPF ---
+    document.getElementById('cpfInput').addEventListener('input', function (e) {
+        let v = e.target.value.replace(/\D/g, '');
+        v = v.replace(/(\d{3})(\d)/, '$1.$2');
+        v = v.replace(/(\d{3})(\d)/, '$1.$2');
+        v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+        e.target.value = v;
+    });
+</script>
 </body>
 
 </html>
