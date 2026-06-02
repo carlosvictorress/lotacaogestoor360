@@ -8,23 +8,23 @@
         /* Configurações Globais de Impressão A4 */
         @page {
             size: A4;
-            margin: 20mm 20mm 20mm 20mm;
+            margin: 15mm 20mm 15mm 20mm;
         }
         
         body { 
             font-family: 'Times New Roman', Times, serif; 
-            color: #111;
-            line-height: 1.6;
+            color: #000;
+            line-height: 1.5;
             margin: 0;
             padding: 0;
             background-color: #fff;
         }
 
-        /* Estrutura de Folhas Estritas */
+        /* Estrutura de Folhas Controladas */
         .page {
             position: relative;
             width: 100%;
-            min-height: 257mm; /* Proporção ideal para evitar páginas órfãs */
+            height: 250mm; /* Altura ideal calculada para evitar quebras falsas */
             box-sizing: border-box;
             page-break-after: always;
         }
@@ -36,13 +36,13 @@
         /* Marca d'água Premium usando logo.jpg */
         .watermark-container {
             position: absolute;
-            top: 45%;
+            top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 380px;
-            height: 380px;
+            width: 350px;
+            height: 350px;
             z-index: -1;
-            opacity: 0.03; /* Extremamente sutil para visual limpo e legível */
+            opacity: 0.03; /* Suave e elegante */
             pointer-events: none;
         }
 
@@ -52,94 +52,120 @@
             object-fit: contain;
         }
 
-        /* Cabeçalho Institucional Simétrico */
+        /* Cabeçalho Institucional Oficial */
         .institucional-header {
             text-align: center;
             border-bottom: 2px solid #000;
-            padding-bottom: 12px;
-            margin-bottom: 20px;
+            padding-bottom: 8px;
+            margin-bottom: 15px;
         }
 
         .institucional-header h1 {
-            font-size: 15px;
+            font-size: 14px;
             text-transform: uppercase;
-            margin: 0 0 4px 0;
-            letter-spacing: 0.8px;
-            font-weight: bold;
-        }
-
-        .institucional-header h2 {
-            font-size: 13px;
-            text-transform: uppercase;
-            margin: 0 0 6px 0;
+            margin: 0 0 2px 0;
             letter-spacing: 0.5px;
             font-weight: bold;
         }
 
-        .institucional-header p {
-            font-size: 10.5px;
-            margin: 1px 0;
-            color: #333;
+        .institucional-header h2 {
+            font-size: 12px;
+            text-transform: uppercase;
+            margin: 0 0 4px 0;
+            font-weight: bold;
         }
 
-        /* Bloco de Identificação de Contrato (Top Right) */
-        .contrato-badge-container {
+        .institucional-header p {
+            font-size: 10px;
+            margin: 1px 0;
+            color: #222;
+        }
+
+        /* Tabela de Identificação do Contrato */
+        .contrato-table-container {
             display: flex;
             justify-content: flex-end;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
-        .contrato-badge {
-            border: 1px solid #000;
-            padding: 5px 15px;
+        .contrato-table {
+            border-collapse: collapse;
             font-size: 12px;
             font-weight: bold;
-            text-transform: uppercase;
-            background-color: #fafafa;
         }
 
-        /* Componentes de Texto e Título */
+        .contrato-table td {
+            border: 1px solid #000;
+            padding: 4px 12px;
+            background-color: #fcfcfc;
+            text-transform: uppercase;
+        }
+
+        /* Título do Documento */
         .doc-title {
             text-align: center;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             text-transform: uppercase;
-            margin-top: 35px;
-            margin-bottom: 35px;
-            letter-spacing: 1px;
+            margin-top: 20px;
+            margin-bottom: 25px;
+            letter-spacing: 0.5px;
         }
 
+        /* Tabelas de Qualificação dos Dados (Visual Corporativo) */
+        .qualificacao-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        .qualificacao-table td {
+            border: 1px solid #000;
+            padding: 6px 10px;
+            vertical-align: middle;
+        }
+
+        .bg-label {
+            background-color: #f5f5f5;
+            font-weight: bold;
+            width: 15%;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+
+        /* Corpo do Texto */
         .content {
             text-align: justify;
-            font-size: 14px;
+            font-size: 13.5px;
         }
 
         .content p {
-            margin-bottom: 18px;
-            text-indent: 50px; /* Recuo padrão de redação oficial */
+            margin-bottom: 12px;
+            text-indent: 40px;
         }
 
-        .content .no-indent {
+        .no-indent {
             text-indent: 0 !important;
         }
 
         .date-location {
-            margin-top: 40px;
-            margin-bottom: 50px;
-            font-size: 14px;
+            margin-top: 30px;
+            margin-bottom: 35px;
+            font-size: 13.5px;
             text-align: left;
         }
 
-        /* Seção Elegante de Assinaturas */
+        /* Assinaturas Organizadas */
         .signatures-section {
-            margin-top: 50px;
+            margin-top: 35px;
             width: 100%;
         }
 
         .signature-block {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 40px;
+            margin-bottom: 35px;
         }
 
         .signature-wrapper {
@@ -149,31 +175,30 @@
 
         .signature-line {
             border-top: 1px solid #000;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
 
         .signature-role {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
             text-transform: uppercase;
         }
 
         .signature-detail {
-            font-size: 11px;
-            color: #222;
+            font-size: 10.5px;
         }
 
+        /* Seção de Testemunhas */
         .witness-section {
-            margin-top: 45px;
-            border-top: 1px dashed #ccc;
-            padding-top: 20px;
+            margin-top: 30px;
+            border-top: 1px dashed #bbb;
+            padding-top: 15px;
         }
 
         .witness-title {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
-            margin-bottom: 25px;
-            letter-spacing: 0.5px;
+            margin-bottom: 15px;
         }
 
         .witness-grid {
@@ -186,28 +211,21 @@
         }
 
         .witness-line {
-            border-bottom: 1px dashed #111;
-            margin-bottom: 15px;
-            font-size: 12px;
-            padding-bottom: 4px;
+            border-bottom: 1px dashed #000;
+            margin-bottom: 12px;
+            font-size: 11px;
+            padding-bottom: 2px;
         }
 
-        /* Linha Guia de Preenchimento Manual para Históricos Legados */
+        /* Linhas guias para campos em branco */
         .fill-line {
             display: inline-block;
-            border-bottom: 1px solid #000;
-            min-width: 160px;
-            margin-bottom: -2px;
+            border-bottom: 1px dashed #000;
+            width: 80%;
+            height: 12px;
         }
 
-        .fill-line-long {
-            display: inline-block;
-            border-bottom: 1px solid #000;
-            min-width: 280px;
-            margin-bottom: -2px;
-        }
-
-        /* Rodapé de Página Padrão */
+        /* Rodapé de Página */
         .institucional-footer {
             position: absolute;
             bottom: 0;
@@ -215,88 +233,81 @@
             width: 100%;
             text-align: center;
             border-top: 1px solid #000;
-            padding-top: 6px;
-            font-size: 10px;
+            padding-top: 4px;
+            font-size: 9.5px;
             font-weight: bold;
-            color: #333;
         }
 
-        /* Painel Superior de Ações Estilo Apple Clean (Não sai no Papel) */
+        /* Interface Administrativa Web (Ocultada na Impressão) */
         .no-print-actions {
-            background: rgba(255, 255, 255, 0.8);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            padding: 14px 32px;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            padding: 12px 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid #e2e8f0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             position: sticky;
             top: 0;
             z-index: 100;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
         }
 
         .info-badge {
-            font-size: 13px;
-            color: #475569;
+            font-size: 12px;
+            color: #334155;
             font-weight: 500;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .btn-print {
-            background-color: #1e293b;
+            background-color: #0f172a;
             color: #fff;
-            padding: 8px 18px;
+            padding: 8px 16px;
             border: none;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.15s ease;
+            transition: background 0.1s;
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
         .btn-print:hover {
-            background-color: #0f172a;
-            transform: translateY(-0.5px);
+            background-color: #1e293b;
         }
 
-        /* Ocultação e Reset Estrito na Impressão */
         @media print {
             .no-print-actions { display: none !important; }
             body { background-color: #fff; }
-            .page { min-height: auto; height: 100%; }
+            .page { height: 250mm; } /* Força o travamento do tamanho na prensa do papel */
         }
     </style>
 </head>
 <body>
 
-    <!-- Painel Administrativo de Controle Remoto (Web Apenas) -->
+    <!-- Painel Web de Controle de Impressão -->
     <div class="no-print-actions">
         <div class="info-badge">
-            <i class="ph ph-check-circle-accent font-bold" style="color: #10b981; font-size: 16px;"></i>
-            Modelo de visualização oficial integrado ao <strong>Gestoor 360º</strong>. Pronto para impressão física ou PDF.
+            <i class="ph ph-sliders font-bold" style="color: #2563eb;"></i>
+            Otimização de Página Aplicada: Documento configurado para exatamente <strong>2 páginas</strong> A4[cite: 3].
         </div>
         <button class="btn-print" onclick="window.print()">
-            <i class="ph ph-printer font-bold"></i> Imprimir Documento
+            <i class="ph ph-printer font-bold"></i> Imprimir Termo
         </button>
     </div>
 
     <!-- ==================== FOLHA 01 ==================== -->
     <div class="page">
-        <!-- Marca d'água -->
         <div class="watermark-container">
             <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão">
         </div>
 
-        <!-- Cabeçalho Institucional -->
         <div class="institucional-header">
             <h1>ESTADO DO PIAUÍ</h1>
             <h2>MUNICÍPIO DE VALENÇA DO PIAUÍ</h2>
@@ -304,27 +315,44 @@
             <p>CNPJ Nº 06.095.146/0001-44 | Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco</p>
         </div>
 
-        <!-- Número de Controle do Contrato -->
-        <div class="contrato-badge-container">
-            <div class="contrato-badge">
-                CONTRATO Nº: {% if f.num_vinculo %}{{ f.num_vinculo }}{% else %}<span class="fill-line" style="min-width: 90px;"></span>{% endif %}
-            </div>
+        <div class="contrato-table-container">
+            <table class="contrato-table">
+                <tr>
+                    <td>CONTRATO ADMINISTRATIVO Nº:</td>
+                    <td style="color: #000; min-width: 100px;">
+                        {% if f.num_vinculo %}{{ f.num_vinculo }}{% else %}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/{% endif %}
+                    </td>
+                </tr>
+            </table>
         </div>
 
         <div class="doc-title">TERMO DE RESCISÃO CONTRATUAL</div>
         
         <div class="content">
-            <p>Pelo presente instrumento, as partes abaixo identificadas:</p>
+            <p>Pelo presente instrumento, as partes qualificadas acordam mutuamente as cláusulas de encerramento do vínculo de prestação de serviços estabelecido:</p>
             
-            <p class="no-indent">
-                <strong>CONTRATANTE:</strong> MUNICÍPIO DE VALENÇA DO PIAUÍ / SECRETARIA MUNICIPAL DE EDUCAÇÃO, pessoa jurídica de direito público interno, inscrita no CNPJ sob o nº 06.095.146/0001-44, com sede na Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco, representada neste ato pela Secretária Municipal de Educação, a Srª. <strong>ANTÔNIA IARA COSTA</strong>.<br>
-                <strong>CONTRATADO(A):</strong> <strong>{{ f.nome }}</strong>, inscrito(a) sob o CPF nº 
-                {% if f.cpf %}{{ f.cpf }}{% else %}<span class="fill-line"></span>{% endif %}, 
-                portador(a) do RG nº 
-                {% if f.rg %}{{ f.rg }}{% else %}<span class="fill-line"></span>{% endif %}, 
-                residente e domiciliado(a) no município de 
-                {% if f.endereco %}{{ f.endereco }}{% else %}<span class="fill-line-long"></span>{% endif %}.
-            </p>
+            <!-- Tabela de Qualificação Executiva -->
+            <table class="qualificacao-table">
+                <tr>
+                    <td class="bg-label">Contratante</td>
+                    <td><strong>MUNICÍPIO DE VALENÇA DO PIAUÍ / SECRETARIA MUNICIPAL DE EDUCAÇÃO</strong>, inscrito no CNPJ sob o nº 06.095.146/0001-44, com sede administrativa na Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco, representada neste ato pela Secretária de Educação, a Srª. <strong>ANTÔNIA IARA COSTA</strong>.</td>
+                </tr>
+                <tr>
+                    <td class="bg-label">Contratado(a)</td>
+                    <td><strong>{{ f.nome }}</strong></td>
+                </tr>
+                <tr>
+                    <td class="bg-label">Documentos</td>
+                    <td>
+                        <strong>CPF Nº:</strong> {% if f.cpf %}{{ f.cpf }}{% else %}<span class="fill-line"></span>{% endif %} &nbsp;&nbsp;|&nbsp;&nbsp; 
+                        <strong>RG Nº:</strong> {% if f.rg %}{{ f.rg }}{% else %}<span class="fill-line"></span>{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="bg-label">Endereço</td>
+                    <td>{% if f.endereco %}{{ f.endereco }}{% else %}<span class="fill-line" style="width: 95%;"></span>{% endif %}</td>
+                </tr>
+            </table>
             
             <p>Resolvem, de comum acordo, rescindir o vínculo de contratação firmado em <strong>{{ f.data_inicio.strftime('%d/%m/%Y') if f.data_inicio is not string and f.data_inicio else f.data_inicio }}</strong>, referente à prestação de serviço temporário na função de <strong>{{ f.funcao if f.funcao else f.funcao_nome }}</strong>, conforme anotações e registros funcionais vinculados a esta municipalidade.</p>
             
@@ -337,7 +365,6 @@
             Valença do Piauí - PI, {{ data_atual.strftime('%d de %B de %Y') if data_atual is not string else data_atual }}.
         </div>
 
-        <!-- Assinaturas Principais Folha 1 -->
         <div class="signatures-section">
             <div class="signature-block">
                 <div class="signature-wrapper">
@@ -353,7 +380,6 @@
                 </div>
             </div>
 
-            <!-- Bloco Adicional de Testemunhas em conformidade com o Modelo legal -->
             <div class="witness-section">
                 <div class="witness-title">TESTEMUNHAS:</div>
                 <div class="witness-grid">
@@ -369,7 +395,6 @@
             </div>
         </div>
 
-        <!-- Rodapé Folha 1 -->
         <div class="institucional-footer">
             Rua Epaminondas Nogueira, 1425 - Bairro São Francisco - Valença do Piauí | CNPJ: 06.095.146/0001-44
         </div>
@@ -377,12 +402,10 @@
 
     <!-- ==================== FOLHA 02 ==================== -->
     <div class="page">
-        <!-- Marca d'água -->
         <div class="watermark-container">
             <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão">
         </div>
 
-        <!-- Cabeçalho Institucional -->
         <div class="institucional-header">
             <h1>ESTADO DO PIAUÍ</h1>
             <h2>MUNICÍPIO DE VALENÇA DO PIAUÍ</h2>
@@ -390,11 +413,15 @@
             <p>CNPJ Nº 06.095.146/0001-44 | Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco</p>
         </div>
 
-        <!-- Número de Controle do Contrato na Folha 2 -->
-        <div class="contrato-badge-container">
-            <div class="contrato-badge">
-                CONTRATO Nº: {% if f.num_vinculo %}{{ f.num_vinculo }}{% else %}<span class="fill-line" style="min-width: 90px;"></span>{% endif %}
-            </div>
+        <div class="contrato-table-container">
+            <table class="contrato-table">
+                <tr>
+                    <td>CONTRATO ADMINISTRATIVO Nº:</td>
+                    <td style="color: #000; min-width: 100px;">
+                        {% if f.num_vinculo %}{{ f.num_vinculo }}{% else %}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/{% endif %}
+                    </td>
+                </tr>
+            </table>
         </div>
 
         <div class="doc-title">RESCISÃO DE CONTRATO ADMINISTRATIVO</div>
@@ -411,8 +438,7 @@
             Valença do Piauí - PI, {{ data_atual.strftime('%d de %B de %Y') if data_atual is not string else data_atual }}.
         </div>
 
-        <!-- Assinatura Central de Homologação da Segunda Folha -->
-        <div class="signatures-section" style="margin-top: 80px;">
+        <div class="signatures-section" style="margin-top: 60px;">
             <div class="signature-block" style="justify-content: center;">
                 <div class="signature-wrapper" style="width: 65%;">
                     <div class="signature-line"></div>
@@ -422,7 +448,6 @@
             </div>
         </div>
 
-        <!-- Rodapé Folha 2 -->
         <div class="institucional-footer">
             Rua Epaminondas Nogueira, 1425 - Bairro São Francisco - Valença do Piauí | CNPJ: 06.095.146/0001-44
         </div>
