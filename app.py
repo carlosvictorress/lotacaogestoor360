@@ -2343,12 +2343,12 @@ def reimprimir_rescisao(id):
         flash("Registro de rescisão não encontrado.", "error")
         return redirect(url_for("pagina_recisoes"))
 
-    # Monta os dados estruturados para o documento idênticos ao processo original
+    # Monta os dados estruturados usando EXATAMENTE os nomes que o template espera
     dados_doc = {
         "nome": rescisao.nome,
         "funcao": rescisao.funcao,
-        "dt_inicio": rescisao.data_inicio.strftime("%d/%m/%Y") if rescisao.data_inicio else "N/D",
-        "dt_saida": rescisao.data_saida.strftime("%d/%m/%Y") if rescisao.data_saida else "N/D",
+        "data_inicio": rescisao.data_inicio,  # Enviado como objeto de data para o .strftime do Jinja funcionar
+        "data_saida": rescisao.data_saida,    # Enviado como objeto de data
     }
 
     # Prepara a data por extenso atual para a assinatura
@@ -2359,7 +2359,7 @@ def reimprimir_rescisao(id):
     hoje = datetime.now()
     data_extenso = f"{hoje.day} de {meses[hoje.month - 1]} de {hoje.year}"
 
-    # Renderiza o mesmo template usado no ato do desligamento
+    # Renderiza o template de visualização do documento
     return render_template(
         "recisao_documento.html", f=dados_doc, data_atual=data_extenso
     )
