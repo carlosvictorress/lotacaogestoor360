@@ -2408,37 +2408,55 @@ def unidades_ponto():
 if __name__ == "__main__":
     with app.app_context():
         create_admin()
-        atualizar_schema()
         
-        # FORÇADOR DE MIGRAÇÃO DE EMERGÊNCIA PARA O POSTGRES DO RAILWAY
+        # Executa o atualizador de esquema geral padrão do sistema
+        try:
+            atualizar_schema()
+        except Exception as e:
+            print(f"Aviso no atualizar_schema geral: {e}")
+        
+        # FORÇADOR DE MIGRAÇÃO INDEPENDENTE PARA O POSTGRES DO RAILWAY
         try:
             with db.engine.connect() as conn:
-                print("Executando checagem forçada de colunas no Postgres...")
+                print("Iniciando injeção forçada e isolada de colunas no Postgres...")
                 
-                # Injeta coluna RG se não existir
+                # 1. Tenta injetar a coluna 'rg' de forma totalmente isolada
                 try:
                     conn.execute(text("ALTER TABLE rescisao_historico ADD COLUMN rg VARCHAR(20);"))
-                    conn.commit()
-                    print("Coluna 'rg' injetada com sucesso!")
-                except Exception:
-                    conn.rollback()
+                    conn.execute(text("COMMIT;"))
+                    print("Sucesso: Coluna 'rg' criada ou validada.")
+                except Exception as e:
+                    try:
+                        conn.execute(text("ROLLBACK;"))
+                    except:
+                        pass
+                    print("Aviso 'rg': Coluna já existente ou ignorada.")
 
-                # Injeta coluna ENDERECO se não existir
+                # 2. Tenta injetar a coluna 'endereco' de forma totalmente isolada
                 try:
                     conn.execute(text("ALTER TABLE rescisao_historico ADD COLUMN endereco VARCHAR(200);"))
-                    conn.commit()
-                    print("Coluna 'endereco' injetada com sucesso!")
-                except Exception:
-                    conn.rollback()
+                    conn.execute(text("COMMIT;"))
+                    print("Sucesso: Coluna 'endereco' criada ou validada.")
+                except Exception as e:
+                    try:
+                        conn.execute(text("ROLLBACK;"))
+                    except:
+                        pass
+                    print("Aviso 'endereco': Coluna já existente ou ignorada.")
 
-                # Injeta coluna NUM_CONTRATO se não existir
+                # 3. Tenta injetar a coluna 'num_contrato' de forma totalmente isolada
                 try:
                     conn.execute(text("ALTER TABLE rescisao_historico ADD COLUMN num_contrato VARCHAR(50);"))
-                    conn.commit()
-                    print("Coluna 'num_contrato' injetada com sucesso!")
-                except Exception:
-                    conn.rollback()
+                    conn.execute(text("COMMIT;"))
+                    print("Sucesso: Coluna 'num_contrato' criada ou validada.")
+                except Exception as e:
+                    try:
+                        conn.execute(text("ROLLBACK;"))
+                    except:
+                        pass
+                    print("Aviso 'num_contrato': Coluna já existente ou ignorada.")
+                    
         except Exception as e:
-            print(f"Aviso na checagem de tabelas: {e}")
+            print(f"Erro crítico no barramento de migração: {e}")
 
     app.run(debug=True, host="0.0.0.0")
