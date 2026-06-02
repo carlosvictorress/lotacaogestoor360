@@ -2409,4 +2409,36 @@ if __name__ == "__main__":
     with app.app_context():
         create_admin()
         atualizar_schema()
+        
+        # FORÇADOR DE MIGRAÇÃO DE EMERGÊNCIA PARA O POSTGRES DO RAILWAY
+        try:
+            with db.engine.connect() as conn:
+                print("Executando checagem forçada de colunas no Postgres...")
+                
+                # Injeta coluna RG se não existir
+                try:
+                    conn.execute(text("ALTER TABLE rescisao_historico ADD COLUMN rg VARCHAR(20);"))
+                    conn.commit()
+                    print("Coluna 'rg' injetada com sucesso!")
+                except Exception:
+                    conn.rollback()
+
+                # Injeta coluna ENDERECO se não existir
+                try:
+                    conn.execute(text("ALTER TABLE rescisao_historico ADD COLUMN endereco VARCHAR(200);"))
+                    conn.commit()
+                    print("Coluna 'endereco' injetada com sucesso!")
+                except Exception:
+                    conn.rollback()
+
+                # Injeta coluna NUM_CONTRATO se não existir
+                try:
+                    conn.execute(text("ALTER TABLE rescisao_historico ADD COLUMN num_contrato VARCHAR(50);"))
+                    conn.commit()
+                    print("Coluna 'num_contrato' injetada com sucesso!")
+                except Exception:
+                    conn.rollback()
+        except Exception as e:
+            print(f"Aviso na checagem de tabelas: {e}")
+
     app.run(debug=True, host="0.0.0.0")
