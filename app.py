@@ -2334,6 +2334,36 @@ def ponto_portal():
         local_id_selecionado=local_id
     )
 
+@app.route("/reimprimir_rescisao/<int:id>")
+@login_required
+def reimprimir_rescisao(id):
+    # Busca o histórico da rescisão diretamente da tabela de histórico
+    rescisao = db.session.get(RescisaoHistorico, id)
+    if not rescisao:
+        flash("Registro de rescisão não encontrado.", "error")
+        return redirect(url_for("pagina_recisoes"))
+
+    # Monta os dados estruturados para o documento idênticos ao processo original
+    dados_doc = {
+        "nome": rescisao.nome,
+        "funcao": rescisao.funcao,
+        "dt_inicio": rescisao.data_inicio.strftime("%d/%m/%Y") if rescisao.data_inicio else "N/D",
+        "dt_saida": rescisao.data_saida.strftime("%d/%m/%Y") if rescisao.data_saida else "N/D",
+    }
+
+    # Prepara a data por extenso atual para a assinatura
+    meses = [
+        "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+        "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+    ]
+    hoje = datetime.now()
+    data_extenso = f"{hoje.day} de {meses[hoje.month - 1]} de {hoje.year}"
+
+    # Renderiza o mesmo template usado no ato do desligamento
+    return render_template(
+        "recisao_documento.html", f=dados_doc, data_atual=data_extenso
+    )
+
 @app.route("/admin/escolas/atalhos")
 @login_required
 def atalhos_escolas():
