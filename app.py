@@ -2343,25 +2343,21 @@ def reimprimir_rescisao(id):
         flash("Registro de rescisão não encontrado.", "error")
         return redirect(url_for("pagina_recisoes"))
 
-    # Monta os dados estruturados usando EXATAMENTE os nomes que o template espera
+    # Monta os dados estruturados usando os nomes corretos esperados pelo template
     dados_doc = {
         "nome": rescisao.nome,
         "funcao": rescisao.funcao,
-        "data_inicio": rescisao.data_inicio,  # Enviado como objeto de data para o .strftime do Jinja funcionar
-        "data_saida": rescisao.data_saida,    # Enviado como objeto de data
+        "data_inicio": rescisao.data_inicio,  # Objeto date original
+        "data_saida": rescisao.data_saida,    # Objeto date original
     }
 
-    # Prepara a data por extenso atual para a assinatura
-    meses = [
-        "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-        "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
-    ]
-    hoje = datetime.now()
-    data_extenso = f"{hoje.day} de {meses[hoje.month - 1]} de {hoje.year}"
+    # AJUSTE DE HORÁRIO BRASÍLIA para a assinatura do documento
+    fuso_br = pytz.timezone('America/Sao_Paulo')
+    agora_br = datetime.now(fuso_br).replace(tzinfo=None)
 
-    # Renderiza o template de visualização do documento
+    # Renderiza o template passando o objeto datetime cru (com suporte a .strftime)
     return render_template(
-        "recisao_documento.html", f=dados_doc, data_atual=data_extenso
+        "recisao_documento.html", f=dados_doc, data_atual=agora_br
     )
 
 @app.route("/admin/escolas/atalhos")
