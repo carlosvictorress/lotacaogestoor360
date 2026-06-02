@@ -192,7 +192,10 @@ class RescisaoHistorico(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(150), nullable=False)
     cpf = db.Column(db.String(14))
+    rg = db.Column(db.String(20), nullable=True) # Nova coluna
+    endereco = db.Column(db.String(200), nullable=True) # Nova coluna
     funcao = db.Column(db.String(100))
+    num_contrato = db.Column(db.String(50), nullable=True) # Nova coluna
     data_inicio = db.Column(db.Date)
     data_saida = db.Column(db.Date)
     data_geracao = db.Column(db.DateTime, default=datetime.utcnow)
@@ -631,7 +634,6 @@ def admin_dashboard():
 @login_required
 def processar_recisao():
     id_func = request.form.get("id_funcionario")
-    # Captura as datas do formulário
     data_inicio_str = request.form.get("data_inicio")
     data_saida_str = request.form.get("data_saida")
 
@@ -643,63 +645,51 @@ def processar_recisao():
         flash("Servidor não encontrado", "error")
         return redirect(url_for("pagina_recisoes"))
 
-    # Se as datas vierem vazias, tenta usar as da ficha como backup
     if not dt_ini:
         dt_ini = funcionario.dt_inicio
     if not dt_sai:
         dt_sai = date.today()
 
     try:
-        # 1. Salva no histórico de rescisões (antes de excluir o objeto)
+        # Salva no histórico carregando os dados completos do funcionário antes de excluí-lo!
         nova_rescisao = RescisaoHistorico(
             nome=funcionario.nome,
             cpf=funcionario.cpf,
+            rg=funcionario.rg,
+            endereco=funcionario.endereco,
             funcao=funcionario.funcao.nome if funcionario.funcao else "N/A",
+            num_contrato=funcionario.num_vinculo, # Pega o vínculo atual como número do contrato
             data_inicio=dt_ini,
             data_saida=dt_sai,
         )
         db.session.add(nova_rescisao)
 
-        # 2. Prepara dados para o template com segurança contra datas nulas
+        # Prepara dados para o template imediato
         dados_doc = {
             "nome": funcionario.nome,
             "funcao": funcionario.funcao.nome if funcionario.funcao else "N/A",
-            "dt_inicio": dt_ini.strftime("%d/%m/%Y") if dt_ini else "N/D",
-            "dt_saida": dt_sai.strftime("%d/%m/%Y") if dt_sai else "N/D",
+            "data_inicio": dt_ini,
+            "data_saida": dt_sai,
+            "cpf": funcionario.cpf,
+            "rg": funcionario.rg,
+            "endereco": funcionario.endereco,
+            "num_contrato": funcionario.num_vinculo
         }
 
-        # 3. Limpeza total de vínculos e exclusão definitiva
-        # Remove históricos e pontos para evitar erros de integridade (FK)
         HistoricoLotacao.query.filter_by(funcionario_id=funcionario.id).delete()
         RegistroPonto.query.filter_by(funcionario_id=funcionario.id).delete()
 
         nome_servidor = funcionario.nome
         db.session.delete(funcionario)
-
-        # O commit deve ser feito após todas as operações de banco
         db.session.commit()
+        
         registrar_log("GEROU RESCISAO", nome_servidor)
 
-        # Prepara data por extenso para o documento
-        meses = [
-            "janeiro",
-            "fevereiro",
-            "março",
-            "abril",
-            "maio",
-            "junho",
-            "julho",
-            "agosto",
-            "setembro",
-            "outubro",
-            "novembro",
-            "dezembro",
-        ]
-        hoje = datetime.now()
-        data_extenso = f"{hoje.day} de {meses[hoje.month - 1]} de {hoje.year}"
+        fuso_br = pytz.timezone('America/Sao_Paulo')
+        agora_br = datetime.now(fuso_br).replace(tzinfo=None)
 
         return render_template(
-            "recisao_documento.html", f=dados_doc, data_atual=data_extenso
+            "recisao_documento.html", f=dados_doc, data_atual=agora_br
         )
 
     except Exception as e:
@@ -1294,11 +1284,18 @@ def atualizar_schema():
                 ("foto_path", "VARCHAR(255)"),
             ]
 
-            # 2. Colunas para a tabela 'local_trabalho' (CRÍTICO PARA GEOFENCING)
+            # 2. Colunas para a tabela 'local_trabalho'
             colunas_local = [
                 ("latitude", "FLOAT"),
                 ("longitude", "FLOAT"),
                 ("raio_permitido", "INTEGER DEFAULT 50"),
+            ]
+
+            # 3. Novas colunas para a tabela 'rescisao_historico' (Salvamento permanente)
+            colunas_rescisao = [
+                ("rg", "VARCHAR(20)"),
+                ("endereco", "VARCHAR(200)"),
+                ("num_contrato", "VARCHAR(50)")
             ]
 
             # Processa tabela funcionario
@@ -1306,9 +1303,7 @@ def atualizar_schema():
                 try:
                     conn.execute(text(f"ALTER TABLE funcionario ADD COLUMN {col} {tipo}"))
                     conn.commit()
-                    print(f"SUCESSO: Coluna '{col}' adicionada em 'funcionario'.")
                 except Exception as e:
-                    # Em caso de erro (coluna já existe), faz rollback para limpar a transação
                     conn.rollback() 
 
             # Processa tabela local_trabalho
@@ -1316,7 +1311,15 @@ def atualizar_schema():
                 try:
                     conn.execute(text(f"ALTER TABLE local_trabalho ADD COLUMN {col} {tipo}"))
                     conn.commit()
-                    print(f"SUCESSO: Coluna '{col}' adicionada em 'local_trabalho'.")
+                except Exception as e:
+                    conn.rollback()
+
+            # Processa tabela rescisao_historico (POSTGRESQL RAILWAY)
+            for col, tipo in colunas_rescisao:
+                try:
+                    conn.execute(text(f"ALTER TABLE rescisao_historico ADD COLUMN {col} {tipo}"))
+                    conn.commit()
+                    print(f"SUCESSO: Coluna '{col}' adicionada em 'rescisao_historico'.")
                 except Exception as e:
                     conn.rollback()
 
@@ -2337,28 +2340,51 @@ def ponto_portal():
 @app.route("/reimprimir_rescisao/<int:id>")
 @login_required
 def reimprimir_rescisao(id):
-    # Busca o histórico da rescisão diretamente da tabela de histórico
     rescisao = db.session.get(RescisaoHistorico, id)
     if not rescisao:
         flash("Registro de rescisão não encontrado.", "error")
         return redirect(url_for("pagina_recisoes"))
 
-    # Monta os dados estruturados usando os nomes corretos esperados pelo template
     dados_doc = {
         "nome": rescisao.nome,
         "funcao": rescisao.funcao,
-        "data_inicio": rescisao.data_inicio,  # Objeto date original
-        "data_saida": rescisao.data_saida,    # Objeto date original
+        "data_inicio": rescisao.data_inicio,
+        "data_saida": rescisao.data_saida,
+        "cpf": rescisao.cpf,
+        "rg": rescisao.rg,
+        "endereco": rescisao.endereco,
+        "num_contrato": rescisao.num_contrato
     }
 
-    # AJUSTE DE HORÁRIO BRASÍLIA para a assinatura do documento
     fuso_br = pytz.timezone('America/Sao_Paulo')
     agora_br = datetime.now(fuso_br).replace(tzinfo=None)
 
-    # Renderiza o template passando o objeto datetime cru (com suporte a .strftime)
     return render_template(
         "recisao_documento.html", f=dados_doc, data_atual=agora_br
     )
+
+@app.route("/api/salvar_dados_rescisao", methods=["POST"])
+@login_required
+def api_salvar_dados_rescisao():
+    """Rota API para salvar as edições de histórico via AJAX sem recarregar a tela"""
+    try:
+        data = request.get_json()
+        rescisao_id = data.get("id")
+        rescisao = db.session.get(RescisaoHistorico, rescisao_id)
+        
+        if not rescisao:
+            return {"success": False, "message": "Registro não encontrado"}, 404
+            
+        rescisao.rg = data.get("rg")
+        rescisao.endereco = data.get("endereco")
+        rescisao.num_contrato = data.get("num_contrato")
+        
+        db.session.commit()
+        registrar_log("ATUALIZOU DADOS HISTORICOS RESCISAO", rescisao.nome)
+        return {"success": True}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
 
 @app.route("/admin/escolas/atalhos")
 @login_required

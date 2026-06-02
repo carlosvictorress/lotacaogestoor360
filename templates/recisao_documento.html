@@ -320,7 +320,7 @@
                 <tr>
                     <td>CONTRATO ADMINISTRATIVO Nº:</td>
                     <td style="color: #000; min-width: 100px;">
-                        {% if f.num_vinculo %}{{ f.num_vinculo }}{% else %}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/{% endif %}
+                        {% if f.num_contrato %}{{ f.num_contrato }}{% elif f.num_vinculo %}{{ f.num_vinculo }}{% else %}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/{% endif %}
                     </td>
                 </tr>
             </table>
@@ -354,11 +354,11 @@
                 </tr>
             </table>
             
-            <p>Resolvem, de comum acordo, rescindir o vínculo de contratação firmado em <strong>{{ f.data_inicio.strftime('%d/%m/%Y') if f.data_inicio is not string and f.data_inicio else f.data_inicio }}</strong>, referente à prestação de serviço temporário na função de <strong>{{ f.funcao if f.funcao else f.funcao_nome }}</strong>, conforme anotações e registros funcionais vinculados a esta municipalidade.</p>
+            <p>Resolvem, de comum acordo, rescindir o vínculo de contratação firmado em <strong>{{ f.data_inicio.strftime('%d/%m/%Y') if f.data_inicio is not string and f.data_inicio else f.data_inicio }}</strong>, referente à prestação de serviço temporário na função de <strong>{{ f.funcao if f.funcao else f.funcao_nome }}</strong>, conforme anotações e registros funcionais vinculados a esta municipalidade[cite: 4].</p>
             
-            <p>O(A) servidor(a) acima qualificado(a) prestou efetivamente seus serviços até o dia <strong>{{ f.data_saida.strftime('%d/%m/%Y') if f.data_saida is not string and f.data_saida else f.data_saida }}</strong>. Com a assinatura deste instrumento, as partes declaram estarem plenamente cientes e em perfeito acordo com a respectiva rescisão, dando-se mútua, plena e geral quitação, para nada mais haver a reclamar ou exigir, seja a que tempo ou título for.</p>
+            <p>O(A) servidor(a) acima qualificado(a) prestou efetivamente seus serviços até o dia <strong>{{ f.data_saida.strftime('%d/%m/%Y') if f.data_saida is not string and f.data_saida else f.data_saida }}</strong>. Com a assinatura deste instrumento, as partes declaram estarem plenamente cientes e em perfeito acordo com a respectiva rescisão, dando-se mútua, plena e geral quitação, para nada mais haver a reclamar ou exigir, seja a que tempo ou título for[cite: 4].</p>
             
-            <p>E, por estarem assim justos e contratados, assinam o presente termo em duas vias de igual teor e forma para um só efeito, na presença das testemunhas adiante subscritas.</p>
+            <p>E, por estarem assim justos e contratados, assinam o presente termo em duas vias de igual teor e forma para um só efeito, na presença das testemunhas adiante subscritas[cite: 4].</p>
         </div>
 
         <div class="date-location">
@@ -418,7 +418,7 @@
                 <tr>
                     <td>CONTRATO ADMINISTRATIVO Nº:</td>
                     <td style="color: #000; min-width: 100px;">
-                        {% if f.num_vinculo %}{{ f.num_vinculo }}{% else %}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/{% endif %}
+                        {% if f.num_contrato %}{{ f.num_contrato }}{% elif f.num_vinculo %}{{ f.num_vinculo }}{% else %}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/{% endif %}
                     </td>
                 </tr>
             </table>

@@ -21,7 +21,6 @@
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
 
-        /* Efeito sutil ao focar inputs */
         .premium-input:focus {
             box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
         }
@@ -77,7 +76,6 @@
                     <i class="ph ph-file-text text-base"></i> Gerar Rescisão
                 </button>
             </div>
-            
             <div id="nomeSelecionado" class="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl text-xs font-bold hidden"></div>
         </div>
 
@@ -100,8 +98,8 @@
                         <tr>
                             <th class="px-6 md:px-8 py-4">Nome do Profissional</th>
                             <th class="px-6 md:px-8 py-4">Período Contratual</th>
-                            <th class="px-6 md:px-8 py-4">Data da Saída</th>
-                            <th class="px-6 md:px-8 py-4 text-center">Status / Ação</th>
+                            <th class="px-6 md:px-8 py-4">Contrato Original</th>
+                            <th class="px-6 md:px-8 py-4 text-center">Ações</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 font-medium text-slate-700">
@@ -116,32 +114,19 @@
                                 <i class="ph ph-caret-right text-slate-300 mx-1 font-bold"></i> 
                                 <span class="bg-rose-50 px-2.5 py-1 rounded-md text-rose-600 font-semibold">{{ h.data_saida.strftime('%d/%m/%Y') }}</span>
                             </td>
-                            <td class="px-6 md:px-8 py-4.5">
-                                <span class="text-xs text-slate-500 font-semibold">{{ h.data_saida.strftime('%d/%m/%Y') }}</span>
+                            <td class="px-6 md:px-8 py-4.5 text-xs text-slate-600 font-mono">
+                                {% if h.num_contrato %}{{ h.num_contrato }}{% else %}<span class="text-slate-300">Não informado</span>{% endif %}
                             </td>
                             <td class="px-6 md:px-8 py-4.5">
-                                <div class="flex items-center justify-center gap-3">
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 border border-rose-100 text-rose-700 rounded-full text-xs font-bold">
-                                        <span class="w-1.5 h-1.5 bg-rose-500 rounded-full"></span>
-                                        Desligado
-                                    </span>
-                                    
-                                    <a href="{{ url_for('reimprimir_rescisao', id=h.id) }}" target="_blank"
-                                       class="inline-flex items-center gap-1 px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-50 shadow-sm transition-all">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button onclick="abrirModalEditarDados('{{ h.id }}', '{{ h.nome }}', '{{ h.rg or '' }}', '{{ h.endereco or '' }}', '{{ h.num_contrato or '' }}')"
+                                       class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 hover:text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-50 shadow-sm transition-all">
                                         <i class="ph ph-printer text-sm text-slate-500"></i> Termo
-                                    </a>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
                         {% endfor %}
-                        {% if not historico %}
-                        <tr>
-                            <td colspan="4" class="px-8 py-12 text-center text-slate-400 font-medium">
-                                <i class="ph ph-folder-open text-3xl block mb-2 text-slate-300"></i>
-                                Nenhum registro de rescisão encontrado no histórico.
-                            </td>
-                        </tr>
-                        {% endif %}
                     </tbody>
                 </table>
             </div>
@@ -149,7 +134,7 @@
     </div>
 
     <div id="modalRecisao" class="fixed inset-0 bg-slate-900/60 hidden flex items-center justify-center z-50 backdrop-blur-sm transition-all p-4">
-        <div class="bg-white p-6 md:p-8 rounded-[32px] w-full max-w-md shadow-2xl border border-slate-100 transform transition-all duration-300 animate-[fadeIn_0.2s_ease-out]">
+        <div class="bg-white p-6 md:p-8 rounded-[32px] w-full max-w-md shadow-2xl border border-slate-100 transform transition-all duration-300">
             <div class="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center mb-5 mx-auto shadow-inner">
                 <i class="ph ph-calendar-x text-2xl font-bold"></i>
             </div>
@@ -158,20 +143,16 @@
             
             <form action="{{ url_for('processar_recisao') }}" method="POST" class="space-y-5">
                 <input type="hidden" name="id_funcionario" id="input_func_id">
-                
                 <div class="space-y-4">
                     <div class="space-y-1.5">
                         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-0.5">Data de Início (Contratação)</label>
-                        <input type="date" name="data_inicio" required 
-                               class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-bold text-slate-800 focus:bg-white focus:border-blue-500 outline-none premium-input transition-all">
+                        <input type="date" name="data_inicio" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-bold text-slate-800 focus:bg-white focus:border-blue-500 outline-none premium-input transition-all">
                     </div>
                     <div class="space-y-1.5">
                         <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-0.5">Data de Saída (Desligamento)</label>
-                        <input type="date" name="data_saida" required 
-                               class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-bold text-slate-800 focus:bg-white focus:border-rose-500 outline-none premium-input transition-all">
+                        <input type="date" name="data_saida" required class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-sm font-bold text-slate-800 focus:bg-white focus:border-rose-500 outline-none premium-input transition-all">
                     </div>
                 </div>
-                
                 <div class="flex flex-col gap-2 pt-4">
                     <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white p-3.5 rounded-xl font-bold text-sm shadow-lg shadow-rose-600/10 transition-all active:scale-[0.98]">
                         Confirmar Baixa e Gerar Termo
@@ -184,27 +165,57 @@
         </div>
     </div>
 
+    <div id="modalEditarDados" class="fixed inset-0 bg-slate-900/60 hidden flex items-center justify-center z-50 backdrop-blur-sm transition-all p-4">
+        <div class="bg-white p-6 md:p-8 rounded-[32px] w-full max-w-lg shadow-2xl border border-slate-100 transform transition-all duration-300">
+            <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-4 mx-auto shadow-inner">
+                <i class="ph ph-note-pencil text-2xl font-bold"></i>
+            </div>
+            <h3 class="text-xl font-extrabold mb-1 text-center text-slate-900">Dados do Termo de Rescisão</h3>
+            <p id="modalNomeServidor" class="text-blue-600 text-xs text-center font-bold mb-6 uppercase"></p>
+            
+            <div class="space-y-4">
+                <input type="hidden" id="edit_rescisao_id">
+                
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-0.5">Nº do Contrato / Ano</label>
+                        <input type="text" id="edit_num_contrato" placeholder="Ex: 124/2026" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold text-slate-800 focus:bg-white focus:border-blue-500 outline-none premium-input transition-all">
+                    </div>
+                    <div class="space-y-1.5">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-0.5">RG do Servidor</label>
+                        <input type="text" id="edit_rg" placeholder="Digite o RG" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold text-slate-800 focus:bg-white focus:border-blue-500 outline-none premium-input transition-all">
+                    </div>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-0.5">Endereço Completo</label>
+                    <input type="text" id="edit_endereco" placeholder="Rua, Número, Bairro, Cidade - UF" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm font-semibold text-slate-800 focus:bg-white focus:border-blue-500 outline-none premium-input transition-all">
+                </div>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row gap-2 pt-6">
+                <button type="button" onclick="salvarDadosEImprimir()" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white p-3.5 rounded-xl font-bold text-sm shadow-lg transition-all inline-flex items-center justify-center gap-2">
+                    <i class="ph ph-printer"></i> Salvar e Abrir Termo
+                </button>
+                <button type="button" onclick="fecharModalEditar()" class="p-3 text-sm font-semibold text-slate-400 hover:text-slate-600 transition-colors">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         function filtrarAtivos() {
             const busca = document.getElementById('buscaServidorAtivo').value.toUpperCase();
             const lista = document.getElementById('listaAtivos');
             const itens = document.getElementsByClassName('item-ativo');
-            let algumVisivel = false;
-
             if (busca.length > 0) {
                 lista.classList.remove('hidden');
                 for (let i = 0; i < itens.length; i++) {
-                    const texto = itens[i].textContent.toUpperCase();
-                    if (texto.includes(busca)) {
-                        itens[i].style.display = "";
-                        algumVisivel = true;
-                    } else {
-                        itens[i].style.display = "none";
-                    }
+                    if (itens[i].textContent.toUpperCase().includes(busca)) itens[i].style.display = "";
+                    else itens[i].style.display = "none";
                 }
-            } else {
-                lista.classList.add('hidden');
-            }
+            } else { lista.classList.add('hidden'); }
         }
 
         function selecionarServidor(id, nome) {
@@ -212,7 +223,6 @@
             document.getElementById('buscaServidorAtivo').value = nome;
             document.getElementById('listaAtivos').classList.add('hidden');
             document.getElementById('btnGerar').disabled = false;
-            
             const label = document.getElementById('nomeSelecionado');
             label.innerHTML = '<i class="ph ph-check-circle text-base"></i> Servidor Selecionado: ' + nome;
             label.classList.remove('hidden');
@@ -221,31 +231,67 @@
         function filtrarHistorico() {
             const busca = document.getElementById('filtroHistorico').value.toUpperCase();
             const linhas = document.getElementsByClassName('linha-historico');
-
             for (let i = 0; i < linhas.length; i++) {
-                const texto = linhas[i].textContent.toUpperCase();
-                linhas[i].style.display = texto.includes(busca) ? "" : "none";
+                linhas[i].style.display = linhas[i].textContent.toUpperCase().includes(busca) ? "" : "none";
             }
         }
 
         function abrirModalRecisao() {
-            const id = document.getElementById('selectServidor').value;
-            document.getElementById('input_func_id').value = id;
-            const modal = document.getElementById('modalRecisao');
-            modal.classList.remove('hidden');
+            document.getElementById('input_func_id').value = document.getElementById('selectServidor').value;
+            document.getElementById('modalRecisao').classList.remove('hidden');
         }
 
-        function fecharModal() {
-            document.getElementById('modalRecisao').classList.add('hidden');
+        function fecharModal() { document.getElementById('modalRecisao').classList.add('hidden'); }
+
+        // Funções do Novo Modal de Edição Permanente via API
+        function abrirModalEditarDados(id, nome, rg, endereco, numContrato) {
+            document.getElementById('edit_rescisao_id').value = id;
+            document.getElementById('modalNomeServidor').innerText = "Servidor: " + nome;
+            document.getElementById('edit_rg').value = rg;
+            document.getElementById('edit_endereco').value = endereco;
+            document.getElementById('edit_num_contrato').value = numContrato;
+            document.getElementById('modalEditarDados').classList.remove('hidden');
+        }
+
+        function fecharModalEditar() { document.getElementById('modalEditarDados').classList.add('hidden'); }
+
+        function salvarDadosEImprimir() {
+            const id = document.getElementById('edit_rescisao_id').value;
+            const payload = {
+                id: id,
+                rg: document.getElementById('edit_rg').value,
+                endereco: document.getElementById('edit_endereco').value,
+                num_contrato: document.getElementById('edit_num_contrato').value
+            };
+
+            // Envia para o Postgres do Railway via requisição JSON assíncrona
+            fetch('/api/salvar_dados_rescisao', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    fecharModalEditar();
+                    // Abre o documento em uma nova aba com os dados atualizados em tempo real!
+                    window.open('/reimprimir_rescisao/' + id, '_blank');
+                } else {
+                    alert("Erro ao salvar dados no Railway: " + data.message);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Erro de conexão com o servidor.");
+            });
         }
 
         window.onclick = function(event) {
             if (!event.target.matches('#buscaServidorAtivo')) {
                 document.getElementById('listaAtivos').classList.add('hidden');
             }
-            if (event.target == document.getElementById('modalRecisao')) {
-                fecharModal();
-            }
+            if (event.target == document.getElementById('modalRecisao')) fecharModal();
+            if (event.target == document.getElementById('modalEditarDados')) fecharModalEditar();
         }
     </script>
 </body>
