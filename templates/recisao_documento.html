@@ -4,110 +4,136 @@
     <meta charset="UTF-8">
     <title>Termo de Rescisão Contratual - Gestoor 360</title>
     <style>
-        /* Configurações de Página e Fontes (Estilo Oficial/Sofisticado) */
+        /* Configurações Globais de Impressão A4 */
         @page {
             size: A4;
-            margin: 20mm;
+            margin: 15mm 20mm 20mm 20mm;
         }
         
         body { 
             font-family: 'Times New Roman', Times, serif; 
             color: #000;
-            line-height: 1.6;
+            line-height: 1.5;
             margin: 0;
             padding: 0;
-            position: relative;
+            background-color: #fff;
         }
 
-        /* Marca d'água Estruturada */
+        /* Estrutura de Folhas Independentes */
+        .page {
+            position: relative;
+            width: 100%;
+            min-height: 260mm; /* Garante tamanho de página inteira */
+            box-sizing: border-box;
+        }
+
+        /* Quebra de página estrita na impressão */
+        .page-break {
+            page-break-before: always;
+        }
+
+        /* Marca d'água usando a logo.jpg solicitada */
         .watermark-container {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 420px;
+            height: 420px;
             z-index: -1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            opacity: 0.04; /* Suave para não atrapalhar a leitura */
+            opacity: 0.035; /* Suave para conformidade de leitura */
             pointer-events: none;
         }
 
-        .watermark-container svg {
-            width: 500px;
-            height: 500px;
+        .watermark-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
 
-        /* Cabeçalho Idêntico à Ficha de Cadastro */
+        /* Cabeçalho Oficial Padronizado */
         .institucional-header {
             text-align: center;
             border-bottom: 2px solid #000;
-            padding-bottom: 15px;
-            margin-bottom: 30px;
+            padding-bottom: 10px;
+            margin-bottom: 25px;
         }
 
         .institucional-header h1 {
-            font-size: 16px;
+            font-size: 15px;
             text-transform: uppercase;
-            margin: 0 0 5px 0;
+            margin: 0 0 3px 0;
             letter-spacing: 0.5px;
             font-weight: bold;
         }
 
         .institucional-header h2 {
-            font-size: 14px;
+            font-size: 13px;
             text-transform: uppercase;
-            margin: 0 0 8px 0;
+            margin: 0 0 5px 0;
             font-weight: bold;
         }
 
         .institucional-header p {
             font-size: 11px;
-            margin: 2px 0;
-            font-style: italic;
+            margin: 1px 0;
         }
 
-        /* Título do Documento */
+        /* Rodapé Fixo das Páginas */
+        .institucional-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        /* Componentes de Texto */
         .doc-title {
             text-align: center;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
-            text-decoration: underline;
-            margin-top: 40px;
-            margin-bottom: 40px;
-            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-top: 25px;
+            margin-bottom: 30px;
+            letter-spacing: 0.5px;
         }
 
-        /* Conteúdo Textual */
         .content {
             text-align: justify;
-            font-size: 14px;
-            text-indent: 50px; /* Parágrafo padrão de documentos oficiais */
+            font-size: 13.5px;
         }
 
         .content p {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+            text-indent: 50px;
         }
 
-        /* Data e Local */
+        .content .no-indent {
+            text-indent: 0 !important;
+        }
+
         .date-location {
-            margin-top: 40px;
-            margin-bottom: 60px;
-            font-size: 14px;
+            margin-top: 35px;
+            margin-bottom: 45px;
+            font-size: 13.5px;
             text-align: left;
         }
 
-        /* Bloco de Assinaturas */
+        /* Assinaturas e Testemunhas */
         .signatures-section {
-            margin-top: 50px;
+            margin-top: 40px;
             width: 100%;
         }
 
         .signature-block {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 50px;
+            margin-bottom: 45px;
         }
 
         .signature-wrapper {
@@ -117,7 +143,7 @@
 
         .signature-line {
             border-top: 1px solid #000;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
         }
 
         .signature-role {
@@ -128,19 +154,16 @@
 
         .signature-detail {
             font-size: 11px;
-            color: #333;
         }
 
-        /* Seção de Testemunhas */
         .witness-section {
-            margin-top: 40px;
+            margin-top: 35px;
         }
 
         .witness-title {
             font-size: 12px;
             font-weight: bold;
-            margin-bottom: 25px;
-            letter-spacing: 0.5px;
+            margin-bottom: 20px;
         }
 
         .witness-grid {
@@ -159,119 +182,197 @@
             padding-bottom: 2px;
         }
 
-        /* Botão de Impressão (Não sai no papel) */
+        /* Fallback Elegante para dados não salvos no histórico */
+        .fill-line {
+            display: inline-block;
+            border-bottom: 1px solid #000;
+            min-width: 180px;
+            padding-bottom: -2px;
+        }
+
+        /* Painel Superior de Ações (Apenas Web) */
         .no-print-actions {
-            margin-bottom: 20px;
+            background-color: #f1f5f9;
+            padding: 12px 24px;
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        .info-badge {
+            font-size: 12px;
+            color: #475569;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .btn-print {
-            background-color: #000;
+            background-color: #0f172a;
             color: #fff;
-            padding: 10px 20px;
+            padding: 8px 16px;
             border: none;
-            border-radius: 8px;
-            font-family: 'Inter', sans-serif;
+            border-radius: 6px;
             font-size: 12px;
             font-weight: bold;
             cursor: pointer;
-            transition: opacity 0.2s;
+            transition: background 0.15s;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 6px;
         }
 
         .btn-print:hover {
-            opacity: 0.8;
+            background-color: #1e293b;
         }
 
+        /* Oculta elementos sistêmicos na impressão */
         @media print {
             .no-print-actions { display: none; }
-            body { padding: 0; }
+            body { background-color: #fff; }
+            .page { min-height: auto; height: 100%; }
         }
     </style>
 </head>
 <body>
 
-    <!-- Botão de Ação Rápida -->
+    <!-- Bloco Superior Administrativo -->
     <div class="no-print-actions">
+        <div class="info-badge">
+            <i class="ph ph-info font-bold" style="color: #3b82f6;"></i>
+            Imprima este documento em folha A4. Ele foi formatado para gerar exatamente 2 páginas.
+        </div>
         <button class="btn-print" onclick="window.print()">
-            Imprimir Termo de Rescisão
+            <i class="ph ph-printer font-bold"></i> Imprimir Termo Oficial
         </button>
     </div>
 
-    <!-- Container da Marca d'água (Brasão Vetorial Estilizado) -->
-    <div class="watermark-container">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            <path d="M12 8v8M9 11h6"/>
-        </svg>
-    </div>
+    <!-- ==================== FOLHA 01 ==================== -->
+    <div class="page">
+        <!-- Marca d'água -->
+        <div class="watermark-container">
+            <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logomarca">
+        </div>
 
-    <!-- Cabeçalho Padronizado da Ficha de Cadastro -->
-    <div class="institucional-header">
-        <h1>ESTADO DO PIAUÍ</h1>
-        <h2>MUNICÍPIO DE VALENÇA DO PIAUÍ</h2>
-        <h2>SECRETARIA MUNICIPAL DE EDUCAÇÃO</h2>
-        <p>CNPJ Nº 06.095.146/0001-44 | Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco</p>
-    </div>
+        <!-- Cabeçalho Institucional -->
+        <div class="institucional-header">
+            <h1>ESTADO DO PIAUÍ</h1>
+            <h2>MUNICÍPIO DE VALENÇA DO PIAUÍ</h2>
+            <h2>SECRETARIA MUNICIPAL DE EDUCAÇÃO</h2>
+            <p>CNPJ Nº 06.095.146/0001-44 | Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco</p>
+        </div>
 
-    <!-- Título Oficial -->
-    <div class="doc-title">TERMO DE RESCISÃO CONTRATUAL</div>
-    
-    <!-- Corpo do Documento com Variáveis do Servidor -->
-    <div class="content">
-        <p>Pelo presente instrumento, as partes abaixo identificadas:</p>
+        <div class="doc-title">TERMO DE RESCISÃO CONTRATUAL</div>
         
-        <p style="text-indent: 0;">
-            <strong>CONTRATANTE:</strong> MUNICÍPIO DE VALENÇA DO PIAUÍ / SECRETARIA MUNICIPAL DE EDUCAÇÃO, pessoa jurídica de direito público interno, inscrita no CNPJ sob o nº 06.095.146/0001-44, com sede na Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco, representada neste ato pela Secretária Municipal de Educação, a Srª. <strong>ANTÔNIA IARA COSTA</strong>.<br>
-            <strong>CONTRATADO(A):</strong> <strong>{{ f.nome }}</strong>, inscrito(a) sob o CPF nº {{ f.cpf }}, portador(a) do RG nº {{ f.rg }}, residente e domiciliado(a) no município de Valença do Piauí - PI.
-        </p>
-        
-        <p>Resolvem, de comum acordo, rescindir o vínculo de contratação firmado em <strong>{{ f.data_inicio.strftime('%d/%m/%Y') }}</strong>, referente à prestação de serviço temporário na função de <strong>{{ f.funcao }}</strong>, conforme anotações e registros funcionais vinculados a esta municipalidade e à CTPS Digital.</p>
-        
-        <p>O(A) servidor(a) acima qualificado(a) prestou efetivamente seus serviços até o dia <strong>{{ f.data_saida.strftime('%d/%m/%Y') }}</strong>. Com a assinatura deste instrumento, as partes declaram estarem plenamente cientes e em perfeito acordo com a respectiva rescisão, dando-se mútua, plena e geral quitação, para nada mais haver a reclamar ou exigir, seja a que tempo ou título for.</p>
-        
-        <p>E, por estarem assim justos e contratados, assinam o presente termo em duas vias de igual teor e forma para um só efeito, na presença das testemunhas adiante subscritas.</p>
-    </div>
-
-    <!-- Data da Emissão -->
-    <div class="date-location">
-        Valença do Piauí - PI, {{ data_atual.strftime('%d de %B de %Y') }}.
-    </div>
-
-    <!-- Assinaturas Principais -->
-    <div class="signatures-section">
-        <div class="signature-block">
-            <div class="signature-wrapper">
-                <div class="signature-line"></div>
-                <div class="signature-role">Antônia Iara Costa</div>
-                <div class="signature-detail">Secretária Municipal de Educação</div>
-            </div>
+        <div class="content">
+            <p>Pelo presente instrumento, as partes abaixo identificadas:</p>
             
-            <div class="signature-wrapper">
-                <div class="signature-line"></div>
-                <div class="signature-role">{{ f.nome }}</div>
-                <div class="signature-detail">Contratado(a)</div>
+            <p class="no-indent">
+                <strong>CONTRATANTE:</strong> MUNICÍPIO DE VALENÇA DO PIAUÍ / SECRETARIA MUNICIPAL DE EDUCAÇÃO, pessoa jurídica de direito público interno, inscrita no CNPJ sob o nº 06.095.146/0001-44, com sede na Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco, representada neste ato pela Secretária Municipal de Educação, a Srª. <strong>ANTÔNIA IARA COSTA</strong>.<br>
+                <strong>CONTRATADO(A):</strong> <strong>{{ f.nome }}</strong>, inscrito(a) sob o CPF nº 
+                {% if f.cpf %}{{ f.cpf }}{% else %}<span class="fill-line"></span>{% endif %}, 
+                portador(a) do RG nº 
+                {% if f.rg %}{{ f.rg }}{% else %}<span class="fill-line"></span>{% endif %}, 
+                residente e domiciliado(a) no município de 
+                {% if f.endereco %}{{ f.endereco }}{% else %}Valença do Piauí - PI{% endif %}.
+            </p>
+            
+            <p>Resolvem, de comum acordo, rescindir o vínculo de contratação firmado em <strong>{{ f.data_inicio.strftime('%d/%m/%Y') if f.data_inicio is not string and f.data_inicio else f.data_inicio }}</strong>, referente à prestação de serviço temporário na função de <strong>{{ f.funcao if f.funcao else f.funcao_nome }}</strong>, conforme anotações e registros funcionais vinculados a esta municipalidade e à CTPS Digital.</p>
+            
+            <p>O(A) servidor(a) acima qualificado(a) prestou efetivamente seus serviços até o dia <strong>{{ f.data_saida.strftime('%d/%m/%Y') if f.data_saida is not string and f.data_saida else f.data_saida }}</strong>. Com a assinatura deste instrumento, as partes declaram estarem plenamente cientes e em perfeito acordo com a respectiva rescisão, dando-se mútua, plena e geral quitação, para nada mais haver a reclamar ou exigir, seja a que tempo ou título for.</p>
+            
+            <p>E, por estarem assim justos e contratados, assinam o presente termo em duas vias de igual teor e forma para um só efeito, na presença das testemunhas adiante subscritas.</p>
+        </div>
+
+        <div class="date-location">
+            Valença do Piauí - PI, {{ data_atual.strftime('%d de %B de %Y') if data_atual is not string else data_atual }}.
+        </div>
+
+        <!-- Assinaturas da Folha 1 -->
+        <div class="signatures-section">
+            <div class="signature-block">
+                <div class="signature-wrapper">
+                    <div class="signature-line"></div>
+                    <div class="signature-role">Antônia Iara Costa</div>
+                    <div class="signature-detail">Secretária Municipal de Educação</div>
+                </div>
+                
+                <div class="signature-wrapper">
+                    <div class="signature-line"></div>
+                    <div class="signature-role">{{ f.nome }}</div>
+                    <div class="signature-detail">Contratado(a)</div>
+                </div>
+            </div>
+
+            <div class="witness-section">
+                <div class="witness-title">TESTEMUNHAS:</div>
+                <div class="witness-grid">
+                    <div class="witness-fields">
+                        <div class="witness-line">1. Nome:</div>
+                        <div class="witness-line">CPF:</div>
+                    </div>
+                    <div class="witness-fields">
+                        <div class="witness-line">2. Nome:</div>
+                        <div class="witness-line">CPF:</div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Seção de Testemunhas -->
-        <div class="witness-section">
-            <div class="witness-title">TESTEMUNHAS:</div>
-            <div class="witness-grid">
-                <div class="witness-fields">
-                    <div class="witness-line">1. Nome:</div>
-                    <div class="witness-line">CPF:</div>
-                </div>
-                <div class="witness-fields">
-                    <div class="witness-line">2. Nome:</div>
-                    <div class="witness-line">CPF:</div>
+        <!-- Rodapé da Folha 1 -->
+        <div class="institucional-footer">
+            Rua Epaminondas Nogueira, 1425 - Bairro São Francisco - Valença do Piauí | CNPJ: 06.095.146/0001-44
+        </div>
+    </div>
+
+    <!-- ==================== FOLHA 02 ==================== -->
+    <div class="page page-break">
+        <!-- Marca d'água -->
+        <div class="watermark-container">
+            <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logomarca">
+        </div>
+
+        <!-- Cabeçalho Institucional -->
+        <div class="institucional-header">
+            <h1>ESTADO DO PIAUÍ</h1>
+            <h2>MUNICÍPIO DE VALENÇA DO PIAUÍ</h2>
+            <h2>SECRETARIA MUNICIPAL DE EDUCAÇÃO</h2>
+            <p>CNPJ Nº 06.095.146/0001-44 | Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco</p>
+        </div>
+
+        <div class="doc-title">RESCISÃO DE CONTRATO ADMINISTRATIVO</div>
+
+        <div class="content">
+            <p>Pelo presente termo complementar de distrato, o <strong>MUNICÍPIO DE VALENÇA DO PIAUÍ / SECRETARIA MUNICIPAL DE EDUCAÇÃO</strong>, inscrito no CNPJ sob o nº 06.095.146/0001-44, com sede administrativa estabelecida na Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco, neste ato devidamente representada por sua gestora da pasta, a Secretária Municipal de Educação, a Srª. <strong>ANTÔNIA IARA COSTA</strong>, resolve formalizar a extinção do termo de prestação de serviços temporários de excepcional interesse público.</p>
+
+            <p>A presente resilição tem como objeto a baixa integral de atribuições inerentes à função pública de <strong>{{ f.funcao if f.funcao else f.funcao_nome }}</strong>, cujas atividades laborais foram legalmente inauguradas no dia <strong>{{ f.data_inicio.strftime('%d/%m/%Y') if f.data_inicio is not string and f.data_inicio else f.data_inicio }}</strong>, tendo como parte contratada a(o) prestadora(o) de serviços subscrita(o) <strong>{{ f.nome }}</strong>.</p>
+
+            <p>Fica acordado entre as partes que a vigência das obrigações funcionais cessa de forma irrevogável na data final de homologação do desligamento, eximindo a administração pública municipal de quaisquer ônus de continuidade contratual subsequente.</p>
+        </div>
+
+        <div class="date-location">
+            Valença do Piauí - PI, {{ data_atual.strftime('%d de %B de %Y') if data_atual is not string else data_atual }}.
+        </div>
+
+        <!-- Assinatura Unificada de Homologação da Folha 2 -->
+        <div class="signatures-section" style="margin-top: 80px;">
+            <div class="signature-block" style="justify-content: center;">
+                <div class="signature-wrapper" style="width: 60%;">
+                    <div class="signature-line"></div>
+                    <div class="signature-role">Antônia Iara Costa</div>
+                    <div class="signature-detail">Município de Valença do Piauí - Secretaria Municipal de Educação</div>
                 </div>
             </div>
+        </div>
+
+        <!-- Rodapé da Folha 2 -->
+        <div class="institucional-footer">
+            Rua Epaminondas Nogueira, 1425 - Bairro São Francisco - Valença do Piauí | CNPJ: 06.095.146/0001-44
         </div>
     </div>
 
 </body>
-</html> 
+</html>
