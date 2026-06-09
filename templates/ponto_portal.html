@@ -155,6 +155,13 @@
                 Posicione o rosto no centro...
             </div>
 
+            <div id="alertaDemora" class="hidden mt-2">
+                <button type="button" onclick="ativarFallbackRH()" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all animate-bounce">
+                    <i class="ph ph-warning text-base"></i>
+                    ESTÁ DEMORANDO? BATER PONTO PELO CPF
+                </button>
+            </div>
+
             <p class="text-[10px] text-slate-400 uppercase font-black tracking-tighter">
                 O sistema está conferindo a biometria do CPF informado.
             </p>
@@ -187,6 +194,7 @@
     let isModelsLoaded = false;
     let detectionInterval;
     let fallbackAtivo = false;
+    let timeoutDemora;
 
     // --- 2. CARREGAMENTO DOS MODELOS TINY ---
     Promise.all([
@@ -252,20 +260,16 @@
             return;
         }
 
-        // Armazena ID encontrado
         document.getElementById('inputFuncionarioId').value = servidor.id;
 
-        // Se os modelos não carregaram, espera
         if (!isModelsLoaded) {
             document.getElementById('btnProsseguirCPF').innerText = "Carregando IA...";
             while (!isModelsLoaded) { await new Promise(r => setTimeout(r, 300)); }
         }
 
-        // Gera a assinatura facial filtrada especificamente para este servidor (Performance 1:1)
         document.getElementById('btnProsseguirCPF').innerText = "Sincronizando Biometria...";
         faceMatcher = await gerarAssinaturaFuncionarioFocado(servidor.id);
 
-        // Avança para a câmera
         irParaCapturaFacial();
     }
 
@@ -274,7 +278,7 @@
         const descricoesSalvas = JSON.parse(localStorage.getItem('bioid_descritores') || '{}');
         const base64Image = fotosSalvas[funcionarioId];
 
-        if (!base64Image) return null; // Sem foto cadastrada
+        if (!base64Image) return null;
 
         const imageHash = base64Image.substring(0, 50);
         if (descricoesSalvas[funcionarioId] && descricoesSalvas[funcionarioId].hash === imageHash) {
@@ -301,6 +305,7 @@
     function irParaCapturaFacial() {
         stepCPF.classList.add('hidden');
         stepFacial.classList.remove('hidden');
+        document.getElementById('alertaDemora').classList.add('hidden');
         abrirCamera();
     }
 
@@ -311,6 +316,15 @@
             });
             video.srcObject = stream;
             document.getElementById('scannerLine').classList.remove('hidden');
+
+            // Dispara o botão amarelo se demorar mais que 5 segundos na tela da câmera
+            clearTimeout(timeoutDemora);
+            timeoutDemora = setTimeout(() => {
+                if (!stepFacial.classList.contains('hidden')) {
+                    document.getElementById('alertaDemora').classList.remove('hidden');
+                }
+            }, 5000);
+
         } catch (err) {
             alert("Erro ao acessar a câmera. Redirecionando para registro manual.");
             ativarFallbackRH();
@@ -320,6 +334,7 @@
     function pararCamera() {
         if (stream) { stream.getTracks().forEach(t => t.stop()); }
         clearInterval(detectionInterval);
+        clearTimeout(timeoutDemora);
         const oldCanvas = document.querySelector('canvas.face-api-canvas');
         if (oldCanvas) oldCanvas.remove();
     }
@@ -331,9 +346,6 @@
         document.getElementById('videoContainer').append(canvas);
         const displaySize = { width: 250, height: 250 };
         faceapi.matchDimensions(canvas, displaySize);
-
-        let tentativas = 0;
-        const maxTentativas = 20; // Aproximadamente 8 segundos de varredura
 
         document.getElementById('statusMsg').innerText = "Analisando seu rosto...";
 
@@ -352,6 +364,7 @@
 
                     if (bestMatch.label !== 'unknown') {
                         clearInterval(detectionInterval);
+                        clearTimeout(timeoutDemora);
                         document.getElementById('scannerLine').classList.add('hidden');
                         document.getElementById('statusMsg').innerText = "Rosto Confirmado! Registrando...";
                         document.getElementById('statusMsg').className = "text-sm font-bold text-green-600 bg-green-50 py-2 rounded-lg";
@@ -364,30 +377,21 @@
                     }
                 }
             }
-
-            tentativas++;
-            if (tentativas >= maxTentativas) {
-                clearInterval(detectionInterval);
-                ativarFallbackRH();
-            }
         }, 400);
     });
 
     // --- 6. CASO O ROSTO NÃO SEJA RECONHECIDO (RETORNA AO CPF COM ALERTA) ---
-    function activarFallbackRH() {
-        salvarFotoAuditoria(); // Salva a foto que falhou para auditoria do RH
+    function ativarFallbackRH() {
+        salvarFotoAuditoria();
         pararCamera();
 
-        // Volta para a tela de CPF com a nova configuração de erro
         stepFacial.classList.add('hidden');
         stepCPF.classList.remove('hidden');
 
-        // Exibe o Alerta do RH
         document.getElementById('alertaFoto').classList.remove('hidden');
         document.getElementById('cpfTitulo').innerText = "Confirmação Manual";
         document.getElementById('cpfSubtitulo').innerText = "Seu rosto não foi reconhecido. Clique no botão preto abaixo para registrar sua batida de contingência.";
 
-        // Modifica o botão para agir como SUBMIT do formulário
         fallbackAtivo = true;
         btnProsseguirCPF.type = "submit";
         btnProsseguirCPF.innerText = "CONFIRMAR PONTO MANUAL";
@@ -418,6 +422,10 @@
         }
     }
 
+    document.addEventListener("DOMContentLoaded", () => {
+        capturarGeo();
+    });
+
     function validarEnvio() {
         capturarGeo(); 
         const idFunc = document.getElementById('inputFuncionarioId').value;
@@ -430,7 +438,6 @@
         return true;
     }
 
-    // Máscara Javascript para o Input de CPF
     document.getElementById('cpfInput').addEventListener('input', function (e) {
         let v = e.target.value.replace(/\D/g, '');
         v = v.replace(/(\d{3})(\d)/, '$1.$2');
