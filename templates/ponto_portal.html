@@ -26,26 +26,12 @@
         }
 
         @keyframes scan {
-            0% {
-                top: 0%;
-                opacity: 0;
-            }
-
-            10% {
-                opacity: 1;
-            }
-
-            90% {
-                opacity: 1;
-            }
-
-            100% {
-                top: 100%;
-                opacity: 0;
-            }
+            0% { top: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
         }
 
-        /* Espelha a câmera para parecer um espelho real */
         video {
             transform: scaleX(-1);
             object-fit: cover;
@@ -66,8 +52,7 @@
     {% if messages %}
     <div id="toast-container" class="fixed top-6 right-6 z-50 flex flex-col gap-3">
         {% for category, message in messages %}
-        <div
-            class="toast-msg px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold text-white transition-opacity duration-500 {{ 'bg-emerald-500' if category == 'success' else 'bg-red-500' }}">
+        <div class="toast-msg px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-bold text-white transition-opacity duration-500 {{ 'bg-emerald-500' if category == 'success' else 'bg-red-500' }}">
             {% if category == 'success' %}
             <i class="ph ph-check-circle text-2xl"></i>
             {% else %}
@@ -79,7 +64,6 @@
     </div>
 
     <script>
-        // Faz as mensagens sumirem sozinhas após 5 segundos
         setTimeout(() => {
             const toasts = document.querySelectorAll('.toast-msg');
             toasts.forEach(toast => {
@@ -91,8 +75,7 @@
     {% endif %}
     {% endwith %}
 
-    <div class="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden transition-all"
-        id="mainContainer">
+    <div class="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl border border-slate-200 overflow-hidden transition-all" id="mainContainer">
 
         <div id="stepClock" class="p-8 text-center space-y-6">
             <div class="flex justify-center mb-4">
@@ -110,25 +93,60 @@
                 <p class="text-slate-500 text-sm mt-2">Pronto para registrar sua frequência?</p>
             </div>
 
-            <button onclick="iniciarAppFacial()" id="btnIniciar"
+            <button onclick="irParaCPF()" id="btnIniciar"
                 class="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-bold text-lg shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center justify-center gap-3">
                 <i class="ph ph-fingerprint text-2xl"></i>
                 REGISTRAR PONTO
             </button>
-            <p id="loadingModelsMsg" class="text-xs font-bold text-blue-600 hidden animate-pulse">Carregando
-                Inteligência Artificial...</p>
+            <p id="loadingModelsMsg" class="text-xs font-bold text-blue-600 hidden animate-pulse">Carregando Inteligência Artificial...</p>
+        </div>
+
+        <div id="stepCPF" class="hidden p-8 text-center space-y-4">
+            <div id="alertaFoto" class="hidden bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl text-left shadow-sm flex items-start gap-3">
+                <i class="ph ph-warning-circle text-2xl mt-0.5"></i>
+                <div>
+                    <h3 class="font-bold text-sm">Rosto não reconhecido!</h3>
+                    <p class="text-xs mt-1 font-medium opacity-90">Por favor, confirme seu ponto manualmente abaixo e dirija-se ao setor responsável para atualizar sua foto.</p>
+                </div>
+            </div>
+
+            <h2 class="text-xl font-black text-slate-900 mt-4" id="cpfTitulo">Identificação do Servidor</h2>
+            <p class="text-sm text-slate-500 mb-4" id="cpfSubtitulo">Insira seu CPF para buscar seu cadastro biométrico.</p>
+
+            <form id="pontoForm" method="POST" action="/ponto/registrar_facial" class="space-y-4" onsubmit="return validarEnvio()">
+                <input type="hidden" name="lat" id="lat">
+                <input type="hidden" name="lng" id="lng">
+                <input type="hidden" name="foto_base64" id="foto_base64">
+                <input type="hidden" name="tipo" value="automatico">
+                <input type="hidden" name="funcionario_id" id="inputFuncionarioId">
+                <input type="hidden" name="local_id" value="{{ local_id_selecionado }}">
+
+                <div class="text-left">
+                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Informe seu CPF</label>
+                    <input type="text" name="cpf" id="cpfInput" placeholder="000.000.000-00"
+                        class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                </div>
+
+                <button type="button" id="btnProsseguirCPF" onclick="prosseguirAposCPF()"
+                    class="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-bold shadow-xl transition-all active:scale-95">
+                    AVANÇAR
+                </button>
+            </form>
+
+            <button onclick="voltarRelogio()" class="text-xs font-bold text-slate-400 hover:text-black transition-colors mt-4">
+                Cancelar e voltar ao início
+            </button>
         </div>
 
         <div id="stepFacial" class="hidden p-8 text-center space-y-6">
             <div class="flex items-center gap-3 mb-4">
-                <button onclick="voltarRelogio()" class="p-2 hover:bg-slate-100 rounded-full transition">
+                <button onclick="voltarParaCPF()" class="p-2 hover:bg-slate-100 rounded-full transition">
                     <i class="ph ph-arrow-left text-xl"></i>
                 </button>
                 <h2 class="font-bold text-slate-800">Validação Biométrica</h2>
             </div>
 
-            <div class="relative w-full aspect-square bg-black rounded-3xl overflow-hidden border-4 border-slate-100 shadow-lg"
-                id="videoContainer">
+            <div class="relative w-full aspect-square bg-black rounded-3xl overflow-hidden border-4 border-slate-100 shadow-lg" id="videoContainer">
                 <div id="scannerLine" class="scanner-line hidden"></div>
                 <video id="video" autoplay playsinline muted class="w-full h-full"></video>
             </div>
@@ -138,54 +156,19 @@
             </div>
 
             <p class="text-[10px] text-slate-400 uppercase font-black tracking-tighter">
-                O sistema tentará reconhecer seu rosto automaticamente.
+                O sistema está conferindo a biometria do CPF informado.
             </p>
         </div>
 
-        <div id="stepCPF" class="hidden p-8 text-center space-y-4">
-
-            <div id="alertaFoto"
-                class="hidden bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl text-left shadow-sm flex items-start gap-3">
-                <i class="ph ph-warning-circle text-2xl mt-0.5"></i>
-                <div>
-                    <h3 class="font-bold text-sm">Rosto não reconhecido!</h3>
-                    <p class="text-xs mt-1 font-medium opacity-90">Servidor, por favor, dirija-se ao setor responsável
-                        para atualizar sua foto no módulo "Reconhecimento Facial".</p>
-                </div>
-            </div>
-
-            <h2 class="text-xl font-black text-slate-900 mt-4">Registro Manual</h2>
-            <p class="text-sm text-slate-500 mb-4">Para não ficar com falta, registre o ponto pelo seu CPF abaixo.</p>
-
-            <form id="pontoForm" method="POST" action="/ponto/registrar_facial" class="space-y-4"
-                onsubmit="return validarEnvio()">
-                <input type="hidden" name="lat" id="lat">
-                <input type="hidden" name="lng" id="lng">
-                <input type="hidden" name="foto_base64" id="foto_base64">
-                <input type="hidden" name="tipo" value="automatico">
-                <input type="hidden" name="funcionario_id" id="inputFuncionarioId">
-
-                <input type="hidden" name="local_id" value="{{ local_id_selecionado }}">
-
-                <div class="text-left">
-                    <label class="text-[10px] font-black text-slate-400 uppercase ml-2">Informe seu CPF</label>
-                    <input type="text" name="cpf" id="cpfInput" placeholder="000.000.000-00"
-                        class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 text-lg font-bold focus:ring-2 focus:ring-blue-500 outline-none transition-all">
-                </div>
-
-                <button type="submit" id="btnConfirmarCPF"
-                    class="w-full bg-black text-white py-5 rounded-2xl font-bold shadow-xl transition-all active:scale-95">
-                    CONFIRMAR PONTO
-                </button>
-            </form>
-
-            <button onclick="voltarRelogio()"
-                class="text-xs font-bold text-slate-400 hover:text-black transition-colors mt-4">
-                Cancelar e voltar ao início
-            </button>
-        </div>
-
     </div>
+
+    <script>
+        const servidoresUnidade = {
+            {% for s in servidores %}
+                "{{ s.cpf|replace('.','')|replace('-','') }}": { "id": "{{ s.id }}", "nome": "{{ s.nome }}" },
+            {% endfor %}
+        };
+    </script>
 
     <script>
     // --- 1. RELÓGIO ---
@@ -198,15 +181,15 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // --- Variáveis Globais da IA ---
+    // --- Variáveis Globais ---
     let faceMatcher = null;
     let stream = null;
     let isModelsLoaded = false;
     let detectionInterval;
+    let fallbackAtivo = false;
 
-    // --- 2. CARREGAMENTO DOS MODELOS TINY (Ultra-rápido) ---
+    // --- 2. CARREGAMENTO DOS MODELOS TINY ---
     Promise.all([
-        // Trocamos o modelo pesado pelo TinyFaceDetector
         faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
         faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
         faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/')
@@ -215,111 +198,33 @@
         console.log("Modelos Tiny IA carregados.");
     });
 
-    // --- 3. INICIAR FLUXO AO CLICAR NO BOTÃO ---
-    async function iniciarAppFacial() {
-        document.getElementById('btnIniciar').classList.add('hidden');
-        const loadingMsg = document.getElementById('loadingModelsMsg');
-        loadingMsg.classList.remove('hidden');
-
-        if (!isModelsLoaded) {
-            loadingMsg.innerText = "Iniciando redes neurais...";
-            while (!isModelsLoaded) {
-                await new Promise(r => setTimeout(r, 500));
-            }
-        }
-
-        loadingMsg.innerText = "Sincronizando rostos (Verificando cache)...";
-
-        if (!faceMatcher) {
-            faceMatcher = await gerarAssinaturasFaciais();
-        }
-
-        irParaCaptura();
-    }
-
-    // --- 4. CONVERTE AS FOTOS COM CACHE DE ALTA PERFORMANCE ---
-    async function gerarAssinaturasFaciais() {
-        const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
-        const descricoesSalvas = JSON.parse(localStorage.getItem('bioid_descritores') || '{}');
-        const labeledDescriptors = [];
-        let precisaAtualizar = false;
-
-        for (const [id_funcionario, base64Image] of Object.entries(fotosSalvas)) {
-            const imageHash = base64Image.substring(0, 50);
-
-            if (descricoesSalvas[id_funcionario] && descricoesSalvas[id_funcionario].hash === imageHash) {
-                const arr = new Float32Array(Object.values(descricoesSalvas[id_funcionario].descriptor));
-                labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(id_funcionario, [arr]));
-                continue;
-            }
-
-            try {
-                const img = new Image();
-                img.src = base64Image;
-                await new Promise((resolve) => { img.onload = resolve; });
-
-                // Detecção inicial também usando Tiny para ser coerente
-                const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-                if (detection) {
-                    labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(id_funcionario, [detection.descriptor]));
-                    descricoesSalvas[id_funcionario] = {
-                        hash: imageHash,
-                        descriptor: detection.descriptor
-                    };
-                    precisaAtualizar = true;
-                }
-            } catch (e) {
-                console.error("Erro ao processar foto do ID:", id_funcionario);
-            }
-        }
-
-        if (precisaAtualizar) {
-            localStorage.setItem('bioid_descritores', JSON.stringify(descricoesSalvas));
-        }
-
-        if (labeledDescriptors.length > 0) {
-            return new faceapi.FaceMatcher(labeledDescriptors, 0.6);
-        }
-        return null;
-    }
-
-    // --- 5. FLUXO DE TELAS E CÂMERA ---
+    // --- 3. FLUXO DE MOVIMENTAÇÃO DE TELAS ---
     const stepClock = document.getElementById('stepClock');
-    const stepFacial = document.getElementById('stepFacial');
     const stepCPF = document.getElementById('stepCPF');
+    const stepFacial = document.getElementById('stepFacial');
     const video = document.getElementById('video');
+    const btnProsseguirCPF = document.getElementById('btnProsseguirCPF');
 
-    function irParaCaptura() {
+    function irParaCPF() {
         stepClock.classList.add('hidden');
-        stepCPF.classList.add('hidden');
-        stepFacial.classList.remove('hidden');
-
-        document.getElementById('btnIniciar').classList.remove('hidden');
-        document.getElementById('loadingModelsMsg').classList.add('hidden');
-
+        stepFacial.classList.add('hidden');
+        stepCPF.classList.remove('hidden');
+        
+        fallbackAtivo = false;
+        document.getElementById('alertaFoto').classList.add('hidden');
+        document.getElementById('cpfTitulo').innerText = "Identificação do Servidor";
+        document.getElementById('cpfSubtitulo').innerText = "Insira seu CPF para buscar seu cadastro biométrico.";
+        btnProsseguirCPF.type = "button";
+        btnProsseguirCPF.innerText = "AVANÇAR";
+        btnProsseguirCPF.className = "w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-bold shadow-xl transition-all active:scale-95";
+        
         capturarGeo();
-        abrirCamera();
     }
 
-    async function abrirCamera() {
-        try {
-            // Resolução reduzida para 250x250 para aumentar a performance
-            stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { width: 250, height: 250, facingMode: "user" } 
-            });
-            video.srcObject = stream;
-            document.getElementById('scannerLine').classList.remove('hidden');
-        } catch (err) {
-            alert("Erro ao acessar a câmera: " + err.message + "\nRedirecionando para registro manual.");
-            irParaCPF(false);
-        }
-    }
-
-    function pararCamera() {
-        if (stream) { stream.getTracks().forEach(t => t.stop()); }
-        clearInterval(detectionInterval);
-        const oldCanvas = document.querySelector('canvas.face-api-canvas');
-        if (oldCanvas) oldCanvas.remove();
+    function voltarParaCPF() {
+        pararCamera();
+        stepFacial.classList.add('hidden');
+        stepCPF.classList.remove('hidden');
     }
 
     function voltarRelogio() {
@@ -331,10 +236,95 @@
         document.getElementById('inputFuncionarioId').value = "";
         document.getElementById('cpfInput').value = "";
         document.getElementById('alertaFoto').classList.add('hidden');
-        document.getElementById('cpfInput').required = false;
     }
 
-    // --- 6. LÓGICA DE RECONHECIMENTO AO VIVO (OTIMIZADA) ---
+    // --- 4. VALIDAÇÃO DO CPF DIGITADO E PREPARAÇÃO DA IA ---
+    async function prosseguirAposCPF() {
+        const cpfLimpo = document.getElementById('cpfInput').value.replace(/\D/g, '');
+        if (cpfLimpo.length < 11) {
+            alert("Por favor, digite um CPF válido.");
+            return;
+        }
+
+        const servidor = servidoresUnidade[cpfLimpo];
+        if (!servidor) {
+            alert("CPF não localizado nesta unidade de trabalho. Verifique ou procure o RH.");
+            return;
+        }
+
+        // Armazena ID encontrado
+        document.getElementById('inputFuncionarioId').value = servidor.id;
+
+        // Se os modelos não carregaram, espera
+        if (!isModelsLoaded) {
+            document.getElementById('btnProsseguirCPF').innerText = "Carregando IA...";
+            while (!isModelsLoaded) { await new Promise(r => setTimeout(r, 300)); }
+        }
+
+        // Gera a assinatura facial filtrada especificamente para este servidor (Performance 1:1)
+        document.getElementById('btnProsseguirCPF').innerText = "Sincronizando Biometria...";
+        faceMatcher = await gerarAssinaturaFuncionarioFocado(servidor.id);
+
+        // Avança para a câmera
+        irParaCapturaFacial();
+    }
+
+    async function gerarAssinaturaFuncionarioFocado(funcionarioId) {
+        const fotosSalvas = JSON.parse(localStorage.getItem('bioid_fotos') || '{}');
+        const descricoesSalvas = JSON.parse(localStorage.getItem('bioid_descritores') || '{}');
+        const base64Image = fotosSalvas[funcionarioId];
+
+        if (!base64Image) return null; // Sem foto cadastrada
+
+        const imageHash = base64Image.substring(0, 50);
+        if (descricoesSalvas[funcionarioId] && descricoesSalvas[funcionarioId].hash === imageHash) {
+            const arr = new Float32Array(Object.values(descricoesSalvas[funcionarioId].descriptor));
+            return new faceapi.FaceMatcher([new faceapi.LabeledFaceDescriptors(funcionarioId, [arr])], 0.6);
+        }
+
+        try {
+            const img = new Image();
+            img.src = base64Image;
+            await new Promise((resolve) => { img.onload = resolve; });
+            const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+            if (detection) {
+                descricoesSalvas[funcionarioId] = { hash: imageHash, descriptor: detection.descriptor };
+                localStorage.setItem('bioid_descritores', JSON.stringify(descricoesSalvas));
+                return new faceapi.FaceMatcher([new faceapi.LabeledFaceDescriptors(funcionarioId, [detection.descriptor])], 0.6);
+            }
+        } catch (e) {
+            console.error("Erro processamento facial:", e);
+        }
+        return null;
+    }
+
+    function irParaCapturaFacial() {
+        stepCPF.classList.add('hidden');
+        stepFacial.classList.remove('hidden');
+        abrirCamera();
+    }
+
+    async function abrirCamera() {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { width: 250, height: 250, facingMode: "user" } 
+            });
+            video.srcObject = stream;
+            document.getElementById('scannerLine').classList.remove('hidden');
+        } catch (err) {
+            alert("Erro ao acessar a câmera. Redirecionando para registro manual.");
+            ativarFallbackRH();
+        }
+    }
+
+    function pararCamera() {
+        if (stream) { stream.getTracks().forEach(t => t.stop()); }
+        clearInterval(detectionInterval);
+        const oldCanvas = document.querySelector('canvas.face-api-canvas');
+        if (oldCanvas) oldCanvas.remove();
+    }
+
+    // --- 5. EXECUÇÃO DA BIOMETRIA EM TEMPO REAL ---
     video.addEventListener('play', () => {
         const canvas = faceapi.createCanvasFromMedia(video);
         canvas.classList.add('face-api-canvas');
@@ -343,12 +333,13 @@
         faceapi.matchDimensions(canvas, displaySize);
 
         let tentativas = 0;
-        const maxTentativas = 20;
+        const maxTentativas = 20; // Aproximadamente 8 segundos de varredura
+
+        document.getElementById('statusMsg').innerText = "Analisando seu rosto...";
 
         detectionInterval = setInterval(async () => {
             if (stepFacial.classList.contains('hidden')) return;
 
-            // Execução usando TinyFaceDetectorOptions para velocidade máxima
             const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
 
             if (detection) {
@@ -362,18 +353,13 @@
                     if (bestMatch.label !== 'unknown') {
                         clearInterval(detectionInterval);
                         document.getElementById('scannerLine').classList.add('hidden');
-                        document.getElementById('statusMsg').innerText = "Rosto Reconhecido! Salvando...";
-                        document.getElementById('statusMsg').classList.replace('text-blue-600', 'text-green-600');
-                        document.getElementById('statusMsg').classList.replace('bg-blue-50', 'bg-green-50');
-
-                        document.getElementById('inputFuncionarioId').value = bestMatch.label;
+                        document.getElementById('statusMsg').innerText = "Rosto Confirmado! Registrando...";
+                        document.getElementById('statusMsg').className = "text-sm font-bold text-green-600 bg-green-50 py-2 rounded-lg";
 
                         salvarFotoAuditoria();
-                        capturarGeo(); 
-
                         setTimeout(() => {
                             document.getElementById('pontoForm').submit();
-                        }, 500); // Reduzi o delay para 500ms
+                        }, 400);
                         return;
                     }
                 }
@@ -382,22 +368,30 @@
             tentativas++;
             if (tentativas >= maxTentativas) {
                 clearInterval(detectionInterval);
-                irParaCPF(true);
+                ativarFallbackRH();
             }
-        }, 400); // Intervalo de 400ms ideal para processadores mobile
+        }, 400);
     });
 
-    // --- 7. FALLBACK PARA O CPF E MENSAGEM ---
-    function irParaCPF(mostrarAviso) {
-        salvarFotoAuditoria();
+    // --- 6. CASO O ROSTO NÃO SEJA RECONHECIDO (RETORNA AO CPF COM ALERTA) ---
+    function activarFallbackRH() {
+        salvarFotoAuditoria(); // Salva a foto que falhou para auditoria do RH
         pararCamera();
 
+        // Volta para a tela de CPF com a nova configuração de erro
         stepFacial.classList.add('hidden');
         stepCPF.classList.remove('hidden');
 
-        if (mostrarAviso) {
-            document.getElementById('alertaFoto').classList.remove('hidden');
-        }
+        // Exibe o Alerta do RH
+        document.getElementById('alertaFoto').classList.remove('hidden');
+        document.getElementById('cpfTitulo').innerText = "Confirmação Manual";
+        document.getElementById('cpfSubtitulo').innerText = "Seu rosto não foi reconhecido. Clique no botão preto abaixo para registrar sua batida de contingência.";
+
+        // Modifica o botão para agir como SUBMIT do formulário
+        fallbackAtivo = true;
+        btnProsseguirCPF.type = "submit";
+        btnProsseguirCPF.innerText = "CONFIRMAR PONTO MANUAL";
+        btnProsseguirCPF.className = "w-full bg-black text-white py-5 rounded-2xl font-bold shadow-xl transition-all active:scale-95";
     }
 
     function salvarFotoAuditoria() {
@@ -408,11 +402,11 @@
             tempCanvas.getContext('2d').drawImage(video, 0, 0, 250, 250);
             document.getElementById('foto_base64').value = tempCanvas.toDataURL('image/jpeg', 0.6);
         } catch (e) {
-            console.log("Câmera indisponível para auditoria.");
+            console.log("Câmera estática ou indisponível para auditoria.");
         }
     }
 
-    // --- GEOLOCALIZAÇÃO ---
+    // --- 7. AJUSTES AUXILIARES E GEOLOCALIZAÇÃO ---
     function capturarGeo() {
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(pos => {
@@ -424,20 +418,19 @@
         }
     }
 
-    // --- VALIDAÇÃO DE ENVIO ---
     function validarEnvio() {
         capturarGeo(); 
-        const idFacial = document.getElementById('inputFuncionarioId').value;
+        const idFunc = document.getElementById('inputFuncionarioId').value;
         const cpfDigitado = document.getElementById('cpfInput').value.replace(/\D/g, '');
 
-        if (!idFacial && cpfDigitado.length < 11) {
-            alert("Erro: Nenhum servidor identificado. Por favor, insira o CPF corretamente.");
+        if (!idFunc && cpfDigitado.length < 11) {
+            alert("Nenhum servidor identificado. Digite o CPF corretamente.");
             return false;
         }
         return true;
     }
 
-    // --- MÁSCARA CPF ---
+    // Máscara Javascript para o Input de CPF
     document.getElementById('cpfInput').addEventListener('input', function (e) {
         let v = e.target.value.replace(/\D/g, '');
         v = v.replace(/(\d{3})(\d)/, '$1.$2');
@@ -447,5 +440,4 @@
     });
 </script>
 </body>
-
 </html>
