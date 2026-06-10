@@ -335,6 +335,10 @@
         <i class="ph ph-paper-plane-tilt text-xl"></i>
     </a>
 
+    <a href="{{ url_for('relatorio_pessoal', id=f.id) }}" target="_blank" class="p-2 text-orange-600 hover:bg-orange-50 rounded-lg" title="Relatório Pessoal">
+        <i class="ph ph-file-text text-xl"></i>
+    </a>
+
     {% if role == 'admin' or is_admin %}
     <button onclick="confirmAction('{{ url_for('excluir_ficha', id=f.id) }}', 'Excluir Ficha', 'Tem certeza que deseja excluir este registro permanentemente?')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Excluir">
         <i class="ph ph-trash text-xl"></i>

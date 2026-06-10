@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório Pessoal - {{ funcionario.nome }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        /* Estilos para impressão */
+        @media print {
+            .no-print { display: none !important; }
+            body { background-color: #fff; margin: 0; padding: 0; }
+            .print-area { width: 100%; margin: 0; padding: 0; box-shadow: none; border: none; }
+        }
+    </style>
+</head>
+<body class="dark:bg-gray-900 dark:text-gray-100">
+
+    <div class="flex h-screen bg-gray-100 dark:bg-gray-900">
+        <!-- Sidebar (pode ser copiado do admin.html se quiser navegação completa) -->
+        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700 no-print">
+            <div>
+                <div class="p-6 flex items-center gap-3">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="h-10 w-auto object-contain dark:invert">
+                </div>
+                <nav class="px-4 space-y-1">
+                    <a href="{{ url_for('sistema') }}" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
+                        <i class="ph ph-arrow-left text-lg"></i> Voltar ao Sistema
+                    </a>
+                    <a href="#" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium bg-gray-900 text-white rounded-lg dark:bg-gray-700">
+                        <i class="ph ph-file-text text-lg text-blue-500"></i> Relatório Pessoal
+                    </a>
+                </nav>
+            </div>
+        </aside>
+
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm dark:bg-gray-800 dark:border-gray-700 no-print">
+                <h2 class="text-lg font-bold text-gray-800 dark:text-white">Relatório Pessoal</h2>
+                <button onclick="window.print()" class="text-xs bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition">
+                    <i class="ph ph-printer"></i> Imprimir
+                </button>
+            </header>
+
+            <main class="flex-1 overflow-y-auto p-8">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden dark:bg-gray-800 dark:border-gray-700 print-area">
+                    <div class="p-6 border-b border-gray-100 dark:border-gray-700">
+                        <h3 class="text-xl font-bold text-gray-900 dark:text-white">Dados do Funcionário</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Informações básicas para relatório.</p>
+                    </div>
+                    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Nome Completo</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ funcionario.nome }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Função</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ funcionario.funcao.nome if funcionario.funcao else 'Não Definido' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Local de Trabalho</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ funcionario.local_trabalho.nome if funcionario.local_trabalho else 'Não Definido' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Telefone</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ funcionario.telefone if funcionario.telefone else 'Não Informado' }}</p>
+                        </div>
+                        <!-- Adicione mais campos se necessário -->
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">CPF</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ funcionario.cpf if funcionario.cpf else 'Não Informado' }}</p>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Secretaria</p>
+                            <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ funcionario.secretaria.nome if funcionario.secretaria else 'Não Definido' }}</p>
+                        </div>
+                    </div>
+                    <div class="p-6 border-t border-gray-100 dark:border-gray-700 text-right text-sm text-gray-500 dark:text-gray-400">
+                        Gerado em: {{ '%d/%m/%Y %H:%M' | format(now().day, now().month, now().year, now().hour, now().minute) }}
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Função para obter a data e hora atual no formato desejado
+        function now() {
+            const date = new Date();
+            return {
+                day: date.getDate(),
+                month: date.getMonth() + 1, // Mês é baseado em 0
+                year: date.getFullYear(),
+                hour: date.getHours(),
+                minute: date.getMinutes()
+            };
+        }
+    </script>
+</body>
+</html>
