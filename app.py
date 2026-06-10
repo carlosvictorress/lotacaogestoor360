@@ -2390,6 +2390,15 @@ def api_salvar_dados_rescisao():
     except Exception as e:
         db.session.rollback()
         return {"success": False, "message": str(e)}, 500
+    
+@app.route('/relatorio-geral')
+@login_required # Remova ou altere se não usar flask_login nesse projeto
+def relatorio_pessoal():
+    # Aqui recuperamos todos os funcionários do banco de dados (exemplo usando SQLAlchemy)
+    # Ajuste 'Funcionario' para o nome da sua classe de modelo se for diferente
+    funcionarios = Funcionario.query.all() 
+    
+    return render_template('relatorio_pessoal.html', funcionarios=funcionarios)    
 
 @app.route("/admin/escolas/atalhos")
 @login_required
