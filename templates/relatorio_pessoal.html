@@ -5,102 +5,158 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Relação Geral de Servidores</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = { darkMode: 'class' }
     </script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
-        /* Estilos para impressão */
+        body { font-family: 'Inter', sans-serif; background-color: #F5F5F7; }
+        /* Ajustes finos para ocultar barras de rolagem feias e otimizar impressão */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #4B5563; }
+
         @media print {
             .no-print { display: none !important; }
-            body { background-color: #fff; margin: 0; padding: 0; }
-            .print-area { width: 100%; margin: 0; padding: 0; box-shadow: none; border: none; }
+            body { background-color: #ffffff !important; color: #000000 !important; }
+            .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
         }
     </style>
 </head>
-<body class="dark:bg-gray-900 dark:text-gray-100">
+<body class="dark:bg-gray-950 dark:text-gray-100 antialiased">
 
-    <div class="flex h-screen bg-gray-100 dark:bg-gray-900">
-        <aside class="w-64 bg-white border-r border-gray-200 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-800 dark:border-gray-700 no-print">
+    <div class="flex h-screen bg-[#F5F5F7] dark:bg-gray-950 overflow-hidden">
+        
+        <aside class="w-64 bg-white border-r border-gray-100 flex flex-col justify-between hidden md:flex z-10 dark:bg-gray-900 dark:border-gray-800/60 no-print">
             <div>
                 <div class="p-6 flex items-center gap-3">
-                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="h-10 w-auto object-contain dark:invert">
+                    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="h-9 w-auto object-contain dark:invert opacity-90">
                 </div>
-                <nav class="px-4 space-y-1">
-                    <a href="{{ url_for('sistema') }}" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700">
+                <nav class="px-3 space-y-1">
+                    <a href="{{ url_for('sistema') }}" class="flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-500 rounded-xl hover:bg-gray-50 hover:text-gray-900 transition dark:text-gray-400 dark:hover:bg-gray-800/50 dark:hover:text-white">
                         <i class="ph ph-arrow-left text-lg"></i> Voltar ao Sistema
                     </a>
-                    <a href="#" class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium bg-gray-900 text-white rounded-lg dark:bg-gray-700">
-                        <i class="ph ph-file-text text-lg text-blue-500"></i> Relação Geral
+                    <a href="#" class="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold bg-gray-900 text-white rounded-xl shadow-sm dark:bg-gray-800 dark:text-blue-400">
+                        <i class="ph ph-users-three text-lg text-blue-500"></i> Relação Geral
                     </a>
                 </nav>
+            </div>
+            <div class="p-4 border-t border-gray-50 dark:border-gray-800/60">
+                <p class="text-[10px] font-medium text-gray-400 uppercase tracking-widest text-center">Gestoor 360 v2.0</p>
             </div>
         </aside>
 
         <div class="flex-1 flex flex-col overflow-hidden">
-            <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-8 shadow-sm dark:bg-gray-800 dark:border-gray-700 no-print">
-                <h2 class="text-lg font-bold text-gray-800 dark:text-white">Relação Geral de Servidores</h2>
-                <button onclick="window.print()" class="text-xs bg-blue-600 text-white hover:bg-blue-700 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition">
-                    <i class="ph ph-printer"></i> Imprimir Relação
+            
+            <header class="h-16 bg-white/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-8 z-10 dark:bg-gray-900/80 dark:border-gray-800/60 no-print">
+                <div class="flex items-center gap-2">
+                    <i class="ph ph-file-text text-xl text-gray-400"></i>
+                    <h2 class="text-sm font-semibold text-gray-800 dark:text-white tracking-tight">Módulo de Relatórios</h2>
+                </div>
+                <button onclick="window.print()" class="text-xs bg-gray-900 text-white hover:bg-gray-800 dark:bg-blue-600 dark:hover:bg-blue-700 px-4 py-2 rounded-xl font-medium flex items-center gap-2 shadow-sm transition-all duration-200 active:scale-95">
+                    <i class="ph ph-printer text-sm"></i> Imprimir Relação
                 </button>
             </header>
 
-            <main class="flex-1 overflow-y-auto p-8">
-                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden dark:bg-gray-800 dark:border-gray-700 print-area">
+            <main class="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+                
+                <div class="flex flex-col sm:flex-row gap-4 justify-between items-center bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800/60 shadow-sm no-print">
+                    <div class="relative w-full sm:w-80">
+                        <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-base"></i>
+                        <input type="text" id="buscaServidor" onkeyup="filtrarServidores()" placeholder="Buscar por nome ou função..." 
+                               class="w-full pl-10 pr-4 py-2 bg-gray-50 text-sm rounded-xl border border-transparent focus:bg-white focus:border-gray-200 focus:ring-0 transition-all outline-none dark:bg-gray-800/50 dark:text-white dark:focus:bg-gray-800 dark:focus:border-gray-700">
+                    </div>
+                    <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+                        <span class="text-xs font-medium text-gray-400">Filtro Ativo:</span>
+                        <span class="text-xs font-semibold bg-blue-50/60 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400 px-3 py-1.5 rounded-xl border border-blue-100/50 dark:border-blue-900/30 flex items-center gap-1.5">
+                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                            Todos os Servidores
+                        </span>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden dark:bg-gray-900 dark:border-gray-800/60 print-area">
                     
-                    <div class="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                    <div class="p-6 md:p-8 border-b border-gray-100 dark:border-gray-800/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-gray-50/50 to-transparent dark:from-gray-900">
                         <div>
-                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">Lista de Servidores Cadastrados</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Dados gerais de identificação, lotação e contato.</p>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-[10px] uppercase font-bold tracking-widest text-blue-600 dark:text-blue-400">Secretaria Municipal de Educação</span>
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white tracking-tight">Relação Geral de Servidores</h3>
+                            <p class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Listagem oficializada contendo identificação de cargo, lotações e meios de contato.</p>
                         </div>
-                        <div class="text-right hidden sm:block">
-                            <span class="text-xs font-semibold bg-blue-50 text-blue-700 px-3 py-1 rounded-full dark:bg-blue-900/30 dark:text-blue-400">
-                                Total: {{ funcionarios|length }} servidores
-                            </span>
+                        <div class="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-xl px-4 py-2.5 flex items-center gap-3 shadow-inner">
+                            <i class="ph ph-identification-card text-2xl text-gray-400"></i>
+                            <div>
+                                <p class="text-[10px] uppercase font-bold tracking-wider text-gray-400">Registros Ativos</p>
+                                <p class="text-base font-bold text-gray-900 dark:text-white">{{ funcionarios|length }} cadastros</p>
+                            </div>
                         </div>
                     </div>
                     
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
+                        <table class="w-full text-left border-collapse" id="tabelaServidores">
                             <thead>
-                                <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50 text-xs font-bold text-gray-500 uppercase tracking-wider dark:text-gray-400">
-                                    <th class="p-4 pl-6">Nome Completo</th>
-                                    <th class="p-4">Função</th>
-                                    <th class="p-4">Local de Trabalho</th>
-                                    <th class="p-4 pr-6">Telefone</th>
+                                <tr class="border-b border-gray-100 dark:border-gray-800 bg-gray-50/70 dark:bg-gray-800/40 text-[11px] font-bold text-gray-400 uppercase tracking-wider">
+                                    <th class="p-4 pl-6 md:pl-8 w-[35%]">Nome Completo</th>
+                                    <th class="p-4 w-[25%]">Função / Cargo</th>
+                                    <th class="p-4 w-[25%]">Local de Trabalho</th>
+                                    <th class="p-4 pr-6 md:pr-8 w-[15%] text-right">Telefone</th>
                                 </tr>
                             </thead>
-                            <tbody class="divide-y divide-gray-100 dark:divide-gray-700 text-sm">
+                            <tbody class="divide-y divide-gray-50 dark:divide-gray-800/60 text-sm">
                                 {% for f in funcionarios %}
-                                <tr class="hover:bg-gray-50/70 transition dark:hover:bg-gray-700/30">
-                                    <td class="p-4 pl-6 font-semibold text-gray-900 dark:text-white">
+                                <tr class="hover:bg-gray-50/40 dark:hover:bg-gray-800/20 transition-colors duration-150 group">
+                                    <td class="p-4 pl-6 md:pl-8 font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                         {{ f.nome }}
                                     </td>
-                                    <td class="p-4 text-gray-600 dark:text-gray-300">
+                                    <td class="p-4 text-gray-500 dark:text-gray-400 font-medium">
                                         {{ f.funcao.nome if f.funcao else (f.funcao if f.funcao else 'Não Definido') }}
                                     </td>
-                                    <td class="p-4 text-gray-600 dark:text-gray-300">
-                                        {{ f.local_trabalho.nome if f.local_trabalho else (f.local_trabalho if f.local_trabalho else 'Não Definido') }}
+                                    <td class="p-4 text-gray-500 dark:text-gray-400">
+                                        <div class="flex items-center gap-1.5">
+                                            <i class="ph ph-map-pin text-gray-300 dark:text-gray-600 no-print"></i>
+                                            <span>{{ f.local_trabalho.nome if f.local_trabalho else (f.local_trabalho if f.local_trabalho else 'Não Definido') }}</span>
+                                        </div>
                                     </td>
-                                    <td class="p-4 pr-6 text-gray-600 dark:text-gray-300 font-mono text-xs">
-                                        {{ f.telefone if f.telefone else 'Não Informado' }}
+                                    <td class="p-4 pr-6 md:pr-8 text-gray-500 dark:text-gray-400 font-mono text-xs text-right whitespace-nowrap">
+                                        {{ f.telefone if f.telefone else '—' }}
                                     </td>
                                 </tr>
                                 {% else %}
-                                <tr>
-                                    <td colspan="4" class="p-8 text-center text-gray-500 dark:text-gray-400">
-                                        <i class="ph ph-users-three text-3xl mb-2 block text-gray-400"></i>
-                                        Nenhum servidor cadastrado ou encontrado no sistema.
+                                <tr id="linhaVazia">
+                                    <td colspan="4" class="p-12 text-center text-gray-400 dark:text-gray-500">
+                                        <div class="flex flex-col items-center justify-center gap-2">
+                                            <i class="ph ph-users-three text-4xl text-gray-300 dark:text-gray-700"></i>
+                                            <p class="text-sm font-medium">Nenhum servidor localizado na base de dados.</p>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% endfor %}
+                                
+                                <tr id="buscaSemResultado" class="hidden">
+                                    <td colspan="4" class="p-12 text-center text-gray-400 dark:text-gray-500">
+                                        <div class="flex flex-col items-center justify-center gap-2">
+                                            <i class="ph ph-magnifying-glass text-4xl text-gray-300 dark:text-gray-700"></i>
+                                            <p class="text-sm font-medium">Nenhum resultado corresponde à sua pesquisa.</p>
+                                        </div>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    <div class="p-6 border-t border-gray-100 dark:border-gray-700 text-right text-xs text-gray-500 dark:text-gray-400">
-                        Gerado em: <span id="data-geracao"></span>
+                    <div class="p-6 border-t border-gray-100 dark:border-gray-800/60 bg-gray-50/30 dark:bg-gray-900/20 flex justify-between items-center text-[11px] font-medium text-gray-400 dark:text-gray-500">
+                        <div>
+                            <span>Valença do Piauí - PI</span>
+                        </div>
+                        <div class="text-right">
+                            Documento Autenticado • Gerado em: <span id="data-geracao" class="font-semibold text-gray-500 dark:text-gray-400"></span>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -109,6 +165,7 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
+            // Gerador de data e hora atualizado
             const date = new Date();
             const day = String(date.getDate()).padStart(2, '0');
             const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -116,8 +173,53 @@
             const hours = String(date.getHours()).padStart(2, '0');
             const minutes = String(date.getMinutes()).padStart(2, '0');
             
-            document.getElementById("data-geracao").innerText = `${day}/${month}/${year} às ${hours}:${minutes}`;
+            const campoData = document.getElementById("data-geracao");
+            if(campoData) {
+                campoData.innerText = `${day}/${month}/${year} às ${hours}:${minutes}`;
+            }
         });
+
+        // Função de busca inteligente em JS puro
+        function filtrarServidores() {
+            const input = document.getElementById("buscaServidor");
+            const filter = input.value.toUpperCase();
+            const table = document.getElementById("tabelaServidores");
+            const tr = table.getElementsByTagName("tr");
+            let linhasVisiveis = 0;
+            let totalServidores = 0;
+
+            // Começa do índice 1 para ignorar o cabeçalho <thead>
+            for (let i = 1; i < tr.length; i++) {
+                // Ignora as linhas de mensagens especiais
+                if (tr[i].id === "buscaSemResultado" || tr[i].id === "linhaVazia") continue;
+                
+                totalServidores++;
+                const tdNome = tr[i].getElementsByTagName("td")[0];
+                const tdFuncao = tr[i].getElementsByTagName("td")[1];
+                
+                if (tdNome || tdFuncao) {
+                    const txtNome = tdNome.textContent || tdNome.innerText;
+                    const txtFuncao = tdFuncao.textContent || tdFuncao.innerText;
+                    
+                    if (txtNome.toUpperCase().indexOf(filter) > -1 || txtFuncao.toUpperCase().indexOf(filter) > -1) {
+                        tr[i].style.display = "";
+                        linhasVisiveis++;
+                    } else {
+                        tr[i].style.display = "none";
+                    }
+                }
+            }
+
+            // Exibe mensagem de erro se a busca zerar a tabela
+            const msgSemResultado = document.getElementById("buscaSemResultado");
+            if (totalServidores > 0) {
+                if (linhasVisiveis === 0) {
+                    msgSemResultado.classList.remove("hidden");
+                } else {
+                    msgSemResultado.classList.add("hidden");
+                }
+            }
+        }
     </script>
 </body>
 </html>
