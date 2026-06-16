@@ -1245,13 +1245,21 @@
                 switchTab('config', document.querySelector('button[onclick*="config"]'));
             }
 
-            // --- LÓGICA DO TERMO LGPD COM AUTOMATIZAÇÃO DE ROLAGEM MÍNIMA ---
+            // --- LÓGICA DO TERMO LGPD COM CONTROLE DE EXIBIÇÃO POR SESSÃO ---
             const container = document.getElementById('termo-scroll-container');
             const botao = document.getElementById('btn-confirmar-leitura');
             const modal = document.getElementById('modal-lgpd-obrigatorio');
-
+            
             if (container && botao && modal) {
+                // VERIFICAÇÃO: Se o usuário já aceitou o termo nesta sessão, esconde o modal direto
+                if (sessionStorage.getItem('termo_aceito_gestoor') === 'true') {
+                    modal.style.display = 'none';
+                }
+
                 function verificarEAtualizarScroll() {
+                    // Se o modal já estiver oculto por causa do sessionStorage, não faz nada
+                    if (modal.style.display === 'none') return;
+
                     const alturaTotal = container.scrollHeight - container.clientHeight;
 
                     // Se o texto couber por inteiro na janela sem precisar de barra de rolagem
@@ -1287,6 +1295,8 @@
 
                 botao.addEventListener('click', function () {
                     if (!botao.disabled) {
+                        // Grava no navegador que o usuário já aceitou nesta sessão
+                        sessionStorage.setItem('termo_aceito_gestoor', 'true');
                         modal.style.display = 'none';
                     }
                 });
