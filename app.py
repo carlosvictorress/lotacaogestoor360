@@ -285,12 +285,58 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
+            
+            # --- INJEÇÃO DO TERMO DE RESPONSABILIDADE E COMUNICADO UNIFICADO ---
+            mensagem_aviso = (
+                "Prezado(a) operador(a), você está acessando uma área restrita contendo dados pessoais "
+                "de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, "
+                "intransmissível e todas as ações realizadas nesta plataforma são registradas em nosso log de auditoria interna. "
+                "⚠️ ATENÇÃO: Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, "
+                "solicitamos que revise as fichas pendentes de validação no painel administrativo. Certifique-se também de "
+                "vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de "
+                "ponto via geofencing. Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo."
+            )
+            flash(mensagem_aviso, "aviso_lgpd")
+            
             return redirect(
                 url_for("admin_dashboard") if user.is_admin else url_for("sistema")
             )
         else:
             flash("Login inválido.", "error")
     return render_template("login.html")
+
+@app.context_processor
+def inject_global_data():
+    data = {"pending_count": 0, "notifications": []}
+    
+    # --- SEU AVISO UNIFICADO EMITIDO DIRETAMENTE PELO BACKEND ---
+    data["aviso_sistema"] = (
+        "Prezado(a) operador(a), você está acessando uma área restrita contendo dados pessoais "
+        "de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, "
+        "intransmissível e todas as ações realizadas nesta plataforma são registradas em nosso log de auditoria interna. "
+        "⚠️ ATENÇÃO: Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, "
+        "solicitamos que revise as fichas pendentes de validação no painel administrativo. Certifique-se também de "
+        "vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de "
+        "ponto via geofencing. Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo."
+    )
+
+    if current_user.is_authenticated:
+        if current_user.role == "admin" or getattr(current_user, "is_admin", False):
+            try:
+                data["pending_count"] = Funcionario.query.filter_by(
+                    validado=False
+                ).count()
+            except:
+                pass
+        try:
+            data["notifications"] = (
+                LogAuditoria.query.order_by(LogAuditoria.data_hora.desc())
+                .limit(5)
+                .all()
+            )
+        except:
+            pass
+    return data
 
 
 @app.route("/logout")
