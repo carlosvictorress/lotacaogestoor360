@@ -144,10 +144,11 @@
                 <i class="ph ph-calendar-check text-lg text-teal-500"></i> Frequência Escolar
             </button>
 
-            <a href="{{ url_for('unidades_ponto') }}" class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-100 transition-all dark:text-gray-400 dark:hover:bg-gray-700">
-    <i class="ph ph-map-pin text-xl"></i>
-    <span class="font-medium">Unidades de Ponto</span>
-</a>
+            <a href="{{ url_for('unidades_ponto') }}"
+                class="nav-item flex items-center gap-3 px-4 py-3 rounded-xl text-gray-600 hover:bg-gray-100 transition-all dark:text-gray-400 dark:hover:bg-gray-700">
+                <i class="ph ph-map-pin text-xl"></i>
+                <span class="font-medium">Unidades de Ponto</span>
+            </a>
 
             <a href="{{ url_for('folha_pagamento') }}"
                 class="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-gray-600 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
@@ -235,7 +236,8 @@
                         <div
                             class="p-3 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
                             <span class="font-bold text-xs text-gray-700 dark:text-gray-200 uppercase">Últimas
-                                Ações</span><span class="text-[10px] text-gray-400">Recentes</span></div>
+                                Ações</span><span class="text-[10px] text-gray-400">Recentes</span>
+                        </div>
                         <div class="max-h-64 overflow-y-auto menu-scroll">
                             {% for notif in notifications %}
                             <div
@@ -584,7 +586,8 @@
                                 class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
                                 <span>{{ sec.nome }}</span><button
                                     onclick="confirmAction('{{ url_for('delete_secretaria', sec_id=sec.id) }}', 'Excluir Secretaria', 'Tem certeza? Isso pode afetar usuários e servidores vinculados.')"
-                                    class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{%
+                                    class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button>
+                            </li>{%
                             endfor %}</ul>
                     </div>
                     <div
@@ -605,7 +608,8 @@
                                 class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
                                 <span>{{ f.nome }}</span><button
                                     onclick="confirmAction('{{ url_for('delete_funcao', id=f.id) }}', 'Excluir Função', 'Tem certeza? Verifique se não há servidores com esta função.')"
-                                    class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{%
+                                    class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button>
+                            </li>{%
                             endfor %}</ul>
                     </div>
 
@@ -722,7 +726,8 @@
                                 class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
                                 <span>{{ p.nome }}</span><button
                                     onclick="confirmAction('{{ url_for('delete_padrinho', id=p.id) }}', 'Excluir Padrinho', 'Tem certeza? Verifique se não há servidores indicados por ele.')"
-                                    class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button></li>{%
+                                    class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button>
+                            </li>{%
                             endfor %}</ul>
                     </div>
 
@@ -810,13 +815,16 @@
         <div id="pdf-table-container"></div>
         <div
             style="margin-top: 15px; padding-top: 8px; border-top: 0.5px solid #eee; display: flex; align-items: center; justify-content: center; gap: 3px; text-align: center; font-size: 6pt;">
-            <span style="color: #999;">Gerado por</span><img src="{{ url_for('static', filename='logo.png') }}" alt="Logo"
-                style="height: 5mm; width: auto; display: inline-block; opacity: 0.7;"><span style="color: #999;">no
-                dia</span><span id="report-date" style="color: #888;"></span></div>
+            <span style="color: #999;">Gerado por</span><img src="{{ url_for('static', filename='logo.png') }}"
+                alt="Logo" style="height: 5mm; width: auto; display: inline-block; opacity: 0.7;"><span
+                style="color: #999;">no
+                dia</span><span id="report-date" style="color: #888;"></span>
+        </div>
     </div>
     <div id="loading"
         class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white">
-        <i class="ph ph-spinner-gap animate-spin text-4xl mb-3"></i><span>Gerando Relatório...</span></div>
+        <i class="ph ph-spinner-gap animate-spin text-4xl mb-3"></i><span>Gerando Relatório...</span>
+    </div>
 
     <div id="modalSelecionarEscola"
         class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[70] backdrop-blur-sm">
@@ -831,11 +839,11 @@
                     <i class="ph ph-x text-xl"></i>
                 </button>
             </div>
-    
+
             <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
                 Selecione a unidade escolar para acessar o painel de assiduidade e gerar os espelhos de ponto.
             </p>
-    
+
             <div class="space-y-4">
                 <div>
                     <label
@@ -850,7 +858,7 @@
                     </select>
                 </div>
             </div>
-    
+
             <div class="mt-8">
                 <button onclick="acessarPainelEscola()"
                     class="w-full bg-teal-600 text-white font-bold py-3.5 rounded-xl hover:bg-teal-700 transition-all shadow-lg shadow-teal-200 dark:shadow-none flex items-center justify-center gap-2">
@@ -867,7 +875,8 @@
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Editar Localização</h3>
                 <button onclick="document.getElementById('modalEditarLocal').classList.add('hidden')"
-                    class="text-gray-400 hover:text-black dark:hover:text-white"><i class="ph ph-x text-xl"></i></button>
+                    class="text-gray-400 hover:text-black dark:hover:text-white"><i
+                        class="ph ph-x text-xl"></i></button>
             </div>
             <form action="/admin/editar_local" method="POST" class="space-y-4">
                 <input type="hidden" name="id_local" id="edit_local_id">
@@ -909,7 +918,8 @@
             <div class="text-center">
                 <div
                     class="w-14 h-14 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 dark:bg-red-900/30 dark:text-red-400">
-                    <i class="ph ph-warning text-3xl"></i></div>
+                    <i class="ph ph-warning text-3xl"></i>
+                </div>
                 <h3 id="modalConfirmTitle" class="text-lg font-bold text-gray-900 dark:text-white mb-2">Confirmação</h3>
                 <p id="modalConfirmMessage" class="text-sm text-gray-500 dark:text-gray-400 mb-6">Tem certeza que deseja
                     realizar esta ação?</p>
@@ -930,7 +940,8 @@
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-bold text-gray-900 dark:text-white">Editar Usuário</h3>
                 <button onclick="document.getElementById('modalEditUser').classList.add('hidden')"
-                    class="text-gray-400 hover:text-black dark:hover:text-white"><i class="ph ph-x text-xl"></i></button>
+                    class="text-gray-400 hover:text-black dark:hover:text-white"><i
+                        class="ph ph-x text-xl"></i></button>
             </div>
             <form action="{{ url_for('update_user') }}" method="POST">
                 <input type="hidden" name="user_id" id="edit_user_id">
@@ -943,7 +954,8 @@
                 <input type="password" name="password"
                     class="w-full border p-2 rounded mb-3 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
                     placeholder="Deixe em branco para manter">
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Secretaria</label>
+                <label
+                    class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Secretaria</label>
                 <select name="secretaria_id" id="edit_secretaria_id"
                     class="w-full border p-2 rounded mb-3 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
                     {% for sec in secretarias %}<option value="{{ sec.id }}">{{ sec.nome }}</option>{% endfor %}
@@ -972,7 +984,8 @@
                     <p id="movimentacaoNomeFuncionario" class="text-sm text-gray-500"></p>
                 </div>
                 <button onclick="document.getElementById('modalMovimentacao').classList.add('hidden')"
-                    class="text-gray-400 hover:text-black dark:hover:text-white"><i class="ph ph-x text-xl"></i></button>
+                    class="text-gray-400 hover:text-black dark:hover:text-white"><i
+                        class="ph ph-x text-xl"></i></button>
             </div>
             <form action="{{ url_for('movimentar_servidor') }}" method="POST">
                 <input type="hidden" name="funcionario_id" id="movimentacao_func_id">
@@ -986,7 +999,8 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Novo Local de
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Novo
+                            Local de
                             Trabalho</label>
                         <select name="novo_local_id" id="movimentacao_local_id"
                             class="w-full border p-2 rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
@@ -1026,36 +1040,49 @@
             </div>
         </div>
     </div>
-<div id="modal-lgpd-obrigatorio" style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 999999; backdrop-filter: blur(6px); padding: 20px; font-family: sans-serif;">
-    <div style="background: white; max-w: 600px; width: 100%; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: 85vh; overflow: hidden;">
-        
-        <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f8fafc;">
-            <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #111827; display: flex; align-items: center; gap: 8px;">
-                <span>📢</span> Termo de Responsabilidade e Segurança (LGPD)
-            </h3>
-        </div>
-        
-        <div id="termo-scroll-container" style="padding: 24px; overflow-y: auto; font-size: 14px; color: #374151; line-height: 1.6; flex-grow: 1;">
-            <p style="margin-top: 0;"><strong>Prezado(a) operador(a),</strong></p>
-            <p>Você está acessando uma área restrita contendo dados pessoais de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, intransmissível e todas as ações realizadas nesta plataforma são monitoradas e registradas em nosso log de auditoria interna.</p>
-            
-            <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px; margin: 18px 0; border-radius: 6px;">
-                <p style="margin: 0; color: #78350f; font-weight: 700;">⚠️ COMUNICADO IMPORTANTE:</p>
-                <p style="margin: 6px 0 0 0; color: #92400e; font-weight: 500;">Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, solicitamos que revise as fichas pendentes de validação no painel administrativo.</p>
+    <div id="modal-lgpd-obrigatorio"
+        style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 999999; backdrop-filter: blur(6px); padding: 20px; font-family: sans-serif;">
+        <div
+            style="background: white; max-w: 600px; width: 100%; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: 85vh; overflow: hidden;">
+
+            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f8fafc;">
+                <h3
+                    style="margin: 0; font-size: 18px; font-weight: 600; color: #111827; display: flex; align-items: center; gap: 8px;">
+                    <span>📢</span> Termo de Responsabilidade e Segurança (LGPD)
+                </h3>
             </div>
-            
-            <p>Certifique-se também de vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de ponto via <em>geofencing</em>.</p>
-            <p style="margin-bottom: 0;">Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo para evitar acessos não autorizados por terceiros.</p>
-        </div>
-        
-        <div style="padding: 15px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; background: #f9fafb;">
-            <button id="btn-confirmar-leitura" disabled style="background: #10b981; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: 600; border-radius: 8px; cursor: not-allowed; opacity: 0.4; transition: all 0.2s;">
-                Role o termo até o fim (0%)
-            </button>
+
+            <div id="termo-scroll-container"
+                style="padding: 24px; overflow-y: auto; font-size: 14px; color: #374151; line-height: 1.6; flex-grow: 1;">
+                <p style="margin-top: 0;"><strong>Prezado(a) operador(a),</strong></p>
+                <p>Você está acessando uma área restrita contendo dados pessoais de servidores públicos municipais.
+                    Lembramos que o uso de suas credenciais é pessoal, intransmissível e todas as ações realizadas nesta
+                    plataforma são monitoradas e registradas em nosso log de auditoria interna.</p>
+
+                <div
+                    style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px; margin: 18px 0; border-radius: 6px;">
+                    <p style="margin: 0; color: #78350f; font-weight: 700;">⚠️ COMUNICADO IMPORTANTE:</p>
+                    <p style="margin: 6px 0 0 0; color: #92400e; font-weight: 500;">Para garantir a exatidão da folha de
+                        pagamento e dos relatórios de frequência deste mês, solicitamos que revise as fichas pendentes
+                        de validação no painel administrativo.</p>
+                </div>
+
+                <p>Certifique-se também de vincular corretamente os servidores às suas respectivas unidades físicas para
+                    evitar bloqueios no registro de ponto via <em>geofencing</em>.</p>
+                <p style="margin-bottom: 0;">Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo para
+                    evitar acessos não autorizados por terceiros.</p>
+            </div>
+
+            <div
+                style="padding: 15px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; background: #f9fafb;">
+                <button id="btn-confirmar-leitura" disabled
+                    style="background: #10b981; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: 600; border-radius: 8px; cursor: not-allowed; opacity: 0.4; transition: all 0.2s;">
+                    Role o termo até o fim (0%)
+                </button>
+            </div>
         </div>
     </div>
-</div>
-    <script>
+<script>
         function toggleDarkMode() {
             const html = document.documentElement;
             const icon = document.getElementById('theme-icon');
@@ -1217,40 +1244,55 @@
             if (urlParams.get('tab') === 'config') {
                 switchTab('config', document.querySelector('button[onclick*="config"]'));
             }
-        });
 
-        document.addEventListener("DOMContentLoaded", function() {
-        const container = document.getElementById('termo-scroll-container');
-        const botao = document.getElementById('btn-confirmar-leitura');
-        const modal = document.getElementById('modal-lgpd-obrigatorio');
-        
-        if (container && botao && modal) {
-            container.addEventListener('scroll', function() {
-                // Calcula a distância real do scroll interno
-                const alturaTotal = container.scrollHeight - container.clientHeight;
-                const scrollAtual = container.scrollTop;
-                const percentual = alturaTotal > 0 ? Math.min(Math.round((scrollAtual / alturaTotal) * 100), 100) : 100;
-                
-                if (percentual < 98) {
-                    botao.disabled = true;
-                    botao.style.opacity = "0.4";
-                    botao.style.cursor = "not-allowed";
-                    botao.innerText = `Role o termo até o fim (${percentual}%)`;
-                } else {
-                    botao.disabled = false;
-                    botao.style.opacity = "1";
-                    botao.style.cursor = "pointer";
-                    botao.innerText = "Li e estou de acordo";
+            // --- LÓGICA DO TERMO LGPD COM AUTOMATIZAÇÃO DE ROLAGEM MÍNIMA ---
+            const container = document.getElementById('termo-scroll-container');
+            const botao = document.getElementById('btn-confirmar-leitura');
+            const modal = document.getElementById('modal-lgpd-obrigatorio');
+
+            if (container && botao && modal) {
+                function verificarEAtualizarScroll() {
+                    const alturaTotal = container.scrollHeight - container.clientHeight;
+
+                    // Se o texto couber por inteiro na janela sem precisar de barra de rolagem
+                    if (alturaTotal <= 0) {
+                        botao.disabled = false;
+                        botao.style.opacity = "1";
+                        botao.style.cursor = "pointer";
+                        botao.innerText = "Li e estou de acordo";
+                        return;
+                    }
+
+                    const scrollAtual = container.scrollTop;
+                    const percentual = Math.min(Math.round((scrollAtual / alturaTotal) * 100), 100);
+
+                    if (percentual < 95) {
+                        botao.disabled = true;
+                        botao.style.opacity = "0.4";
+                        botao.style.cursor = "not-allowed";
+                        botao.innerText = `Role o termo até o fim (${percentual}%)`;
+                    } else {
+                        botao.disabled = false;
+                        botao.style.opacity = "1";
+                        botao.style.cursor = "pointer";
+                        botao.innerText = "Li e estou de acordo";
+                    }
                 }
-            });
-            
-            botao.addEventListener('click', function() {
-                if (!botao.disabled) {
-                    modal.style.display = 'none';
-                }
-            });
-        }
-    });
+
+                // Dispara uma verificação inicial rápida após a renderização
+                setTimeout(verificarEAtualizarScroll, 500);
+
+                // Adiciona o listener para as rolagens manuais
+                container.addEventListener('scroll', verificarEAtualizarScroll);
+
+                botao.addEventListener('click', function () {
+                    if (!botao.disabled) {
+                        modal.style.display = 'none';
+                    }
+                });
+            }
+        });
     </script>
 </body>
+
 </html>
