@@ -309,31 +309,82 @@ def login():
 def inject_global_data():
     data = {"pending_count": 0, "notifications": []}
     
-    # --- SEU AVISO UNIFICADO EMITIDO DIRETAMENTE PELO BACKEND ---
-    data["aviso_sistema"] = (
-        "Prezado(a) operador(a), você está acessando uma área restrita contendo dados pessoais "
-        "de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, "
-        "intransmissível e todas as ações realizadas nesta plataforma são registradas em nosso log de auditoria interna. "
-        "⚠️ ATENÇÃO: Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, "
-        "solicitamos que revise as fichas pendentes de validação no painel administrativo. Certifique-se também de "
-        "vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de "
-        "ponto via geofencing. Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo."
-    )
+    # --- INJEÇÃO COMPLETA DE MODAL PERSISTENTE PELO BACKEND ---
+    data["aviso_sistema"] = """
+    <div id="modal-lgpd" style="position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 99999; backdrop-filter: blur(4px); padding: 20px;">
+        <div style="background: white; max-w: 600px; width: 100%; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); display: flex; flex-direction: column; max-height: 85vh;">
+            
+            <!-- Cabeçalho -->
+            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
+                <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #111827; display: flex; align-items: center; gap: 8px;">
+                    <span>📢</span> Termo de Responsabilidade e Segurança
+                </h3>
+            </div>
+            
+            <!-- Área de Texto com Scroll -->
+            <div id="termo-scroll-box" style="padding: 20px; overflow-y: auto; font-size: 14px; color: #4b5563; line-height: 1.6; flex-grow: 1;">
+                <p style="margin-top: 0;"><strong>Prezado(a) operador(a),</strong></p>
+                <p>Você está acessando uma área restrita contendo dados pessoais de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, intransmissível e todas as ações realizadas nesta plataforma são monitoradas e registradas em nosso log de auditoria interna.</p>
+                
+                <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px; margin: 16px 0; border-radius: 4px;">
+                    <p style="margin: 0; color: #78350f; font-weight: 600;">⚠️ COMUNICADO IMPORTANTE:</p>
+                    <p style="margin: 4px 0 0 0; color: #92400e;">Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, solicitamos que revise as fichas pendentes de validação no painel administrativo.</p>
+                </div>
+                
+                <p>Certifique-se também de vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de ponto via <em>geofencing</em>.</p>
+                <p style="margin-bottom: 0;">Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo para evitar acessos não autorizados.</p>
+            </div>
+            
+            <!-- Rodapé / Botão de Aceite -->
+            <div style="padding: 15px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; background: #f9fafb; border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+                <button id="btn-aceitar-termo" disabled style="background: #10b981; color: white; border: none; padding: 10px 20px; font-size: 14px; font-weight: 500; border-radius: 8px; cursor: not-allowed; opacity: 0.5; transition: all 0.2s;">
+                    Role até o fim para liberar (0%)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const box = document.getElementById('termo-scroll-box');
+            const btn = document.getElementById('btn-aceitar-termo');
+            const modal = document.getElementById('modal-lgpd');
+            
+            if (box && btn && modal) {
+                box.addEventListener('scroll', function() {
+                    // Calcula a porcentagem da rolagem
+                    const totalScrollable = box.scrollHeight - box.clientHeight;
+                    const currentScroll = box.scrollTop;
+                    const percent = totalScrollable > 0 ? Math.min(Math.round((currentScroll / totalScrollable) * 100), 100) : 100;
+                    
+                    if (percent < 95) {
+                        btn.innerText = `Role até o fim para liberar (${percent}%)`;
+                    } else {
+                        btn.disabled = false;
+                        btn.style.opacity = '1';
+                        btn.style.cursor = 'pointer';
+                        btn.innerText = 'Li e estou ciente';
+                    }
+                });
+                
+                btn.addEventListener('click', function() {
+                    if (!btn.disabled) {
+                        modal.style.display = 'none';
+                    }
+                });
+            }
+        })();
+    </script>
+    """
 
     if current_user.is_authenticated:
         if current_user.role == "admin" or getattr(current_user, "is_admin", False):
             try:
-                data["pending_count"] = Funcionario.query.filter_by(
-                    validado=False
-                ).count()
+                data["pending_count"] = Funcionario.query.filter_by(validado=False).count()
             except:
                 pass
         try:
-            data["notifications"] = (
-                LogAuditoria.query.order_by(LogAuditoria.data_hora.desc())
-                .limit(5)
-                .all()
-            )
+            data["notifications"] = LogAuditoria.query.order_by(LogAuditoria.data_hora.desc()).limit(5).all()
         except:
             pass
     return data
