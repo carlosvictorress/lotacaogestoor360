@@ -245,7 +245,10 @@ def registrar_log(acao, alvo):
 
 @app.context_processor
 def inject_global_data():
-    data = {"pending_count": 0, "notifications": []}
+    # 'aviso_sistema' limpo para sumir com a tarja rosa. 
+    # 'mostrar_termo' verifica se a mensagem flash específica do login existe na sessão.
+    data = {"pending_count": 0, "notifications": [], "aviso_sistema": None, "mostrar_termo": False}
+    
     if current_user.is_authenticated:
         if current_user.role == "admin" or getattr(current_user, "is_admin", False):
             try:
@@ -262,8 +265,8 @@ def inject_global_data():
             )
         except:
             pass
+            
     return data
-
 
 # --- ROTAS ---
 
@@ -286,17 +289,8 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             
-            # --- INJEÇÃO DO TERMO DE RESPONSABILIDADE E COMUNICADO UNIFICADO ---
-            mensagem_aviso = (
-                "Prezado(a) operador(a), você está acessando uma área restrita contendo dados pessoais "
-                "de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, "
-                "intransmissível e todas as ações realizadas nesta plataforma são registradas em nosso log de auditoria interna. "
-                "⚠️ ATENÇÃO: Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, "
-                "solicitamos que revise as fichas pendentes de validação no painel administrativo. Certifique-se também de "
-                "vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de "
-                "ponto via geofencing. Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo."
-            )
-            flash(mensagem_aviso, "aviso_lgpd")
+            # --- ACIONA O GATILHO PARA O MODAL APARECER APENAS NESTA ENTRADA INICIAL ---
+            flash("abrir_modal", "aviso_lgpd")
             
             return redirect(
                 url_for("admin_dashboard") if user.is_admin else url_for("sistema")

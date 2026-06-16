@@ -1040,48 +1040,40 @@
             </div>
         </div>
     </div>
-    <div id="modal-lgpd-obrigatorio"
-        style="position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 999999; backdrop-filter: blur(6px); padding: 20px; font-family: sans-serif;">
-        <div
-            style="background: white; max-w: 600px; width: 100%; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); display: flex; flex-direction: column; max-height: 85vh; overflow: hidden;">
-
-            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f8fafc;">
-                <h3
-                    style="margin: 0; font-size: 18px; font-weight: 600; color: #111827; display: flex; align-items: center; gap: 8px;">
-                    <span>📢</span> Termo de Responsabilidade e Segurança (LGPD)
+    {% with modal_flash = get_flashed_messages(category_filter=["aviso_lgpd"]) %}
+    {% if modal_flash %}
+    <div id="modal-lgpd-obrigatorio" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[999999] backdrop-blur-sm p-4 font-sans">
+        <div class="bg-white dark:bg-gray-800 max-w-xl w-full rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-700">
+            
+            <div class="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center gap-3 flex-shrink-0">
+                <span class="text-xl">📢</span>
+                <h3 class="text-base font-semibold text-gray-900 dark:text-white m-0">
+                    Termo de Responsabilidade e Segurança (LGPD)
                 </h3>
             </div>
-
-            <div id="termo-scroll-container"
-                style="padding: 24px; overflow-y: auto; font-size: 14px; color: #374151; line-height: 1.6; flex-grow: 1;">
-                <p style="margin-top: 0;"><strong>Prezado(a) operador(a),</strong></p>
-                <p>Você está acessando uma área restrita contendo dados pessoais de servidores públicos municipais.
-                    Lembramos que o uso de suas credenciais é pessoal, intransmissível e todas as ações realizadas nesta
-                    plataforma são monitoradas e registradas em nosso log de auditoria interna.</p>
-
-                <div
-                    style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px; margin: 18px 0; border-radius: 6px;">
-                    <p style="margin: 0; color: #78350f; font-weight: 700;">⚠️ COMUNICADO IMPORTANTE:</p>
-                    <p style="margin: 6px 0 0 0; color: #92400e; font-weight: 500;">Para garantir a exatidão da folha de
-                        pagamento e dos relatórios de frequência deste mês, solicitamos que revise as fichas pendentes
-                        de validação no painel administrativo.</p>
+            
+            <div id="termo-scroll-container" class="p-6 overflow-y-auto text-sm text-gray-600 dark:text-gray-300 space-y-4 leading-relaxed menu-scroll">
+                <p class="mt-0"><strong>Prezado(a) operador(a),</strong></p>
+                <p>Você está acessando uma área restrita contendo dados pessoais de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, intransmissível e todas as ações realizadas nesta plataforma são monitoradas e registradas em nosso log de auditoria interna.</p>
+                
+                <div class="bg-amber-50 dark:bg-amber-950/30 border-l-4 border-amber-500 p-4 my-4 rounded-r-xl">
+                    <p class="m-0 text-amber-800 dark:text-amber-400 font-bold">⚠️ COMUNICADO IMPORTANTE:</p>
+                    <p class="mt-1.5 mb-0 text-amber-700 dark:text-amber-300 font-medium">Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, solicitamos que revise as fichas pendentes de validação no painel administrativo.</p>
                 </div>
-
-                <p>Certifique-se também de vincular corretamente os servidores às suas respectivas unidades físicas para
-                    evitar bloqueios no registro de ponto via <em>geofencing</em>.</p>
-                <p style="margin-bottom: 0;">Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo para
-                    evitar acessos não autorizados por terceiros.</p>
+                
+                <p>Certifique-se também de vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de ponto via <em>geofencing</em>.</p>
+                <p class="mb-0">Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo para evitar acessos não autorizados por terceiros.</p>
             </div>
-
-            <div
-                style="padding: 15px 20px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; background: #f9fafb;">
-                <button id="btn-confirmar-leitura" disabled
-                    style="background: #10b981; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: 600; border-radius: 8px; cursor: not-allowed; opacity: 0.4; transition: all 0.2s;">
+            
+            <div class="p-4 border-t border-gray-100 dark:border-gray-700 flex justify-end bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
+                <button id="btn-confirmar-leitura" disabled class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm py-2.5 px-5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200">
                     Role o termo até o fim (0%)
                 </button>
             </div>
         </div>
     </div>
+    {% endif %}
+    {% endwith %}
 <script>
         function toggleDarkMode() {
             const html = document.documentElement;
@@ -1245,24 +1237,15 @@
                 switchTab('config', document.querySelector('button[onclick*="config"]'));
             }
 
-            // --- LÓGICA DO TERMO LGPD COM CONTROLE DE EXIBIÇÃO POR SESSÃO ---
+            // --- LÓGICA DO TERMO LGPD COM AJUSTE DE FLUSH ---
             const container = document.getElementById('termo-scroll-container');
             const botao = document.getElementById('btn-confirmar-leitura');
             const modal = document.getElementById('modal-lgpd-obrigatorio');
             
             if (container && botao && modal) {
-                // VERIFICAÇÃO: Se o usuário já aceitou o termo nesta sessão, esconde o modal direto
-                if (sessionStorage.getItem('termo_aceito_gestoor') === 'true') {
-                    modal.style.display = 'none';
-                }
-
                 function verificarEAtualizarScroll() {
-                    // Se o modal já estiver oculto por causa do sessionStorage, não faz nada
-                    if (modal.style.display === 'none') return;
-
                     const alturaTotal = container.scrollHeight - container.clientHeight;
 
-                    // Se o texto couber por inteiro na janela sem precisar de barra de rolagem
                     if (alturaTotal <= 0) {
                         botao.disabled = false;
                         botao.style.opacity = "1";
@@ -1287,16 +1270,10 @@
                     }
                 }
 
-                // Dispara uma verificação inicial rápida após a renderização
                 setTimeout(verificarEAtualizarScroll, 500);
-
-                // Adiciona o listener para as rolagens manuais
                 container.addEventListener('scroll', verificarEAtualizarScroll);
-
                 botao.addEventListener('click', function () {
                     if (!botao.disabled) {
-                        // Grava no navegador que o usuário já aceitou nesta sessão
-                        sessionStorage.setItem('termo_aceito_gestoor', 'true');
                         modal.style.display = 'none';
                     }
                 });
