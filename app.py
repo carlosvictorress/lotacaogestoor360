@@ -309,72 +309,48 @@ def login():
 def inject_global_data():
     data = {"pending_count": 0, "notifications": []}
     
-    # --- MODAL COM SURPASS DE CSS PARA QUEBRAR O BANNER DO FRONT ---
-    data["aviso_sistema"] = """
-    <div id="modal-lgpd" style="position: fixed !important; inset: 0 !important; background: rgba(0,0,0,0.75) !important; display: flex !important; align-items: center !important; justify-content: center !important; z-index: 999999 !important; backdrop-filter: blur(5px) !important; padding: 20px !important;top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important;">
-        <div style="background: white !important; max-w: 600px !important; width: 100% !important; border-radius: 16px !important; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25) !important; display: flex !important; flex-direction: column !important; max-height: 80vh !important; text-align: left !important;">
-            
-            <!-- Cabeçalho -->
-            <div style="padding: 20px !important; border-bottom: 1px solid #e5e7eb !important;">
-                <h3 style="margin: 0 !important; font-size: 18px !important; font-weight: 600 !important; color: #111827 !important; display: flex !important; align-items: center !important; gap: 8px !important;">
-                    <span>📢</span> Termo de Responsabilidade e Segurança
-                </h3>
-            </div>
-            
-            <!-- Área de Texto com Scroll -->
-            <div id="termo-scroll-box" style="padding: 20px !important; overflow-y: auto !important; font-size: 14px !important; color: #4b5563 !important; line-height: 1.6 !important; flex-grow: 1 !important; max-height: 50vh !important;">
-                <p style="margin-top: 0 !important;"><strong>Prezado(a) operador(a),</strong></p>
-                <p style="margin: 12px 0 !important;">Você está acessando uma área restrita contendo dados pessoais de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, intransmissível e todas as ações realizadas nesta plataforma são monitoradas e registradas em nosso log de auditoria interna.</p>
-                
-                <div style="background: #fffbeb !important; border-left: 4px solid #f59e0b !important; padding: 12px !important; margin: 16px 0 !important; border-radius: 4px !important;">
-                    <p style="margin: 0 !important; color: #78350f !important; font-weight: 600 !important;">⚠️ COMUNICADO IMPORTANTE:</p>
-                    <p style="margin: 4px 0 0 0 !important; color: #92400e !important;">Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, solicitamos que revise as fichas pendentes de validação no painel administrativo.</p>
-                </div>
-                
-                <p style="margin: 12px 0 !important;">Certifique-se também de vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de ponto via <em>geofencing</em>.</p>
-                <p style="margin-bottom: 0 !important;">Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo para evitar acessos não autorizados.</p>
-            </div>
-            
-            <!-- Rodapé / Botão de Aceite -->
-            <div style="padding: 15px 20px !important; border-top: 1px solid #e5e7eb !important; display: flex !important; justify-content: flex-end !important; background: #f9fafb !important; border-bottom-left-radius: 16px !important; border-bottom-right-radius: 16px !important;">
-                <button id="btn-aceitar-termo" disabled style="background: #10b981 !important; color: white !important; border: none !important; padding: 10px 20px !important; font-size: 14px !important; font-weight: 500 !important; border-radius: 8px !important; cursor: not-allowed !important; opacity: 0.5 !important; transition: all 0.2s !important; width: auto !important; height: auto !important;">
-                    Role até o fim para liberar (0%)
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        (function() {
-            const box = document.getElementById('termo-scroll-box');
-            const btn = document.getElementById('btn-aceitar-termo');
-            const modal = document.getElementById('modal-lgpd');
-            
-            if (box && btn && modal) {
-                box.addEventListener('scroll', function() {
-                    const totalScrollable = box.scrollHeight - box.clientHeight;
-                    const currentScroll = box.scrollTop;
-                    const percent = totalScrollable > 0 ? Math.min(Math.round((currentScroll / totalScrollable) * 100), 100) : 100;
-                    
-                    if (percent < 95) {
-                        btn.innerText = `Role até o fim para liberar (${percent}%)`;
-                    } else {
-                        btn.disabled = false;
-                        btn.style.setProperty('opacity', '1', 'important');
-                        btn.style.setProperty('cursor', 'pointer', 'important');
-                        btn.innerText = 'Li e estou ciente';
-                    }
-                });
-                
-                btn.addEventListener('click', function() {
-                    if (!btn.disabled) {
-                        modal.style.setProperty('display', 'none', 'important');
-                    }
-                });
-            }
-        })();
-    </script>
-    """
+    # --- INJEÇÃO FORÇADA DE MODAL VIA COMPORTAMENTO DE ATRIBUTO NATIVO ---
+    data["aviso_sistema"] = (
+        "Prezado(a) operador(a), você está acessando uma área restrita contendo dados pessoais "
+        "de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, "
+        "intransmissível e todas as ações realizadas nesta plataforma são registradas em nosso log de auditoria interna. "
+        "⚠️ ATENÇÃO: Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, "
+        "solicitamos que revise as fichas pendentes de validação no painel administrativo. Certifique-se também de "
+        "vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de "
+        "ponto via geofencing. Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo. "
+        '\" onerror=\"'
+        'if(!window.modalCriado){'
+            'window.modalCriado=true;'
+            'let m=document.createElement(\'div\');'
+            'm.style=\'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:999999;backdrop-filter:blur(5px);padding:20px;\';'
+            'm.innerHTML=\'<div style=\"background:white;max-width:600px;width:100%;border-radius:16px;box-shadow:0 25px 50px rgba(0,0,0,0.3);display:flex;flex-direction:column;max-height:85vh;text-align:left;font-family:sans-serif;\">'
+                '<div style=\"padding:20px;border-bottom:1px solid #e5e7eb;\"><h3 style=\"margin:0;font-size:18px;font-weight:600;color:#111827;\">📢 Termo de Responsabilidade e Segurança</h3></div>'
+                '<div id=\"scr-box\" style=\"padding:20px;overflow-y:auto;font-size:14px;color:#4b5563;line-height:1.6;max-height:50vh;\">'
+                    '<p><strong>Prezado(a) operador(a),</strong></p>'
+                    '<p>Você está acessando uma área restrita contendo dados pessoais de servidores públicos municipais. O uso de suas credenciais é pessoal e todas as ações são auditadas.</p>'
+                    '<div style=\"background:#fffbeb;border-left:4px solid #f59e0b;padding:12px;margin:16px 0;border-radius:4px;\">'
+                        '<p style=\"margin:0;color:#78350f;font-weight:600;\">⚠️ COMUNICADO IMPORTANTE:</p>'
+                        '<p style=\"margin:4px 0 0 0;color:#92400e;\">Revise as fichas pendentes de validação e vincule os servidores às suas unidades físicas para evitar bloqueios de geofencing no ponto.</p>'
+                    '</div>'
+                    '<p>Encerre sua sessão ao se afastar do dispositivo.</p>'
+                '</div>'
+                '<div style=\"padding:15px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;background:#f9fafb;border-bottom-left-radius:16px;border-bottom-right-radius:16px;\">'
+                    '<button id=\"btn-ok\" disabled style=\"background:#10b981;color:white;border:none;padding:10px 20px;font-size:14px;font-weight:500;border-radius:8px;cursor:not-allowed;opacity:0.5;\">Role até o fim para liberar (0%)</button>'
+                '</div>'
+            '</div>\';'
+            'document.body.appendChild(m);'
+            'let b=m.querySelector(\'#scr-box\');'
+            'let btn=m.querySelector(\'#btn-ok\');'
+            'b.addEventListener(\'scroll\',function(){'
+                'let t=b.scrollHeight-b.clientHeight;'
+                'let p=t>0?Math.min(Math.round((b.scrollTop/t)*100),100):100;'
+                'if(p<95){btn.innerText=\'Role até o fim (\'+p+\'%)\';}'
+                'else{btn.disabled=false;btn.style.opacity=\'1\';btn.style.cursor=\'pointer\';btn.innerText=\'Li e estou ciente\';}'
+            '});'
+            'btn.addEventListener(\'click\',function(){if(!btn.disabled){m.remove();}});'
+        '}"'
+        '<img src="x" style="display:none;'
+    )
 
     if current_user.is_authenticated:
         if current_user.role == "admin" or getattr(current_user, "is_admin", False):
