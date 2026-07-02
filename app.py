@@ -44,6 +44,11 @@ if db_url and db_url.startswith("postgres://"):
 app.config["SQLALCHEMY_DATABASE_URI"] = db_url or "sqlite:///banco_local.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+    "pool_pre_ping": True,  # Testa a conexão antes de usar; se caiu, ele reconecta sozinho
+    "pool_recycle": 1800,   # Renova as conexões a cada 30 minutos
+}
+
 db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
