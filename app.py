@@ -2580,8 +2580,11 @@ def unidades_ponto():
 
 
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===
+# --- 1. EXECUTA TANTO LOCALMENTE QUANTO NO RAILWAY (GUNICORN) ---
+with app.app_context():
+    create_admin()
+    atualizar_schema()
+
+# --- 2. EXECUTA APENAS NO SEU COMPUTADOR (LOCAL) ---
 if __name__ == "__main__":
-    with app.app_context():
-        create_admin()
-        atualizar_schema()
     app.run(debug=True, host="0.0.0.0")
