@@ -12,10 +12,11 @@ import base64
 import pytz
 from datetime import datetime
 import sqlite3
+import json
 
 from datetime import date
 from datetime import date
-from flask import Flask, render_template, request, redirect, url_for, flash, Response
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, has_request_context
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
@@ -28,7 +29,7 @@ from flask_login import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from datetime import datetime
-from sqlalchemy import func, text
+from sqlalchemy import func, text, event
 
 load_dotenv()
 
@@ -103,12 +104,25 @@ class User(UserMixin, db.Model):
 
 
 class LogAuditoria(db.Model):
+    __tablename__ = 'log_auditoria' # Garante o nome correto no banco
+    
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     usuario = db.relationship("User", backref="logs")
+    
+    # --- CAMPOS ORIGINAIS (MANTIDOS INTACTOS) ---
     acao = db.Column(db.String(50), nullable=False)
     alvo = db.Column(db.String(200), nullable=False)
     data_hora = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # --- NOVOS CAMPOS DE AUDITORIA MINUCIOSA ---
+    tabela_afetada = db.Column(db.String(50), nullable=True)
+    registro_id = db.Column(db.Integer, nullable=True)
+    dados_antigos = db.Column(db.Text, nullable=True) # Guarda o JSON
+    dados_novos = db.Column(db.Text, nullable=True) # Guarda o JSON
+    ip_origem = db.Column(db.String(50), nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+    rota_acessada = db.Column(db.String(255), nullable=True)
 
 
 class HistoricoLotacao(db.Model):
@@ -298,7 +312,53 @@ def inject_global_data():
     return data
 
 # --- ROTAS ---
+@event.listens_for(Funcionario, 'before_update')
+def auditar_edicao_funcionario(mapper, connection, target):
+    if not has_request_context():
+        return
 
+    state = db.inspect(target)
+    dados_antigos = {}
+    dados_novos = {}
+
+    for attr in state.attrs:
+        hist = attr.history
+        if hist.has_changes():
+            val_antigo = hist.deleted[0] if hist.deleted else None
+            val_novo = hist.added[0] if hist.added else None
+            
+            # Ignora atualizações do próprio sistema que não importam pra auditoria
+            if attr.key not in ['token_validacao']: 
+                dados_antigos[attr.key] = str(val_antigo) if val_antigo is not None else ""
+                dados_novos[attr.key] = str(val_novo) if val_novo is not None else ""
+
+    if dados_antigos or dados_novos:
+        try:
+            usuario_id = current_user.id if current_user.is_authenticated else None
+            nome_user = current_user.username if current_user.is_authenticated else "SISTEMA"
+        except:
+            usuario_id = None
+            nome_user = "SISTEMA"
+
+        # Mantém a lógica do "alvo" para não quebrar a UI
+        alvo_texto = f"Ficha {target.nome} atualizada silenciosamente"
+
+        connection.execute(
+            LogAuditoria.__table__.insert(),
+            {
+                "usuario_id": usuario_id,
+                "acao": "EDIÇÃO MINUCIOSA",
+                "alvo": alvo_texto,
+                "tabela_afetada": "Funcionario",
+                "registro_id": target.id,
+                "dados_antigos": json.dumps(dados_antigos, ensure_ascii=False),
+                "dados_novos": json.dumps(dados_novos, ensure_ascii=False),
+                "ip_origem": request.remote_addr,
+                "user_agent": str(request.user_agent)[:250],
+                "rota_acessada": request.path[:250],
+                "data_hora": datetime.utcnow()
+            }
+        )
 
 @app.route("/")
 def index():
@@ -1458,6 +1518,17 @@ def atualizar_schema():
                 ("endereco", "VARCHAR(200)"),
                 ("num_contrato", "VARCHAR(50)")
             ]
+            
+            # 4. Novas colunas para a tabela 'log_auditoria' (Rastreamento Minucioso)
+            colunas_log = [
+                ("tabela_afetada", "VARCHAR(50)"),
+                ("registro_id", "INTEGER"),
+                ("dados_antigos", "TEXT"),
+                ("dados_novos", "TEXT"),
+                ("ip_origem", "VARCHAR(50)"),
+                ("user_agent", "VARCHAR(255)"),
+                ("rota_acessada", "VARCHAR(255)")
+            ]
 
             # Processa tabela funcionario
             for col, tipo in colunas_funcionario:
@@ -1483,7 +1554,15 @@ def atualizar_schema():
                     print(f"SUCESSO: Coluna '{col}' adicionada em 'rescisao_historico'.")
                 except Exception as e:
                     conn.rollback()
-
+                    
+            # Processa tabela log_auditoria
+            for col, tipo in colunas_log:
+                try:
+                    conn.execute(text(f"ALTER TABLE log_auditoria ADD COLUMN {col} {tipo}"))
+                    conn.commit()
+                    print(f"SUCESSO: Coluna '{col}' adicionada em 'log_auditoria'.")
+                except Exception as e:
+                    conn.rollback()
 
 @app.route("/imprimir_encaminhamento/<int:id>")
 @login_required
