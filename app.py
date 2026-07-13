@@ -177,6 +177,30 @@ class Funcionario(db.Model):
     agencia = db.Column(db.String(20))
     conta = db.Column(db.String(20))
     tipo_conta = db.Column(db.String(20))
+    
+    # --- NOVOS CAMPOS: DADOS PESSOAIS ---
+    pai = db.Column(db.String(150), nullable=True)
+    orgao_emissor_rg = db.Column(db.String(20), nullable=True)
+    genero = db.Column(db.String(20), nullable=True)
+    escolaridade = db.Column(db.String(100), nullable=True)
+
+    # --- NOVOS CAMPOS: ENDEREÇO DESMEMBRADO ---
+    cep = db.Column(db.String(10), nullable=True)
+    bairro = db.Column(db.String(100), nullable=True)
+    cidade = db.Column(db.String(100), default="Valença do Piauí")
+    uf = db.Column(db.String(2), default="PI")
+
+    # --- NOVOS CAMPOS: PROFISSIONAL E E-SOCIAL ---
+    is_pcd = db.Column(db.Boolean, default=False)
+    tipo_deficiencia = db.Column(db.String(100), nullable=True)
+    qtd_dependentes = db.Column(db.Integer, default=0)
+    ctps = db.Column(db.String(50), nullable=True)
+    cnh = db.Column(db.String(20), nullable=True)
+
+    # --- NOVOS CAMPOS: EMERGÊNCIA ---
+    contato_emergencia_nome = db.Column(db.String(150), nullable=True)
+    contato_emergencia_tel = db.Column(db.String(20), nullable=True)
+    tipo_sanguineo = db.Column(db.String(5), nullable=True)
 
 
 class RegistroPonto(db.Model):
@@ -1009,24 +1033,41 @@ def exportar_excel():
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
 
-    # Cabeçalho organizado para o Gestoor 360º
+    # Cabeçalho organizado para o Gestoor 360º com TODOS os novos campos
     header = [
         "Nº VÍNCULO",
         "NOME",
         "CPF",
         "RG",
+        "ÓRGÃO EMISSOR",
         "DATA NASCIMENTO",
+        "GÊNERO",
         "NOME DA MÃE",
+        "NOME DO PAI",
         "EMAIL",
+        "TELEFONE",
+        "ESTADO CIVIL",
+        "NACIONALIDADE",
+        "ESCOLARIDADE",
         "PIS",
+        "TÍTULO ELEITOR",
+        "CTPS",
+        "CNH",
+        "DEPENDENTES",
+        "PCD",
+        "DEFICIÊNCIA",
+        "TIPO SANGUÍNEO",
+        "CONTATO EMERGÊNCIA",
+        "TEL EMERGÊNCIA",
+        "CEP",
+        "ENDEREÇO",
+        "BAIRRO",
+        "CIDADE",
+        "UF",
         "VÍNCULO",
         "LOCAL",
         "CLASSE",
         "Nº CONTRA CHEQUE",
-        "NACIONALIDADE",
-        "ESTADO CIVIL",
-        "TELEFONE",
-        "ENDEREÇO",
         "FUNÇÃO",
         "LOTAÇÃO",
         "JORNADA",
@@ -1041,6 +1082,9 @@ def exportar_excel():
     for f in funcionarios:
         # Formatação de dados bancários em uma única célula
         banco_info = f"Bco: {f.banco or ''}, Ag: {f.agencia or ''}, Cta: {f.conta or ''} ({f.tipo_conta or ''})"
+        
+        # Tratamento do campo PCD para o Excel
+        pcd_info = "SIM" if f.is_pcd else "NÃO"
 
         writer.writerow(
             [
@@ -1048,31 +1092,42 @@ def exportar_excel():
                 f.nome,
                 f.cpf,
                 f.rg,
-                (
-                    f.data_nasc.strftime("%d/%m/%Y") if f.data_nasc else ""
-                ),  # data_nasc corrigido
+                f.orgao_emissor_rg,
+                (f.data_nasc.strftime("%d/%m/%Y") if f.data_nasc else ""),  # data_nasc corrigido
+                f.genero,
                 f.mae,  # mae corrigido
+                f.pai,
                 f.email,
+                f.telefone,
+                f.estado_civil,
+                f.nacionalidade,
+                f.escolaridade,
                 f.pis,  # pis corrigido
+                f.titulo_eleitor,
+                f.ctps,
+                f.cnh,
+                f.qtd_dependentes,
+                pcd_info,
+                f.tipo_deficiencia,
+                f.tipo_sanguineo,
+                f.contato_emergencia_nome,
+                f.contato_emergencia_tel,
+                f.cep,
+                f.endereco,
+                f.bairro,
+                f.cidade,
+                f.uf,
                 f.tipo_vinculo,
                 f.local_trabalho.nome if f.local_trabalho else "",
                 f.classe,
                 f.contracheque,
-                f.nacionalidade,
-                f.estado_civil,
-                f.telefone,
-                f.endereco,
                 f.funcao.nome if f.funcao else "",
                 f.lotacao,
                 f.jornada_trabalho,
                 f.remuneracao,
                 banco_info,
-                (
-                    f.dt_inicio.strftime("%d/%m/%Y") if f.dt_inicio else ""
-                ),  # dt_inicio corrigido
-                (
-                    f.dt_termino.strftime("%d/%m/%Y") if f.dt_termino else ""
-                ),  # dt_termino corrigido
+                (f.dt_inicio.strftime("%d/%m/%Y") if f.dt_inicio else ""),  # dt_inicio corrigido
+                (f.dt_termino.strftime("%d/%m/%Y") if f.dt_termino else ""),  # dt_termino corrigido
             ]
         )
 
@@ -1198,6 +1253,24 @@ def sistema():
                 and request.form.get("crianca_assistida").strip()
                 else None
             ),
+            
+            # --- NOVOS CAMPOS ADICIONADOS AQUI ---
+            "pai": request.form.get("pai").upper() if request.form.get("pai") else None,
+            "orgao_emissor_rg": request.form.get("orgao_emissor_rg").upper() if request.form.get("orgao_emissor_rg") else None,
+            "genero": request.form.get("genero"),
+            "escolaridade": request.form.get("escolaridade"),
+            "cep": request.form.get("cep"),
+            "bairro": request.form.get("bairro").upper() if request.form.get("bairro") else None,
+            "cidade": request.form.get("cidade").upper() if request.form.get("cidade") else "VALENÇA DO PIAUÍ",
+            "uf": request.form.get("uf").upper() if request.form.get("uf") else "PI",
+            "is_pcd": True if request.form.get("is_pcd") == "sim" else False,
+            "tipo_deficiencia": request.form.get("tipo_deficiencia").upper() if request.form.get("tipo_deficiencia") else None,
+            "qtd_dependentes": int(request.form.get("qtd_dependentes")) if request.form.get("qtd_dependentes") and request.form.get("qtd_dependentes").isdigit() else 0,
+            "ctps": request.form.get("ctps"),
+            "cnh": request.form.get("cnh"),
+            "contato_emergencia_nome": request.form.get("contato_emergencia_nome").upper() if request.form.get("contato_emergencia_nome") else None,
+            "contato_emergencia_tel": request.form.get("contato_emergencia_tel"),
+            "tipo_sanguineo": request.form.get("tipo_sanguineo"),
         }
 
         func_id = request.form.get("id")
@@ -1353,6 +1426,23 @@ def atualizar_schema():
                 ("crianca_assistida", "VARCHAR(150)"),
                 ("foto_biometria", "TEXT"),
                 ("foto_path", "VARCHAR(255)"),
+                # --- NOVOS CAMPOS ADICIONADOS ---
+                ("pai", "VARCHAR(150)"),
+                ("orgao_emissor_rg", "VARCHAR(20)"),
+                ("genero", "VARCHAR(20)"),
+                ("escolaridade", "VARCHAR(100)"),
+                ("cep", "VARCHAR(10)"),
+                ("bairro", "VARCHAR(100)"),
+                ("cidade", "VARCHAR(100) DEFAULT 'Valença do Piauí'"),
+                ("uf", "VARCHAR(2) DEFAULT 'PI'"),
+                ("is_pcd", "BOOLEAN DEFAULT FALSE"),
+                ("tipo_deficiencia", "VARCHAR(100)"),
+                ("qtd_dependentes", "INTEGER DEFAULT 0"),
+                ("ctps", "VARCHAR(50)"),
+                ("cnh", "VARCHAR(20)"),
+                ("contato_emergencia_nome", "VARCHAR(150)"),
+                ("contato_emergencia_tel", "VARCHAR(20)"),
+                ("tipo_sanguineo", "VARCHAR(5)"),
             ]
 
             # 2. Colunas para a tabela 'local_trabalho'
