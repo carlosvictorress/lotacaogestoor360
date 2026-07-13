@@ -279,7 +279,24 @@ def mask_cpf(value):
 def registrar_log(acao, alvo):
     try:
         user_id = current_user.id if current_user.is_authenticated else None
-        log = LogAuditoria(usuario_id=user_id, acao=acao, alvo=alvo)
+        
+        # Tenta capturar os dados do navegador silenciosamente
+        ip = None
+        ua = None
+        rota = None
+        if has_request_context():
+            ip = request.remote_addr
+            ua = str(request.user_agent)[:250]
+            rota = request.path[:250]
+
+        log = LogAuditoria(
+            usuario_id=user_id, 
+            acao=acao, 
+            alvo=alvo,
+            ip_origem=ip,
+            user_agent=ua,
+            rota_acessada=rota
+        )
         db.session.add(log)
         db.session.commit()
     except Exception as e:
@@ -772,6 +789,7 @@ def admin_dashboard():
         stats_vinculo=stats_vinculo,
         stats_validacao=stats_validacao,
         locais_stats=locais_stats,
+        logs=logs,
         filtros={
             "sec": filtro_secretaria,
             "vinculo": filtro_vinculo,
