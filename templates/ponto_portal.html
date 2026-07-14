@@ -139,7 +139,7 @@
                 <i class="ph ph-face-scan text-2xl"></i>
                 REGISTRAR PONTO
             </button>
-            <p id="loadingModelsMsg" class="text-xs font-bold text-blue-600 animate-pulse">Sincronizando Inteligência Artificial...</p>
+            <p id="loadingModelsMsg" class="text-xs font-bold text-blue-600 animate-pulse">Iniciando sistema biométrico...</p>
         </div>
 
         <div id="stepFacial" class="hidden p-8 text-center space-y-6">
@@ -162,12 +162,12 @@
             <div id="alertaDemora" class="hidden mt-2">
                 <button type="button" onclick="ativarFallbackRH()" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-md transition-all animate-bounce">
                     <i class="ph ph-keyboard text-lg"></i>
-                    NÃO RECONHECEU? BATER COM CPF
+                    BATER PONTO POR CPF
                 </button>
             </div>
 
             <p class="text-[10px] text-slate-400 uppercase font-black tracking-tighter">
-                Olhe diretamente para a câmera.
+                Olhe diretamente para a câmera ou use o CPF.
             </p>
         </div>
 
@@ -176,7 +176,7 @@
                 <i class="ph ph-warning-circle text-2xl mt-0.5"></i>
                 <div>
                     <h3 class="font-bold text-sm">Confirmação Manual</h3>
-                    <p class="text-xs mt-1 font-medium opacity-90" id="motivoErroFoto">O rosto não foi reconhecido automaticamente. Digite seu CPF para confirmar.</p>
+                    <p class="text-xs mt-1 font-medium opacity-90" id="motivoErroFoto">O reconhecimento pela câmera foi ignorado. Digite seu CPF para confirmar.</p>
                 </div>
             </div>
 
@@ -242,6 +242,9 @@
     let detectionInterval;
     let timeoutDemora;
 
+    let totalServidores = Object.keys(servidoresUnidade).length;
+    let processados = 0;
+
     const stepClock = document.getElementById('stepClock');
     const stepFacial = document.getElementById('stepFacial');
     const stepCPF = document.getElementById('stepCPF');
@@ -249,14 +252,21 @@
     const btnIniciar = document.getElementById('btnIniciar');
     const msgModels = document.getElementById('loadingModelsMsg');
 
-    // --- 2. CARREGAMENTO DOS MODELOS E CRIAÇÃO DO "ÁLBUM" GLOBAL ---
+    // --- 2. CARREGAMENTO DOS MODELOS E CRIAÇÃO DO "ÁLBUM" BACKGROUND ---
     Promise.all([
         faceapi.nets.tinyFaceDetector.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
         faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/'),
         faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/')
-    ]).then(async () => {
+    ]).then(() => {
         isModelsLoaded = true;
-        await buildGlobalFaceMatcher();
+        
+        // MÁGICA DE UX: Libera o botão imediatamente após carregar o motor (1 a 2 segundos)
+        btnIniciar.disabled = false;
+        btnIniciar.classList.remove('opacity-50', 'cursor-not-allowed');
+        msgModels.innerText = "Preparando álbum de fotos em segundo plano...";
+
+        // Inicia a sincronização das fotos sem travar o usuário
+        buildGlobalFaceMatcher();
     });
 
     async function buildGlobalFaceMatcher() {
@@ -265,44 +275,44 @@
         
         for (const key in servidoresUnidade) {
             const servidor = servidoresUnidade[key];
-            // Só tenta processar se a foto existir e for grande o suficiente para ser um base64 válido
             if (servidor.foto && servidor.foto.length > 100) {
                 try {
                     const img = new Image();
                     img.src = servidor.foto.startsWith('data:image') ? servidor.foto : 'data:image/jpeg;base64,' + servidor.foto;
-                    await new Promise((resolve) => { 
-                        img.onload = resolve; 
-                        img.onerror = resolve; // Pula se a imagem estiver corrompida
-                    });
+                    await new Promise((resolve) => { img.onload = resolve; img.onerror = resolve; });
                     const detection = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
                     if (detection) {
                         labeledDescriptors.push(new faceapi.LabeledFaceDescriptors(servidor.id, [detection.descriptor]));
                     }
-                } catch(e) { console.log("Biometria ignorada para ID:", servidor.id) }
+                } catch(e) { console.log("Erro na foto ID:", servidor.id) }
             }
+            processados++;
+            
+            // Atualiza o texto visual mostrando que o sistema não travou
+            if(msgModels && !msgModels.classList.contains('hidden')) {
+                msgModels.innerText = `Sincronizando banco de rostos: ${processados} de ${totalServidores}...`;
+            }
+
+            // Uma pausa minúscula de 10 milissegundos impede a tela do celular de congelar!
+            await new Promise(r => setTimeout(r, 10));
         }
         
         if (labeledDescriptors.length > 0) {
-            // Cria o "cérebro" que reconhece todos da unidade. 0.55 é a tolerância.
             globalFaceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.55); 
         }
         
         isBuildingMatcher = false;
-        msgModels.classList.add('hidden');
-        btnIniciar.disabled = false;
-        btnIniciar.classList.remove('opacity-50', 'cursor-not-allowed');
+        if(msgModels) msgModels.classList.add('hidden');
     }
-
 
     // --- 3. FLUXO DE MOVIMENTAÇÃO DE TELAS ---
     function iniciarReconhecimentoGlobal() {
-        if (!isModelsLoaded || isBuildingMatcher) return;
+        if (!isModelsLoaded) return; // Só barra se os scripts principais da IA não baixaram
 
         capturarGeo();
         
         if(stepClock) stepClock.classList.add('hidden');
         stepFacial.classList.remove('hidden');
-        document.getElementById('alertaDemora').classList.add('hidden');
         
         abrirCamera();
     }
@@ -325,26 +335,9 @@
             });
             video.srcObject = stream;
             document.getElementById('scannerLine').classList.remove('hidden');
-            
-            document.getElementById('statusMsg').innerText = "Procurando rosto...";
-            document.getElementById('statusMsg').className = "text-sm font-bold text-blue-600 bg-blue-50 py-2 rounded-lg";
 
-            // Se ninguém na escola tiver foto cadastrada
-            if (!globalFaceMatcher) {
-                document.getElementById('statusMsg').innerText = "Nenhuma biometria cadastrada na escola.";
-                document.getElementById('statusMsg').className = "text-sm font-bold text-red-600 bg-red-50 py-2 rounded-lg";
-                document.getElementById('alertaDemora').classList.remove('hidden');
-                document.querySelector('#alertaDemora button').innerText = "REGISTRAR PONTO POR CPF";
-                return;
-            }
-
-            // Libera o botão de bater com o CPF após 4 segundos se a câmera não achar ninguém
-            clearTimeout(timeoutDemora);
-            timeoutDemora = setTimeout(() => {
-                if (!stepFacial.classList.contains('hidden')) {
-                    document.getElementById('alertaDemora').classList.remove('hidden');
-                }
-            }, 4000);
+            // LIBERA O BOTÃO AMARELO (CPF) IMEDIATAMENTE. O USUÁRIO NÃO ESPERA NADA SE ESTIVER COM PRESSA.
+            document.getElementById('alertaDemora').classList.remove('hidden');
 
         } catch (err) {
             alert("Erro ao acessar a câmera. Redirecionando para o CPF.");
@@ -362,8 +355,6 @@
 
     // --- 4. EXECUÇÃO DA BIOMETRIA EM TEMPO REAL ---
     video.addEventListener('play', () => {
-        if (!globalFaceMatcher) return;
-
         const canvas = faceapi.createCanvasFromMedia(video);
         canvas.classList.add('face-api-canvas');
         document.getElementById('videoContainer').append(canvas);
@@ -373,7 +364,22 @@
         detectionInterval = setInterval(async () => {
             if (stepFacial.classList.contains('hidden')) return;
 
-            // Fica tirando foto da câmera a cada meio segundo e procurando rostos
+            // Se o álbum de fotos ainda está sendo montado no fundo, avisa o usuário:
+            if (isBuildingMatcher) {
+                document.getElementById('statusMsg').innerText = `Carregando rostos do banco: ${processados} de ${totalServidores}...`;
+                document.getElementById('statusMsg').className = "text-sm font-bold text-amber-600 bg-amber-50 py-2 rounded-lg animate-pulse";
+                return; // Pula a detecção e tenta de novo daqui 0.4s
+            }
+
+            if (!globalFaceMatcher) {
+                document.getElementById('statusMsg').innerText = "Nenhuma biometria cadastrada nesta unidade.";
+                document.getElementById('statusMsg').className = "text-sm font-bold text-red-600 bg-red-50 py-2 rounded-lg";
+                return;
+            }
+
+            document.getElementById('statusMsg').innerText = "Câmera ativa. Procurando rosto...";
+            document.getElementById('statusMsg').className = "text-sm font-bold text-blue-600 bg-blue-50 py-2 rounded-lg animate-pulse";
+
             const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
 
             if (detection && globalFaceMatcher) {
@@ -381,10 +387,8 @@
                 canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
                 faceapi.draw.drawDetections(canvas, resizedDetections);
 
-                // Compara o rosto da câmera com TODOS os rostos da unidade de uma vez
                 const bestMatch = globalFaceMatcher.findBestMatch(detection.descriptor);
 
-                // Se achou alguém parecido (label traz o ID do funcionário)
                 if (bestMatch.label !== 'unknown') {
                     clearInterval(detectionInterval);
                     clearTimeout(timeoutDemora);
@@ -393,9 +397,7 @@
                     document.getElementById('statusMsg').innerText = "Rosto Confirmado! Registrando...";
                     document.getElementById('statusMsg').className = "text-sm font-bold text-green-600 bg-green-50 py-2 rounded-lg";
 
-                    // Coloca o ID dele no formulário escondido
                     document.getElementById('inputFuncionarioId').value = bestMatch.label;
-                    
                     salvarFotoAuditoria();
                     
                     setTimeout(() => {
@@ -407,9 +409,9 @@
         }, 400);
     });
 
-    // --- 5. CASO NÃO RECONHEÇA E O USUÁRIO CLIQUE NO BOTÃO AMARELO (FALLBACK) ---
+    // --- 5. CASO O USUÁRIO CLIQUE NO BOTÃO AMARELO (FALLBACK) ---
     function ativarFallbackRH() {
-        salvarFotoAuditoria(); // Tira a foto de auditoria de quem está na câmera antes de fechar
+        salvarFotoAuditoria(); 
         pararCamera();
 
         stepFacial.classList.add('hidden');
