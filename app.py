@@ -770,7 +770,13 @@ def admin_dashboard():
         .all()
     )
 
-    logs = LogAuditoria.query.order_by(LogAuditoria.data_hora.desc()).limit(100).all()
+    page_auditoria = request.args.get('page_auditoria', 1, type=int)
+    per_page_auditoria = request.args.get('per_page_auditoria', 100, type=int)
+    
+    logs_pagination = LogAuditoria.query.order_by(LogAuditoria.data_hora.desc()).paginate(
+        page=page_auditoria, per_page=per_page_auditoria, error_out=False
+    )
+    logs = logs_pagination.items
     secretarias = Secretaria.query.all()
     users = User.query.order_by(User.username).all()
     funcoes = Funcao.query.order_by(Funcao.nome).all()
@@ -2321,6 +2327,7 @@ def registrar_ponto_facial():
     foto_base64 = request.form.get("foto_base64")
     
     # PEGA O LOCAL ONDE O PONTO ESTÁ SENDO BATIDO (vindo do formulário/QR Code)
+    # Usaremos esse ID apenas para o redirecionamento de tela
     local_batida_id = request.form.get("local_id")
 
     # --- AJUSTE DE HORÁRIO BRASÍLIA ---
@@ -2350,33 +2357,35 @@ def registrar_ponto_facial():
         flash("Servidor não localizado. Verifique os dados ou procure o RH.", "error")
         return redirect(url_for("ponto_portal", local_id=local_batida_id))
 
-    # --- NOVA TRAVA DE SEGURANÇA: VÍNCULO DE UNIDADE ---
-    local_batida = db.session.get(LocalTrabalho, local_batida_id) if local_batida_id else None
-    
-    if local_batida:
-        # Verifica se o servidor pertence a esta unidade específica
-        if funcionario.local_trabalho_id != local_batida.id:
-            flash(f"Acesso Negado: Seu vínculo é em '{funcionario.local_trabalho.nome if funcionario.local_trabalho else 'outra unidade'}'. Você não pode bater ponto em '{local_batida.nome}'.", "error")
-            return redirect(url_for("ponto_portal", local_id=local_batida_id))
 
-        # --- VALIDAÇÃO DE GEOFENCING (Fisicamente no local) ---
-        if local_batida.latitude and local_batida.longitude:
-            # Evita que erros de digitação bizarros travem o funcionário
-            if not (-90 <= local_batida.latitude <= 90) or not (-180 <= local_batida.longitude <= 180):
-                print(f"AVISO: Coordenadas de '{local_batida.nome}' inválidas no banco. Ponto liberado.")
-            else:
-                if not lat or not lng:
-                    flash("GPS não detectado. Ative a localização para registrar o ponto.", "error")
-                    return redirect(url_for("ponto_portal", local_id=local_batida_id))
-                    
-                distancia = calcular_distancia(float(lat), float(lng), local_batida.latitude, local_batida.longitude)
-                raio = local_batida.raio_permitido or 50
+    # ==============================================================================
+    # LÓGICA CORRIGIDA: GEOFENCING BASEADO NA FICHA DO SERVIDOR (A FONTE DA VERDADE)
+    # ==============================================================================
+    local_de_trabalho_correto = funcionario.local_trabalho
+    
+    if not local_de_trabalho_correto:
+        flash("Acesso Negado: Você não possui um Local de Trabalho configurado na sua ficha.", "error")
+        return redirect(url_for("ponto_portal", local_id=local_batida_id))
+
+    # --- VALIDAÇÃO DE GEOFENCING (Fisicamente no local correto) ---
+    if local_de_trabalho_correto.latitude and local_de_trabalho_correto.longitude:
+        # Evita que erros de digitação bizarros travem o funcionário
+        if not (-90 <= local_de_trabalho_correto.latitude <= 90) or not (-180 <= local_de_trabalho_correto.longitude <= 180):
+            print(f"AVISO: Coordenadas de '{local_de_trabalho_correto.nome}' inválidas no banco. Ponto liberado.")
+        else:
+            if not lat or not lng:
+                flash("GPS não detectado. Ative a localização para registrar o ponto.", "error")
+                return redirect(url_for("ponto_portal", local_id=local_batida_id))
                 
-                if distancia > raio:
-                    # SUCESSO: Nova mensagem personalizada solicitada
-                    flash("Acesso Negado: Você precisa estar dentro da escola para bater o ponto.", "error")
-                    registrar_log("TENTATIVA_FORA_RAIO", f"{funcionario.nome} em {local_batida.nome}")
-                    return redirect(url_for("ponto_portal", local_id=local_batida_id))
+            distancia = calcular_distancia(float(lat), float(lng), local_de_trabalho_correto.latitude, local_de_trabalho_correto.longitude)
+            raio = local_de_trabalho_correto.raio_permitido or 50
+            
+            if distancia > raio:
+                flash(f"Acesso Negado: Você precisa estar dentro de '{local_de_trabalho_correto.nome}' para bater o ponto.", "error")
+                registrar_log("TENTATIVA_FORA_RAIO", f"{funcionario.nome} longe de {local_de_trabalho_correto.nome}")
+                return redirect(url_for("ponto_portal", local_id=local_batida_id))
+    # ==============================================================================
+
 
     # --- LÓGICA DE ALTERNÂNCIA E LIMITES ---
     hoje_inicio = agora_br.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -2428,7 +2437,7 @@ def registrar_ponto_facial():
         db.session.add(novo_registro)
         db.session.commit()
 
-        registrar_log(f"PONTO {tipo_atual.upper()}", f"{funcionario.nome} em {local_batida.nome if local_batida else 'Unidade'}")
+        registrar_log(f"PONTO {tipo_atual.upper()}", f"{funcionario.nome} em {local_de_trabalho_correto.nome}")
         flash(f"Ponto de {tipo_atual.upper()} registrado com sucesso!", "success")
     except Exception as e:
         db.session.rollback()
@@ -2532,20 +2541,17 @@ def gerar_relatorio_frequencia(func_id):
 
 
 def calcular_distancia(lat1, lon1, lat2, lon2):
-    """Retorna a distância em metros entre dois pontos GPS"""
-    if not all([lat1, lon1, lat2, lon2]):
-        return float("inf")  # Se faltar um dado, distância infinita
-
-    R = 6371000  # Raio da Terra em metros
-    phi1, phi2 = math.radians(float(lat1)), math.radians(float(lat2))
-    dphi = math.radians(float(lat2) - float(lat1))
-    dlambda = math.radians(float(lon2) - float(lon1))
-
-    a = (
-        math.sin(dphi / 2) ** 2
-        + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
-    )
-    return 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    """Calcula a distância em metros entre duas coordenadas de GPS (Haversine)."""
+    try:
+        R = 6371000  # Raio da Terra em metros
+        phi1, phi2 = math.radians(float(lat1)), math.radians(float(lat2))
+        delta_phi = math.radians(float(lat2) - float(lat1))
+        delta_lambda = math.radians(float(lon2) - float(lon1))
+        a = math.sin(delta_phi / 2.0) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2.0) ** 2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return R * c
+    except (TypeError, ValueError):
+        return float('inf') # Se der erro matemático, joga distância infinita
 
 @app.route("/admin/salvar_biometria", methods=["POST"])
 @login_required
