@@ -176,12 +176,16 @@
                 <p>Declaro que as informações acima são verdadeiras.</p>
                 <p>Valença do Piauí - PI, <span id="data_emissao"></span></p>
                 
-                <div style="display: flex; justify-content: space-around; margin-top: 15mm;">
-                    <div style="width: 40%; border-top: 1px solid #000; padding-top: 2mm;">
-                        <span id="pdf_assinatura_1" style="font-weight: bold; display: block; text-transform: uppercase;"></span>
-                        <span style="font-size: 8pt;">RH/Responsável</span>
+                <div style="display: flex; justify-content: space-between; gap: 4mm; margin-top: 15mm;">
+                    <div style="flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 2mm;">
+                        <span id="pdf_assinatura_servidor" style="font-weight: bold; display: block; text-transform: uppercase;"></span>
+                        <span style="font-size: 8pt;">Assinatura do Servidor</span>
                     </div>
-                    <div style="width: 40%; border-top: 1px solid #000; padding-top: 2mm;">
+                    <div style="flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 2mm;">
+                        <span id="pdf_assinatura_1" style="font-weight: bold; display: block; text-transform: uppercase;"></span>
+                        <span style="font-size: 8pt;">RH / Responsável</span>
+                    </div>
+                    <div style="flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 2mm;">
                         <span id="pdf_assinatura_2" style="font-weight: bold; display: block; text-transform: uppercase;"></span>
                         <span style="font-size: 8pt;">Secretário(a)</span>
                     </div>
@@ -838,6 +842,7 @@
             setTxt('p_tipo_conta', data.tipo_conta);
 
             setTxt('pdf_nome_secretaria', data.lotacao_nome);
+            setTxt('pdf_assinatura_servidor', data.nome);
             setTxt('pdf_assinatura_1', data.lotacao_nome);
             setTxt('pdf_assinatura_2', data.lotacao_nome);
 

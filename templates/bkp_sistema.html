@@ -493,9 +493,9 @@
                 <div style="width: 100%;">
                     <p style="font-size: 9pt; margin-bottom: 15mm;">Declaro que as informações acima são verdadeiras.<br>Valença do Piauí - PI, <span id="data_emissao"></span></p>
                     <div style="display: flex; justify-content: space-between; gap: 5mm;">
+                        <div style="flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 2mm; font-size: 8pt;"><span id="pdf_assinatura_servidor" style="font-weight: bold; display: block; margin-bottom: 2px; text-transform: uppercase;"></span>Assinatura do Servidor</div>
                         <div style="flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 2mm; font-size: 8pt;"><span id="pdf_assinatura_1" style="font-weight: bold; display: block; margin-bottom: 2px;"></span>RH / Responsável</div>
                         <div style="flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 2mm; font-size: 8pt;"><span id="pdf_assinatura_2" style="font-weight: bold; display: block; margin-bottom: 2px;"></span>Secretário(a)</div>
-                        <div style="flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 2mm; font-size: 8pt;"><br>Assinatura do Servidor</div>
                     </div>
                 </div>
             </div>
@@ -708,6 +708,7 @@
         setTxt('p_tipo_conta', data.tipo_conta);
 
         setTxt('pdf_nome_secretaria', data.lotacao_nome);
+        setTxt('pdf_assinatura_servidor', data.nome);
         setTxt('pdf_assinatura_1', data.lotacao_nome);
         setTxt('pdf_assinatura_2', data.lotacao_nome);
 
