@@ -292,9 +292,13 @@
                             
                             <div class="md:col-span-2">
                                 <label class="form-label">Grau de Escolaridade</label>
-                                <select id="escolaridade" name="escolaridade" class="form-input bg-white">
+                                <select id="escolaridade" name="escolaridade" class="form-input bg-white" onchange="toggleEspecialidade()">
                                     <option value="">-</option><option value="Ensino Fundamental Incompleto">Ensino Fundamental Incompleto</option><option value="Ensino Fundamental Completo">Ensino Fundamental Completo</option><option value="Ensino Médio Incompleto">Ensino Médio Incompleto</option><option value="Ensino Médio Completo">Ensino Médio Completo</option><option value="Superior Incompleto">Superior Incompleto</option><option value="Superior Completo">Superior Completo</option><option value="Pós-Graduação/Especialização">Pós-Graduação/Especialização</option><option value="Mestrado/Doutorado">Mestrado/Doutorado</option>
                                 </select>
+                            </div>
+                            <div id="campo_especialidade" class="hidden md:col-span-2">
+                                <label class="form-label">Especialidade / Curso Formação</label>
+                                <input type="text" id="especialidade" name="especialidade" class="form-input uppercase" placeholder="EX: PEDAGOGIA, DIREITO, MEDICINA...">
                             </div>
                             <div><label class="form-label">Dependentes (Qtd)</label><input type="number" id="qtd_dependentes" name="qtd_dependentes" value="0" min="0" class="form-input"></div>
                         </div>
@@ -501,6 +505,7 @@
                                         mae: {{ f.mae|tojson }},
                                         pai: {{ (f.pai or '')|tojson }},
                                         escolaridade: {{ (f.escolaridade or '')|tojson }},
+                                        especialidade: {{ (f.especialidade or '')|tojson }},
                                         pis: {{ f.pis|tojson }},
                                         titulo_eleitor: {{ f.titulo_eleitor|tojson }},
                                         zona_eleitoral: {{ f.zona_eleitoral|tojson }},
@@ -664,6 +669,20 @@
             if (show) { div.classList.remove('hidden'); }
             else { div.classList.add('hidden'); input.value = ''; }
         }
+
+        function toggleEspecialidade() {
+            const select = document.getElementById('escolaridade');
+            const div = document.getElementById('campo_especialidade');
+            const input = document.getElementById('especialidade');
+            const val = select ? select.value : '';
+            const permitir = ["Superior Completo", "Pós-Graduação/Especialização", "Mestrado/Doutorado"];
+            if (permitir.includes(val)) {
+                div.classList.remove('hidden');
+            } else {
+                div.classList.add('hidden');
+                if (input) input.value = '';
+            }
+        }
         
         function limparFormulario() { 
             document.getElementById('employeeForm').reset(); 
@@ -672,6 +691,7 @@
             document.getElementById('tituloFormulario').innerText = "Nova Ficha Cadastral";
             toggleIndicacao(false);
             togglePCD(false);
+            toggleEspecialidade();
             toggleApoioField();
             switchTab('form'); // Garante que a aba mude caso esteja na tabela
             window.scrollTo({ top: 0, behavior: 'smooth' }); 
@@ -694,7 +714,9 @@
             document.getElementById('nacionalidade').value = data.nacionalidade; 
             document.getElementById('mae').value = data.mae; 
             document.getElementById('pai').value = data.pai; 
-            document.getElementById('escolaridade').value = data.escolaridade; 
+            document.getElementById('escolaridade').value = data.escolaridade || ''; 
+            document.getElementById('especialidade').value = data.especialidade || ''; 
+            toggleEspecialidade(); 
 
             // SESSÃO 2
             document.getElementById('email').value = data.email; 
@@ -809,7 +831,12 @@
             setTxt('p_titulo', data.titulo_eleitor);
             setTxt('p_zona', data.zona_eleitoral);
             setTxt('p_secao', data.secao_eleitoral);
-            setTxt('p_escolaridade', data.escolaridade);
+            
+            let escTexto = data.escolaridade || '';
+            if (data.especialidade && data.especialidade.trim() !== '') {
+                escTexto += escTexto ? ' - ' + data.especialidade : data.especialidade;
+            }
+            setTxt('p_escolaridade', escTexto);
             setTxt('p_ctps', data.ctps);
             setTxt('p_cnh', data.cnh);
             setTxt('p_dependentes', data.qtd_dependentes);
@@ -908,6 +935,7 @@
                 pai: getVal('pai'),
                 estado_civil: getVal('estado_civil'),
                 escolaridade: getVal('escolaridade'),
+                especialidade: getVal('especialidade'),
                 ctps: getVal('ctps'),
                 cnh: getVal('cnh'),
                 qtd_dependentes: getVal('qtd_dependentes'),

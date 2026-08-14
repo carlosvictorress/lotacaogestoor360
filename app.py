@@ -197,6 +197,7 @@ class Funcionario(db.Model):
     orgao_emissor_rg = db.Column(db.String(20), nullable=True)
     genero = db.Column(db.String(20), nullable=True)
     escolaridade = db.Column(db.String(100), nullable=True)
+    especialidade = db.Column(db.String(150), nullable=True)
 
     # --- NOVOS CAMPOS: ENDEREÇO DESMEMBRADO ---
     cep = db.Column(db.String(10), nullable=True)
@@ -1133,6 +1134,7 @@ def exportar_excel():
         "ESTADO CIVIL",
         "NACIONALIDADE",
         "ESCOLARIDADE",
+        "ESPECIALIDADE",
         "PIS",
         "TÍTULO ELEITOR",
         "CTPS",
@@ -1186,6 +1188,7 @@ def exportar_excel():
                 f.estado_civil,
                 f.nacionalidade,
                 f.escolaridade,
+                (f.especialidade or ""),
                 f.pis,  # pis corrigido
                 f.titulo_eleitor,
                 f.ctps,
@@ -1343,6 +1346,11 @@ def sistema():
             "orgao_emissor_rg": request.form.get("orgao_emissor_rg").upper() if request.form.get("orgao_emissor_rg") else None,
             "genero": request.form.get("genero"),
             "escolaridade": request.form.get("escolaridade"),
+            "especialidade": (
+                request.form.get("especialidade").strip().upper()
+                if request.form.get("especialidade") and request.form.get("especialidade").strip()
+                else None
+            ),
             "cep": request.form.get("cep"),
             "bairro": request.form.get("bairro").upper() if request.form.get("bairro") else None,
             "cidade": request.form.get("cidade").upper() if request.form.get("cidade") else "VALENÇA DO PIAUÍ",
@@ -1515,6 +1523,7 @@ def atualizar_schema():
                 ("orgao_emissor_rg", "VARCHAR(20)"),
                 ("genero", "VARCHAR(20)"),
                 ("escolaridade", "VARCHAR(100)"),
+                ("especialidade", "VARCHAR(150)"),
                 ("cep", "VARCHAR(10)"),
                 ("bairro", "VARCHAR(100)"),
                 ("cidade", "VARCHAR(100) DEFAULT 'Valença do Piauí'"),
