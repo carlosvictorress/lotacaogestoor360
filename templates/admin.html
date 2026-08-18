@@ -1252,6 +1252,10 @@ function abrirModalAuditoria(btn) {
         // --- FIM GEORREFERENCIAMENTO ---
 
         function generateReportPDF(simplified = false) {
+            const pdfWindow = window.open('', '_blank');
+            if (pdfWindow) {
+                pdfWindow.document.write('<title>Relatório PDF</title><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#f9fafb;"><div style="text-align:center;"><h2>Carregando Relatório PDF...</h2><p style="color:#666;">Aguarde um instante enquanto o relatório é gerado.</p></div></body>');
+            }
             document.getElementById('loading').style.display = 'flex';
             const selectSec = document.getElementById('filter_sec');
             const selectedText = selectSec.options[selectSec.selectedIndex].text;
@@ -1298,7 +1302,18 @@ function abrirModalAuditoria(btn) {
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
             };
 
-            html2pdf().set(opt).from(element).save().then(() => {
+            html2pdf().set(opt).from(element).outputPdf('bloburl').then((pdfUrl) => {
+                if (pdfWindow) {
+                    pdfWindow.location.href = pdfUrl;
+                } else {
+                    window.open(pdfUrl, '_blank');
+                }
+                element.style.display = 'none';
+                document.getElementById('loading').style.display = 'none';
+            }).catch(err => {
+                console.error("Erro ao gerar PDF:", err);
+                if (pdfWindow) pdfWindow.close();
+                alert("Erro ao gerar PDF");
                 element.style.display = 'none';
                 document.getElementById('loading').style.display = 'none';
             });
