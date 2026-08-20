@@ -1369,6 +1369,26 @@ def sistema():
             flash("Data de Início é obrigatória!", "error")
             return redirect(url_for("sistema"))
 
+        if not dados_form.get("cpf") or not dados_form.get("cpf").strip():
+            flash("O CPF é obrigatório!", "error")
+            return redirect(url_for("sistema"))
+
+        if not dados_form.get("titulo_eleitor") or not str(dados_form.get("titulo_eleitor")).strip():
+            flash("O Título de Eleitor é obrigatório!", "error")
+            return redirect(url_for("sistema"))
+
+        if not dados_form.get("zona_eleitoral") or not str(dados_form.get("zona_eleitoral")).strip():
+            flash("A Zona Eleitoral é obrigatória!", "error")
+            return redirect(url_for("sistema"))
+
+        if not dados_form.get("secao_eleitoral") or not str(dados_form.get("secao_eleitoral")).strip():
+            flash("A Seção Eleitoral é obrigatória!", "error")
+            return redirect(url_for("sistema"))
+
+        if not dados_form.get("escolaridade") or not dados_form.get("escolaridade").strip():
+            flash("O Grau de Escolaridade é obrigatório!", "error")
+            return redirect(url_for("sistema"))
+
         func_id = request.form.get("id")
 
         # Se for um novo cadastro, o campo num_vinculo é gerado automaticamente
