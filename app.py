@@ -1365,6 +1365,10 @@ def sistema():
             "tipo_sanguineo": request.form.get("tipo_sanguineo"),
         }
 
+        if not dados_form.get("dt_inicio"):
+            flash("Data de Início é obrigatória!", "error")
+            return redirect(url_for("sistema"))
+
         func_id = request.form.get("id")
 
         # Se for um novo cadastro, o campo num_vinculo é gerado automaticamente
