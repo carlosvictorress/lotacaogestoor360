@@ -1626,6 +1626,37 @@ def atualizar_schema():
                 except Exception as e:
                     conn.rollback()
 
+            # 5. Migração automática do nome da Função de Apoio (no Railway PostgreSQL e SQLite local)
+            try:
+                conn.execute(
+                    text(
+                        "UPDATE funcao SET nome = 'PROFISSIONAL DE APOIO ESCOLAR (CUIDADOR)' "
+                        "WHERE nome IN ('PROFISSIONAL DE APOIO / CUIDADOR', 'PROFISSIONAL DE APOIO (CUIDADOR)') "
+                        "AND NOT EXISTS (SELECT 1 FROM funcao WHERE nome = 'PROFISSIONAL DE APOIO ESCOLAR (CUIDADOR)')"
+                    )
+                )
+                conn.commit()
+            except Exception as e:
+                conn.rollback()
+
+            try:
+                row_nova = conn.execute(
+                    text("SELECT id FROM funcao WHERE nome = 'PROFISSIONAL DE APOIO ESCOLAR (CUIDADOR)'")
+                ).fetchone()
+                if row_nova:
+                    id_novo = row_nova[0]
+                    rows_antigas = conn.execute(
+                        text("SELECT id FROM funcao WHERE nome IN ('PROFISSIONAL DE APOIO / CUIDADOR', 'PROFISSIONAL DE APOIO (CUIDADOR)') AND id != :id_novo"),
+                        {"id_novo": id_novo}
+                    ).fetchall()
+                    for r in rows_antigas:
+                        id_antigo = r[0]
+                        conn.execute(text("UPDATE funcionario SET funcao_id = :id_novo WHERE funcao_id = :id_antigo"), {"id_novo": id_novo, "id_antigo": id_antigo})
+                        conn.execute(text("DELETE FROM funcao WHERE id = :id_antigo"), {"id_antigo": id_antigo})
+                    conn.commit()
+            except Exception as e:
+                conn.rollback()
+
 @app.route("/imprimir_encaminhamento/<int:id>")
 @login_required
 def imprimir_encaminhamento(id):
