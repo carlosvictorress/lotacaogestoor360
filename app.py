@@ -1483,7 +1483,12 @@ def sistema():
 
     # Pega o ID da função de apoio para a lógica do modal no frontend
     funcao_apoio = Funcao.query.filter(
-        Funcao.nome == "PROFISSIONAL DE APOIO / CUIDADOR"
+        Funcao.nome.in_(
+            [
+                "PROFISSIONAL DE APOIO ESCOLAR (CUIDADOR)",
+                "PROFISSIONAL DE APOIO / CUIDADOR",
+            ]
+        )
     ).first()
     funcao_apoio_id = funcao_apoio.id if funcao_apoio else None
 
@@ -1663,7 +1668,12 @@ def apoio_pedagogico():
     cuidadores = (
         Funcionario.query.join(Funcao)
         .filter(
-            Funcao.nome == "PROFISSIONAL DE APOIO / CUIDADOR",
+            Funcao.nome.in_(
+                [
+                    "PROFISSIONAL DE APOIO ESCOLAR (CUIDADOR)",
+                    "PROFISSIONAL DE APOIO / CUIDADOR",
+                ]
+            ),
             Funcionario.crianca_assistida.isnot(None),
         )
         .order_by(Funcionario.crianca_assistida)
