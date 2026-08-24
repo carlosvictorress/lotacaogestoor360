@@ -1037,15 +1037,72 @@ def delete_secretaria(sec_id):
     return redirect(url_for("admin_dashboard"))
 
 
+@app.route("/admin/editar_funcao", methods=["POST"])
+@login_required
+def editar_funcao():
+    if not current_user.is_admin:
+        return redirect(url_for("sistema"))
+
+    id_funcao = request.form.get("id_funcao")
+    novo_nome = request.form.get("nome_funcao", "").strip().upper()
+
+    if not id_funcao or not novo_nome:
+        flash("Erro: Nome da função é obrigatório.", "error")
+        return redirect(url_for("admin_dashboard") + "?tab=config")
+
+    funcao = db.session.get(Funcao, id_funcao)
+    if not funcao:
+        flash("Erro: Função não encontrada.", "error")
+        return redirect(url_for("admin_dashboard") + "?tab=config")
+
+    funcoes_protegidas = [
+        "PROFISSIONAL DE APOIO ESCOLAR (CUIDADOR)",
+        "PROFISSIONAL DE APOIO / CUIDADOR",
+        "PROFISSIONAL DE APOIO (CUIDADOR)",
+    ]
+
+    if funcao.nome in funcoes_protegidas or novo_nome in funcoes_protegidas:
+        flash(
+            "Erro: A função 'PROFISSIONAL DE APOIO ESCOLAR (CUIDADOR)' é protegida do sistema e não pode ser alterada.",
+            "error",
+        )
+        return redirect(url_for("admin_dashboard") + "?tab=config")
+
+    existente = Funcao.query.filter(
+        Funcao.nome == novo_nome, Funcao.id != id_funcao
+    ).first()
+    if existente:
+        flash("Erro: Já existe outra função com esse nome.", "error")
+        return redirect(url_for("admin_dashboard") + "?tab=config")
+
+    nome_antigo = funcao.nome
+    funcao.nome = novo_nome
+    db.session.commit()
+    registrar_log("EDITOU FUNCAO", f"{nome_antigo} -> {novo_nome}")
+    flash(f"Função '{nome_antigo}' renomeada para '{novo_nome}' com sucesso!", "success")
+
+    return redirect(url_for("admin_dashboard") + "?tab=config")
+
+
 @app.route("/admin/delete_funcao/<int:id>")
 @login_required
 def delete_funcao(id):
     if not current_user.is_admin:
         return redirect(url_for("sistema"))
+
+    f = db.session.get(Funcao, id)
+    funcoes_protegidas = [
+        "PROFISSIONAL DE APOIO ESCOLAR (CUIDADOR)",
+        "PROFISSIONAL DE APOIO / CUIDADOR",
+        "PROFISSIONAL DE APOIO (CUIDADOR)",
+    ]
+    if f and f.nome in funcoes_protegidas:
+        flash("Erro: Esta função é protegida pelo sistema e não pode ser excluída.", "error")
+        return redirect(url_for("admin_dashboard") + "?tab=config")
+
     if Funcionario.query.filter_by(funcao_id=id).first():
         flash("Erro: Existem funcionários com esta função.", "error")
     else:
-        f = db.session.get(Funcao, id)
         if f:
             db.session.delete(f)
             db.session.commit()

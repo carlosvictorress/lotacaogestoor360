@@ -617,13 +617,27 @@
                                 placeholder="Nome da Função" required><button
                                 class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Salvar</button>
                         </form>
-                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">{% for f in funcoes %}<li
-                                class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
-                                <span>{{ f.nome }}</span><button
-                                    onclick="confirmAction('{{ url_for('delete_funcao', id=f.id) }}', 'Excluir Função', 'Tem certeza? Verifique se não há servidores com esta função.')"
-                                    class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button>
-                            </li>{%
-                            endfor %}</ul>
+                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">
+                            {% for f in funcoes %}
+                            <li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
+                                <span>{{ f.nome }}</span>
+                                <div class="flex items-center space-x-1">
+                                    {% if f.nome in ['PROFISSIONAL DE APOIO ESCOLAR (CUIDADOR)', 'PROFISSIONAL DE APOIO / CUIDADOR', 'PROFISSIONAL DE APOIO (CUIDADOR)'] %}
+                                        <span title="Função protegida do sistema (não pode ser alterada ou excluída)" class="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                            <i class="ph ph-lock font-bold"></i> Protegida
+                                        </span>
+                                    {% else %}
+                                        <button onclick="abrirModalEditarFuncao({{ f.id }}, '{{ f.nome }}')" class="text-blue-500 hover:text-blue-700 p-1 transition" title="Editar Função">
+                                            <i class="ph ph-pencil text-base"></i>
+                                        </button>
+                                        <button onclick="confirmAction('{{ url_for('delete_funcao', id=f.id) }}', 'Excluir Função', 'Tem certeza? Verifique se não há servidores com esta função.')" class="text-red-500 hover:text-red-700 p-1 transition" title="Excluir Função">
+                                            <i class="ph ph-trash text-base"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
                     </div>
 
                     <div
@@ -1376,6 +1390,38 @@ function abrirModalAuditoria(btn) {
                 });
             }
         });
+    <!-- MODAL EDITAR FUNCAO -->
+    <div id="modalEditarFuncao" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl p-6 w-full max-w-md shadow-xl border border-gray-100 dark:border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-gray-800 dark:text-white text-lg">Editar Função</h3>
+                <button onclick="fecharModalEditarFuncao()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+            <form method="POST" action="{{ url_for('editar_funcao') }}" class="space-y-4">
+                <input type="hidden" name="id_funcao" id="edit_funcao_id">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Nome da Função</label>
+                    <input type="text" name="nome_funcao" id="edit_funcao_nome" class="w-full border border-gray-200 p-2.5 rounded-xl uppercase text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:border-blue-500" required>
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="fecharModalEditarFuncao()" class="px-4 py-2 text-xs font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function abrirModalEditarFuncao(id, nome) {
+            document.getElementById('edit_funcao_id').value = id;
+            document.getElementById('edit_funcao_nome').value = nome;
+            document.getElementById('modalEditarFuncao').classList.remove('hidden');
+        }
+        function fecharModalEditarFuncao() {
+            document.getElementById('modalEditarFuncao').classList.add('hidden');
+        }
     </script>
 </body>
 
