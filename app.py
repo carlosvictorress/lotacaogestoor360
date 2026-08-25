@@ -1833,6 +1833,9 @@ def atualizar_schema():
                         conn.execute(text("UPDATE funcionario SET funcao_id = :id_novo WHERE funcao_id = :id_antigo"), {"id_novo": id_novo, "id_antigo": id_antigo})
                         conn.execute(text("DELETE FROM funcao WHERE id = :id_antigo"), {"id_antigo": id_antigo})
                     conn.commit()
+            except Exception as e:
+                conn.rollback()
+
             # Garantir que a nova tabela contrato_gerado seja criada
             try:
                 db.create_all()
