@@ -612,6 +612,28 @@
                 </div>
             </div>
         </div>
+    <!-- MODAL PROFISSIONAL DE ALERTA DE CONTRATO EXISTENTE -->
+    <div id="modalContratoExistente" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[80] backdrop-blur-sm transition-opacity duration-300 p-4">
+        <div class="bg-white rounded-3xl w-full max-w-md p-6 md:p-8 shadow-2xl transform scale-100 transition-transform duration-300 border border-slate-100 text-center">
+            <div class="w-16 h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+                <i class="ph ph-file-text text-3xl"></i>
+            </div>
+            <h3 class="text-xl font-extrabold text-slate-900 mb-2">Contrato Já Gerado</h3>
+            <p class="text-xs text-slate-500 font-medium mb-4">
+                O servidor <strong id="mce_servidor_nome" class="text-slate-900"></strong> já possui o <strong id="mce_num_contrato" class="text-purple-700 font-bold"></strong> emitido no sistema.
+            </p>
+            <div class="bg-purple-50/80 border border-purple-100 rounded-2xl p-3.5 text-left mb-6 text-xs text-purple-900 leading-relaxed font-medium">
+                <i class="ph ph-info text-purple-600 text-sm inline mr-1"></i> Cada servidor possui um único número de contrato. Você pode visualizar ou editar as informações do contrato existente na página de Contratos Gerados.
+            </div>
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                <button onclick="fecharModalContratoExistente()" class="w-full sm:flex-1 py-2.5 px-4 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition text-xs">
+                    Fechar
+                </button>
+                <a href="{{ url_for('pagina_contratos') }}" class="w-full sm:flex-1 py-2.5 px-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 shadow-lg shadow-purple-200 transition text-xs inline-flex items-center justify-center gap-1.5">
+                    <i class="ph ph-arrow-right font-bold"></i> Ir para Contratos
+                </a>
+            </div>
+        </div>
     </div>
 
     <div id="loading" class="hidden fixed top-0 left-0 w-full h-full bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white"><i class="ph ph-spinner-gap animate-spin text-4xl mb-3"></i><span>Processando PDF...</span></div>
@@ -1049,9 +1071,9 @@
         // --- FUNÇÕES DA GERAÇÃO DE CONTRATO ---
         function abrirModalGerarContrato(f) {
             if (f.has_contrato) {
-                if (confirm('Atenção: O servidor ' + f.nome + ' já possui o Contrato Nº ' + f.num_contrato_existente + ' gerado!\n\nCada servidor pode ter apenas 1 contrato gerado. Deseja ir para a página "Contratos Gerados" para visualizar ou editar o contrato existente?')) {
-                    window.location.href = '/contratos';
-                }
+                document.getElementById('mce_servidor_nome').innerText = f.nome || '';
+                document.getElementById('mce_num_contrato').innerText = 'Contrato Nº ' + (f.num_contrato_existente || '');
+                document.getElementById('modalContratoExistente').classList.remove('hidden');
                 return;
             }
 
@@ -1117,6 +1139,10 @@
             document.getElementById('modalGerarContrato').classList.add('hidden');
         }
 
+        function fecharModalContratoExistente() {
+            document.getElementById('modalContratoExistente').classList.add('hidden');
+        }
+
         function atualizarExtensoAutomatico(val) {
             if (!val) {
                 document.getElementById('mc_remuneracao_extenso').value = '';
@@ -1155,6 +1181,11 @@
                 if (data.success) {
                     fecharModalContrato();
                     window.open(data.view_url, '_blank');
+                } else if (data.existente_num) {
+                    fecharModalContrato();
+                    document.getElementById('mce_servidor_nome').innerText = document.getElementById('mc_contratado_nome').value || '';
+                    document.getElementById('mce_num_contrato').innerText = 'Contrato Nº ' + data.existente_num;
+                    document.getElementById('modalContratoExistente').classList.remove('hidden');
                 } else {
                     alert('Erro ao gerar contrato: ' + (data.message || 'Erro desconhecido'));
                 }
