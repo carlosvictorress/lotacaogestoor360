@@ -606,6 +606,73 @@
         </div>
     </main>
 
+    <!-- RODAPÉ DO DASHBOARD COM STATUS DO TERMO -->
+    <footer class="max-w-7xl mx-auto px-6 my-8 pt-6 border-t border-slate-200/80 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div id="footer-termo-status">
+            {% if current_user.termo_aceito %}
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                <i class="ph ph-shield-check text-sm text-emerald-600"></i>
+                Termo de Responsabilidade aceito por <strong>{{ current_user.username }}</strong> em {{ current_user.termo_aceito_em.strftime('%d/%m/%Y às %H:%M') if current_user.termo_aceito_em else '' }}
+            </span>
+            {% else %}
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
+                <i class="ph ph-warning-circle text-sm text-amber-600"></i>
+                Termo de Responsabilidade Pendente de Assinatura
+            </span>
+            {% endif %}
+        </div>
+        <button type="button" onclick="abrirModalTermoVisualizacao()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold transition text-xs border border-slate-200 shadow-sm">
+            <i class="ph ph-file-text text-base text-purple-600"></i> Ver Termo de Responsabilidade
+        </button>
+    </footer>
+
+    <!-- MODAL TERMO DE RESPONSABILIDADE LGPD -->
+    <div id="modal-lgpd-obrigatorio" class="fixed inset-0 bg-black/80 {% if current_user.termo_aceito and not get_flashed_messages(category_filter=['aviso_lgpd']) %}hidden{% endif %} flex items-center justify-center z-[999999] backdrop-blur-sm p-4 font-sans">
+        <div class="bg-white dark:bg-gray-800 max-w-xl w-full rounded-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border border-gray-200 dark:border-gray-700">
+            
+            <div class="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <span class="text-xl">📢</span>
+                    <h3 class="text-base font-semibold text-gray-900 dark:text-white m-0">
+                        Termo de Responsabilidade e Segurança (LGPD)
+                    </h3>
+                </div>
+                <button type="button" onclick="fecharModalTermoVisualizacao()" id="btn-fechar-termo-top" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-lg {% if not current_user.termo_aceito %}hidden{% endif %}"><i class="ph ph-x"></i></button>
+            </div>
+            
+            <div id="termo-scroll-container" class="p-6 overflow-y-auto text-sm text-gray-600 dark:text-gray-300 space-y-4 leading-relaxed menu-scroll">
+                <p class="mt-0"><strong>Prezado(a) operador(a),</strong></p>
+                <p>Você está acessando uma área restrita contendo dados pessoais de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, intransmissível e todas as ações realizadas nesta plataforma são monitoradas e registradas em nosso log de auditoria interna.</p>
+                
+                <div class="bg-amber-50 dark:bg-amber-950/30 border-l-4 border-amber-500 p-4 my-4 rounded-r-xl">
+                    <p class="m-0 text-amber-800 dark:text-amber-400 font-bold">⚠️ COMUNICADO IMPORTANTE:</p>
+                    <p class="mt-1.5 mb-0 text-amber-700 dark:text-amber-300 font-medium">Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, solicitamos que revise as fichas pendentes de validação no painel administrativo.</p>
+                </div>
+                
+                <p>Certifique-se também de vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de ponto via <em>geofencing</em>.</p>
+                <p class="mb-0">Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo para evitar acessos não autorizados por terceiros.</p>
+
+                {% if current_user.termo_aceito %}
+                <div class="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-3.5 mt-4 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+                    <i class="ph ph-shield-check text-lg text-emerald-600"></i>
+                    <div>
+                        <strong>Termo Assinado:</strong> Aceito por <strong>{{ current_user.username }}</strong> em {{ current_user.termo_aceito_em.strftime('%d/%m/%Y às %H:%M') if current_user.termo_aceito_em else '' }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <div class="p-4 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
+                <button type="button" id="btn-fechar-termo-read" onclick="fecharModalTermoVisualizacao()" class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 font-semibold text-sm py-2.5 px-5 rounded-xl transition-all duration-200 {% if not current_user.termo_aceito %}hidden{% endif %}">
+                    Fechar
+                </button>
+                <button id="btn-confirmar-leitura" {% if current_user.termo_aceito %}style="display:none;"{% else %}disabled{% endif %} class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold text-sm py-2.5 px-5 rounded-xl disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200">
+                    Role o termo até o fim (0%)
+                </button>
+            </div>
+        </div>
+    </div>
+
     <div id="modalConfirm" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm transition-opacity duration-300">
         <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl transform scale-100 transition-transform duration-300 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
             <div class="text-center">
@@ -647,6 +714,90 @@
     <div id="loading" class="hidden fixed top-0 left-0 w-full h-full bg-black/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center text-white"><i class="ph ph-spinner-gap animate-spin text-4xl mb-3"></i><span>Processando PDF...</span></div>
 
     <script>
+        function abrirModalTermoVisualizacao() {
+            var modal = document.getElementById('modal-lgpd-obrigatorio');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.style.display = 'flex';
+            }
+        }
+
+        function fecharModalTermoVisualizacao() {
+            var modal = document.getElementById('modal-lgpd-obrigatorio');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const container = document.getElementById('termo-scroll-container');
+            const botao = document.getElementById('btn-confirmar-leitura');
+            const modal = document.getElementById('modal-lgpd-obrigatorio');
+            
+            if (container && botao && modal) {
+                function verificarEAtualizarScroll() {
+                    if (botao.style.display === 'none') return;
+                    const alturaTotal = container.scrollHeight - container.clientHeight;
+
+                    if (alturaTotal <= 0) {
+                        botao.disabled = false;
+                        botao.style.opacity = "1";
+                        botao.style.cursor = "pointer";
+                        botao.innerText = "Li e estou de acordo";
+                        return;
+                    }
+
+                    const scrollAtual = container.scrollTop;
+                    const percentual = Math.min(Math.round((scrollAtual / alturaTotal) * 100), 100);
+
+                    if (percentual < 95) {
+                        botao.disabled = true;
+                        botao.style.opacity = "0.4";
+                        botao.style.cursor = "not-allowed";
+                        botao.innerText = `Role o termo até o fim (${percentual}%)`;
+                    } else {
+                        botao.disabled = false;
+                        botao.style.opacity = "1";
+                        botao.style.cursor = "pointer";
+                        botao.innerText = "Li e estou de acordo";
+                    }
+                }
+
+                setTimeout(verificarEAtualizarScroll, 500);
+                container.addEventListener('scroll', verificarEAtualizarScroll);
+
+                botao.addEventListener('click', function () {
+                    if (!botao.disabled) {
+                        botao.disabled = true;
+                        botao.innerText = "Salvando aceite...";
+
+                        fetch('/api/aceitar_termo', {
+                            method: 'POST'
+                        })
+                        .then(r => r.json())
+                        .then(data => {
+                            fecharModalTermoVisualizacao();
+                            if (data.success) {
+                                var statusEl = document.getElementById('footer-termo-status');
+                                if (statusEl) {
+                                    statusEl.innerHTML = '<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80"><i class="ph ph-shield-check text-sm text-emerald-600"></i> Termo de Responsabilidade aceito por <strong>' + data.username + '</strong> em ' + data.data_aceite + '</span>';
+                                }
+                                botao.style.display = 'none';
+                                var btnTop = document.getElementById('btn-fechar-termo-top');
+                                var btnRead = document.getElementById('btn-fechar-termo-read');
+                                if (btnTop) btnTop.classList.remove('hidden');
+                                if (btnRead) btnRead.classList.remove('hidden');
+                            }
+                        })
+                        .catch(err => {
+                            fecharModalTermoVisualizacao();
+                        });
+                    }
+                });
+            }
+        });
+
         $(document).ready(function(){ 
             $('#cpf').inputmask('999.999.999-99'); 
             $('#telefone').inputmask(['(99) 9999-9999', '(99) 99999-9999']); 

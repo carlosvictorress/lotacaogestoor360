@@ -95,6 +95,8 @@ class User(UserMixin, db.Model):
         db.String(20), default="rh_secretaria"
     )  # admin, rh_supervisor, rh_secretaria
     secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=True)
+    termo_aceito = db.Column(db.Boolean, default=False)
+    termo_aceito_em = db.Column(db.DateTime, nullable=True)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -525,8 +527,9 @@ def login():
         if user and user.check_password(password):
             login_user(user)
             
-            # --- ACIONA O GATILHO PARA O MODAL APARECER APENAS NESTA ENTRADA INICIAL ---
-            flash("abrir_modal", "aviso_lgpd")
+            # --- ACIONA O GATILHO PARA O MODAL APARECER APENAS SE AINDA NÃO ACEITOU O TERMO ---
+            if not user.termo_aceito:
+                flash("abrir_modal", "aviso_lgpd")
             
             return redirect(
                 url_for("admin_dashboard") if user.is_admin else url_for("sistema")
@@ -1841,6 +1844,19 @@ def atualizar_schema():
                 except Exception as e:
                     conn.rollback()
 
+            # 6. Novas colunas para a tabela 'user' (Aceite do Termo de Responsabilidade)
+            colunas_user = [
+                ("termo_aceito", "BOOLEAN DEFAULT FALSE"),
+                ("termo_aceito_em", "TIMESTAMP")
+            ]
+            for col, tipo in colunas_user:
+                try:
+                    conn.execute(text(f"ALTER TABLE \"user\" ADD COLUMN {col} {tipo}"))
+                    conn.commit()
+                    print(f"SUCESSO: Coluna '{col}' adicionada em 'user'.")
+                except Exception as e:
+                    conn.rollback()
+
             # 5. Migração automática do nome da Função de Apoio (no Railway PostgreSQL e SQLite local)
             try:
                 conn.execute(
@@ -1877,6 +1893,27 @@ def atualizar_schema():
                 db.create_all()
             except Exception as e:
                 pass
+
+
+@app.route("/api/aceitar_termo", methods=["POST"])
+@login_required
+def aceitar_termo():
+    try:
+        current_user.termo_aceito = True
+        current_user.termo_aceito_em = datetime.utcnow()
+        db.session.commit()
+
+        registrar_log("Aceitou Termo", f"Usuário {current_user.username} aceitou o Termo de Responsabilidade e Segurança (LGPD)")
+
+        data_formatada = current_user.termo_aceito_em.strftime("%d/%m/%Y às %H:%M")
+        return {
+            "success": True,
+            "username": current_user.username,
+            "data_aceite": data_formatada
+        }
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
 
 
 @app.context_processor
