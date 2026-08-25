@@ -1867,6 +1867,30 @@ def atualizar_schema():
                 pass
 
 
+@app.context_processor
+def utility_processor():
+    def buscar_contrato_existente(func):
+        if not func:
+            return None
+        try:
+            if func.id:
+                c = ContratoGerado.query.filter_by(funcionario_id=func.id).first()
+                if c:
+                    return c
+            if func.cpf and str(func.cpf).strip():
+                c = ContratoGerado.query.filter_by(contratado_cpf=str(func.cpf).strip()).first()
+                if c:
+                    return c
+            if func.nome and str(func.nome).strip():
+                c = ContratoGerado.query.filter(db.func.upper(ContratoGerado.contratado_nome) == str(func.nome).strip().upper()).first()
+                if c:
+                    return c
+        except Exception:
+            pass
+        return None
+    return dict(buscar_contrato_existente=buscar_contrato_existente)
+
+
 @app.route("/api/proximo_numero_contrato")
 @login_required
 def api_proximo_numero_contrato():
@@ -1884,17 +1908,25 @@ def processar_gerar_contrato():
         return {"success": False, "message": "Acesso negado: Apenas administradores podem gerar contratos."}, 403
     try:
         funcionario_id = request.form.get("funcionario_id", type=int)
+        contratado_cpf = request.form.get("contratado_cpf", "").strip()
+        contratado_nome = request.form.get("contratado_nome", "").strip()
         
-        # O servidor não pode ter contrato gerado mais de uma vez
+        # O servidor não pode ter contrato gerado mais de uma vez (verifica por ID, CPF e Nome)
+        existente = None
         if funcionario_id:
             existente = ContratoGerado.query.filter_by(funcionario_id=funcionario_id).first()
-            if existente:
-                return {
-                    "success": False,
-                    "message": f"Este servidor já possui um contrato gerado (Nº {existente.num_contrato}). Cada servidor só pode ter 1 contrato gerado. Utilize a opção de edição na página 'Contratos Gerados' para alterá-lo.",
-                    "existente_num": existente.num_contrato,
-                    "existente_id": existente.id
-                }, 400
+        if not existente and contratado_cpf:
+            existente = ContratoGerado.query.filter_by(contratado_cpf=contratado_cpf).first()
+        if not existente and contratado_nome:
+            existente = ContratoGerado.query.filter(db.func.upper(ContratoGerado.contratado_nome) == contratado_nome.upper()).first()
+
+        if existente:
+            return {
+                "success": False,
+                "message": f"Este servidor já possui um contrato gerado (Nº {existente.num_contrato}). Cada servidor só pode ter 1 contrato gerado. Utilize a opção de edição na página 'Contratos Gerados' para alterá-lo.",
+                "existente_num": existente.num_contrato,
+                "existente_id": existente.id
+            }, 400
 
         num_contrato = request.form.get("num_contrato")
         dt_inicio_str = request.form.get("dt_inicio")
