@@ -1846,6 +1846,8 @@ def atualizar_schema():
 @app.route("/api/proximo_numero_contrato")
 @login_required
 def api_proximo_numero_contrato():
+    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
+        return {"num_contrato": "01/2026"}, 403
     ano = request.args.get("ano", type=int) or datetime.now().year
     proximo = gerar_proximo_numero_contrato(ano)
     return {"num_contrato": proximo}
@@ -1854,6 +1856,8 @@ def api_proximo_numero_contrato():
 @app.route("/gerar_contrato", methods=["POST"])
 @login_required
 def processar_gerar_contrato():
+    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
+        return {"success": False, "message": "Acesso negado: Apenas administradores podem gerar contratos."}, 403
     try:
         funcionario_id = request.form.get("funcionario_id", type=int)
         num_contrato = request.form.get("num_contrato")
@@ -1932,6 +1936,9 @@ def processar_gerar_contrato():
 @app.route("/contratos")
 @login_required
 def pagina_contratos():
+    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
+        flash("Acesso negado: Apenas administradores podem visualizar os contratos gerados.", "danger")
+        return redirect(url_for("sistema"))
     historico = ContratoGerado.query.order_by(ContratoGerado.data_geracao.desc()).all()
     return render_template("contratos_painel.html", historico=historico)
 
@@ -1948,6 +1955,9 @@ def formatar_remuneracao_rs(valor_str):
 @app.route("/contrato/documento/<int:id>")
 @login_required
 def visualizar_contrato_documento(id):
+    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
+        flash("Acesso negado: Apenas administradores podem visualizar contratos.", "danger")
+        return redirect(url_for("sistema"))
     contrato = db.session.get(ContratoGerado, id)
     if not contrato:
         return "Contrato não encontrado", 404
@@ -1985,6 +1995,9 @@ def visualizar_contrato_documento(id):
 @app.route("/contrato/extrato/<int:id>")
 @login_required
 def visualizar_contrato_extrato(id):
+    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
+        flash("Acesso negado: Apenas administradores podem visualizar os extratos.", "danger")
+        return redirect(url_for("sistema"))
     contrato = db.session.get(ContratoGerado, id)
     if not contrato:
         return "Contrato não encontrado", 404
