@@ -575,7 +575,9 @@
                                         remuneracao: {{ (f.remuneracao or "")|tojson }},
                                         jornada_trabalho: {{ (f.jornada_trabalho or "20")|tojson }},
                                         dt_inicio: {{ (f.dt_inicio.isoformat() if f.dt_inicio else None)|tojson }},
-                                        dt_termino: {{ (f.dt_termino.isoformat() if f.dt_termino else None)|tojson }}
+                                        dt_termino: {{ (f.dt_termino.isoformat() if f.dt_termino else None)|tojson }},
+                                        has_contrato: {{ "true" if f.contratos_gerados else "false" }},
+                                        num_contrato_existente: {{ (f.contratos_gerados[0].num_contrato if f.contratos_gerados else "")|tojson }}
                                     })' class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Gerar contrato">
                                         <i class="ph ph-file-text text-xl"></i>
                                     </button>
@@ -1046,6 +1048,13 @@
 
         // --- FUNÇÕES DA GERAÇÃO DE CONTRATO ---
         function abrirModalGerarContrato(f) {
+            if (f.has_contrato) {
+                if (confirm('Atenção: O servidor ' + f.nome + ' já possui o Contrato Nº ' + f.num_contrato_existente + ' gerado!\n\nCada servidor pode ter apenas 1 contrato gerado. Deseja ir para a página "Contratos Gerados" para visualizar ou editar o contrato existente?')) {
+                    window.location.href = '/contratos';
+                }
+                return;
+            }
+
             document.getElementById('mc_funcionario_id').value = f.id || '';
             document.getElementById('mc_contratado_nome').value = f.nome || '';
             document.getElementById('mc_contratado_cpf').value = f.cpf || '';

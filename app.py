@@ -281,7 +281,14 @@ class ContratoGerado(db.Model):
     # Audit Metadados
     data_geracao = db.Column(db.DateTime, default=datetime.utcnow)
     quem_gerou_id = db.Column(db.Integer, db.ForeignKey("user.id"))
-    quem_gerou = db.relationship("User")
+    quem_gerou = db.relationship("User", foreign_keys=[quem_gerou_id])
+
+    # Rastreamento de Edição
+    editado = db.Column(db.Boolean, default=False)
+    motivo_edicao = db.Column(db.Text, nullable=True)
+    data_edicao = db.Column(db.DateTime, nullable=True)
+    quem_editou_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    quem_editou = db.relationship("User", foreign_keys=[quem_editou_id])
 
 
 def gerar_proximo_numero_contrato(ano=None):
@@ -1796,12 +1803,29 @@ def atualizar_schema():
                 except Exception as e:
                     conn.rollback()
                     
+            # 5. Novas colunas para a tabela 'contrato_gerado' (Rastreamento de Edição)
+            colunas_contrato = [
+                ("editado", "BOOLEAN DEFAULT FALSE"),
+                ("motivo_edicao", "TEXT"),
+                ("data_edicao", "TIMESTAMP"),
+                ("quem_editou_id", "INTEGER")
+            ]
+
             # Processa tabela log_auditoria
             for col, tipo in colunas_log:
                 try:
                     conn.execute(text(f"ALTER TABLE log_auditoria ADD COLUMN {col} {tipo}"))
                     conn.commit()
                     print(f"SUCESSO: Coluna '{col}' adicionada em 'log_auditoria'.")
+                except Exception as e:
+                    conn.rollback()
+
+            # Processa tabela contrato_gerado
+            for col, tipo in colunas_contrato:
+                try:
+                    conn.execute(text(f"ALTER TABLE contrato_gerado ADD COLUMN {col} {tipo}"))
+                    conn.commit()
+                    print(f"SUCESSO: Coluna '{col}' adicionada em 'contrato_gerado'.")
                 except Exception as e:
                     conn.rollback()
 
@@ -1860,6 +1884,18 @@ def processar_gerar_contrato():
         return {"success": False, "message": "Acesso negado: Apenas administradores podem gerar contratos."}, 403
     try:
         funcionario_id = request.form.get("funcionario_id", type=int)
+        
+        # O servidor não pode ter contrato gerado mais de uma vez
+        if funcionario_id:
+            existente = ContratoGerado.query.filter_by(funcionario_id=funcionario_id).first()
+            if existente:
+                return {
+                    "success": False,
+                    "message": f"Este servidor já possui um contrato gerado (Nº {existente.num_contrato}). Cada servidor só pode ter 1 contrato gerado. Utilize a opção de edição na página 'Contratos Gerados' para alterá-lo.",
+                    "existente_num": existente.num_contrato,
+                    "existente_id": existente.id
+                }, 400
+
         num_contrato = request.form.get("num_contrato")
         dt_inicio_str = request.form.get("dt_inicio")
         dt_termino_str = request.form.get("dt_termino")
@@ -1927,6 +1963,67 @@ def processar_gerar_contrato():
             "success": True,
             "contrato_id": novo_contrato.id,
             "view_url": url_for("visualizar_contrato_documento", id=novo_contrato.id)
+        }
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
+
+
+@app.route("/contrato/editar/<int:id>", methods=["POST"])
+@login_required
+def editar_contrato(id):
+    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
+        return {"success": False, "message": "Acesso negado: Apenas administradores podem editar contratos."}, 403
+
+    contrato = db.session.get(ContratoGerado, id)
+    if not contrato:
+        return {"success": False, "message": "Contrato não encontrado."}, 404
+
+    motivo = request.form.get("motivo_edicao", "").strip()
+    if not motivo:
+        return {"success": False, "message": "É obrigatório informar o motivo da edição do contrato."}, 400
+
+    try:
+        # Manter num_contrato e ano_exercicio originais intactos
+        contrato.contratado_nome = request.form.get("contratado_nome", "").strip()
+        contrato.contratado_cpf = request.form.get("contratado_cpf", "").strip()
+        contrato.contratado_rg = request.form.get("contratado_rg", "").strip()
+        contrato.contratado_nacionalidade = request.form.get("contratado_nacionalidade", "brasileiro(a)").strip()
+        contrato.contratado_naturalidade = request.form.get("contratado_naturalidade", "piauiense").strip()
+        contrato.contratado_estado_civil = request.form.get("contratado_estado_civil", "solteiro(a)").strip()
+        contrato.contratado_endereco = request.form.get("contratado_endereco", "").strip()
+
+        contrato.funcao_nome = request.form.get("funcao_nome", "").strip()
+        contrato.jornada_trabalho = request.form.get("jornada_trabalho", "").strip()
+        contrato.remuneracao = request.form.get("remuneracao", "").strip()
+        contrato.remuneracao_extenso = request.form.get("remuneracao_extenso", "").strip()
+
+        dt_inicio_str = request.form.get("dt_inicio")
+        dt_termino_str = request.form.get("dt_termino")
+        dt_assinatura_str = request.form.get("dt_assinatura")
+
+        if dt_inicio_str: contrato.dt_inicio = parse_date(dt_inicio_str)
+        if dt_termino_str: contrato.dt_termino = parse_date(dt_termino_str)
+        if dt_assinatura_str: contrato.dt_assinatura = parse_date(dt_assinatura_str)
+
+        contrato.representante_nome = request.form.get("representante_nome", "MARIA EDNA DE SOUSA QUARESMA").strip()
+        contrato.representante_cargo = request.form.get("representante_cargo", "Secretária Municipal de Educação").strip()
+        contrato.representante_rg_cpf = request.form.get("representante_rg_cpf", "676.079.263-72").strip()
+        contrato.representante_endereco = request.form.get("representante_endereco", "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI").strip()
+
+        contrato.editado = True
+        contrato.motivo_edicao = motivo
+        contrato.data_edicao = datetime.utcnow()
+        contrato.quem_editou_id = current_user.id
+
+        db.session.commit()
+
+        registrar_log("Editou Contrato", f"Contrato Nº {contrato.num_contrato} ({contrato.contratado_nome}) - Motivo: {motivo}")
+
+        return {
+            "success": True,
+            "contrato_id": contrato.id,
+            "view_url": url_for("visualizar_contrato_documento", id=contrato.id)
         }
     except Exception as e:
         db.session.rollback()

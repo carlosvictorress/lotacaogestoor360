@@ -82,7 +82,15 @@
                     <tbody class="divide-y divide-slate-100">
                         {% for c in historico %}
                         <tr class="hover:bg-slate-50/80 transition-colors">
-                            <td class="px-6 py-4 font-bold text-purple-700">{{ c.num_contrato }}</td>
+                            <td class="px-6 py-4 font-bold text-purple-700">
+                                {{ c.num_contrato }}
+                                {% if c.editado %}
+                                <span class="ml-2 px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full inline-flex items-center gap-1 cursor-help" 
+                                      title="EDITADO POR: {{ c.quem_editou.username if c.quem_editou else 'Admin' }} em {{ c.data_edicao.strftime('%d/%m/%Y às %H:%M') if c.data_edicao else '' }}&#10;MOTIVO: {{ c.motivo_edicao }}">
+                                    <i class="ph ph-pencil-simple-line"></i> Editado
+                                </span>
+                                {% endif %}
+                            </td>
                             <td class="px-6 py-4">
                                 <div class="font-bold text-slate-900">{{ c.contratado_nome }}</div>
                                 <div class="text-xs text-slate-400">CPF: {{ c.contratado_cpf or 'N/A' }}</div>
@@ -105,7 +113,34 @@
                                         class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Imprimir Apenas Extrato">
                                         <i class="ph ph-file-text text-xl"></i>
                                     </a>
+                                    
                                     {% if current_user.is_admin %}
+                                    <button type="button" onclick='abrirModalEditarContrato({
+                                        id: {{ c.id }},
+                                        num_contrato: {{ c.num_contrato|tojson }},
+                                        contratado_nome: {{ c.contratado_nome|tojson }},
+                                        contratado_cpf: {{ (c.contratado_cpf or "")|tojson }},
+                                        contratado_rg: {{ (c.contratado_rg or "")|tojson }},
+                                        contratado_nacionalidade: {{ (c.contratado_nacionalidade or "brasileiro(a)")|tojson }},
+                                        contratado_naturalidade: {{ (c.contratado_naturalidade or "piauiense")|tojson }},
+                                        contratado_estado_civil: {{ (c.contratado_estado_civil or "solteiro(a)")|tojson }},
+                                        contratado_endereco: {{ (c.contratado_endereco or "")|tojson }},
+                                        funcao_nome: {{ (c.funcao_nome or "")|tojson }},
+                                        remuneracao: {{ (c.remuneracao or "")|tojson }},
+                                        remuneracao_extenso: {{ (c.remuneracao_extenso or "")|tojson }},
+                                        jornada_trabalho: {{ (c.jornada_trabalho or "20 (vinte) horas semanais")|tojson }},
+                                        dt_inicio: {{ (c.dt_inicio.isoformat() if c.dt_inicio else None)|tojson }},
+                                        dt_termino: {{ (c.dt_termino.isoformat() if c.dt_termino else None)|tojson }},
+                                        dt_assinatura: {{ (c.dt_assinatura.isoformat() if c.dt_assinatura else None)|tojson }},
+                                        representante_nome: {{ (c.representante_nome or "MARIA EDNA DE SOUSA QUARESMA")|tojson }},
+                                        representante_cargo: {{ (c.representante_cargo or "Secretária Municipal de Educação")|tojson }},
+                                        representante_rg_cpf: {{ (c.representante_rg_cpf or "676.079.263-72")|tojson }},
+                                        representante_endereco: {{ (c.representante_endereco or "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI")|tojson }},
+                                        motivo_edicao: {{ (c.motivo_edicao or "")|tojson }}
+                                    })' class="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Editar Contrato">
+                                        <i class="ph ph-pencil-simple text-xl"></i>
+                                    </button>
+
                                     <form action="{{ url_for('excluir_contrato', id=c.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir o registro deste contrato?');" class="inline">
                                         <button type="submit" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition" title="Excluir Registro">
                                             <i class="ph ph-trash text-xl"></i>
@@ -130,6 +165,134 @@
 
     </div>
 
+    <!-- MODAL DE EDIÇÃO DE CONTRATO -->
+    <div id="modalEditarContrato" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[70] backdrop-blur-sm transition-opacity duration-300 p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl w-full max-w-3xl p-6 md:p-8 shadow-2xl transform scale-100 transition-transform duration-300 border border-slate-100 my-8">
+            <div class="flex justify-between items-center pb-4 border-b border-slate-100 mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center font-bold">
+                        <i class="ph ph-pencil-simple-line text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Editar Contrato Nº <span id="me_num_contrato_title" class="text-purple-700"></span></h3>
+                        <p class="text-xs text-slate-500">O número do contrato permanecerá inalterado. Informe o motivo obrigatoriamente.</p>
+                    </div>
+                </div>
+                <button onclick="fecharModalEditar()" class="text-slate-400 hover:text-slate-600 text-xl p-1"><i class="ph ph-x"></i></button>
+            </div>
+
+            <form id="formEditarContrato" onsubmit="enviarEditarContrato(event)" class="space-y-6">
+                <input type="hidden" id="me_contrato_id" name="contrato_id">
+
+                <!-- CAMPO OBRIGATÓRIO: MOTIVO DA EDIÇÃO -->
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                    <label class="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-2">Motivo / Justificativa da Edição*</label>
+                    <textarea name="motivo_edicao" id="me_motivo_edicao" required rows="2" class="w-full p-3 bg-white border border-amber-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Descreva o motivo da alteração dos dados deste contrato..."></textarea>
+                </div>
+
+                <!-- DADOS DO CONTRATADO -->
+                <div>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1"><i class="ph ph-user text-blue-500"></i> Servidor Contratado</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Nome Completo</label>
+                            <input type="text" name="contratado_nome" id="me_contratado_nome" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold uppercase" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">CPF</label>
+                            <input type="text" name="contratado_cpf" id="me_contratado_cpf" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">RG</label>
+                            <input type="text" name="contratado_rg" id="me_contratado_rg" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Estado Civil</label>
+                            <input type="text" name="contratado_estado_civil" id="me_contratado_estado_civil" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Nacionalidade</label>
+                            <input type="text" name="contratado_nacionalidade" id="me_contratado_nacionalidade" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Naturalidade</label>
+                            <input type="text" name="contratado_naturalidade" id="me_contratado_naturalidade" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Endereço Completo</label>
+                            <input type="text" name="contratado_endereco" id="me_contratado_endereco" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FUNÇÃO & JORNADA -->
+                <div>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1"><i class="ph ph-briefcase text-emerald-500"></i> Função & Vigência</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Função / Cargo*</label>
+                            <input type="text" name="funcao_nome" id="me_funcao_nome" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Jornada de Trabalho*</label>
+                            <input type="text" name="jornada_trabalho" id="me_jornada_trabalho" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Remuneração Mensal</label>
+                            <input type="text" name="remuneracao" id="me_remuneracao" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Valor por Extenso</label>
+                            <input type="text" name="remuneracao_extenso" id="me_remuneracao_extenso" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Data Início*</label>
+                            <input type="date" name="dt_inicio" id="me_dt_inicio" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Data Término*</label>
+                            <input type="date" name="dt_termino" id="me_dt_termino" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" required>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Data Assinatura*</label>
+                            <input type="date" name="dt_assinatura" id="me_dt_assinatura" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- REPRESENTANTE CONTRATANTE -->
+                <div>
+                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1"><i class="ph ph-buildings text-amber-500"></i> Representante da Contratante</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Nome do Representante</label>
+                            <input type="text" name="representante_nome" id="me_representante_nome" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Cargo / Título</label>
+                            <input type="text" name="representante_cargo" id="me_representante_cargo" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">CPF / RG do Representante</label>
+                            <input type="text" name="representante_rg_cpf" id="me_representante_rg_cpf" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Endereço do Representante</label>
+                            <input type="text" name="representante_endereco" id="me_representante_endereco" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-100 flex justify-end gap-3">
+                    <button type="button" onclick="fecharModalEditar()" class="py-2.5 px-5 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition">Cancelar</button>
+                    <button type="submit" id="btnSubmitEditarContrato" class="py-2.5 px-6 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 shadow-lg shadow-amber-200 transition flex items-center gap-2">
+                        <i class="ph ph-floppy-disk text-lg"></i> Salvar e Imprimir Novo Contrato
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         function filtrarTabela() {
             var input = document.getElementById("inputBusca");
@@ -145,6 +308,73 @@
                     tr[i].style.display = "none";
                 }
             }
+        }
+
+        function abrirModalEditarContrato(c) {
+            document.getElementById('me_contrato_id').value = c.id;
+            document.getElementById('me_num_contrato_title').innerText = c.num_contrato;
+            document.getElementById('me_motivo_edicao').value = c.motivo_edicao || '';
+
+            document.getElementById('me_contratado_nome').value = c.contratado_nome || '';
+            document.getElementById('me_contratado_cpf').value = c.contratado_cpf || '';
+            document.getElementById('me_contratado_rg').value = c.contratado_rg || '';
+            document.getElementById('me_contratado_estado_civil').value = c.contratado_estado_civil || '';
+            document.getElementById('me_contratado_nacionalidade').value = c.contratado_nacionalidade || 'brasileiro(a)';
+            document.getElementById('me_contratado_naturalidade').value = c.contratado_naturalidade || 'piauiense';
+            document.getElementById('me_contratado_endereco').value = c.contratado_endereco || '';
+
+            document.getElementById('me_funcao_nome').value = c.funcao_nome || '';
+            document.getElementById('me_jornada_trabalho').value = c.jornada_trabalho || '';
+            document.getElementById('me_remuneracao').value = c.remuneracao || '';
+            document.getElementById('me_remuneracao_extenso').value = c.remuneracao_extenso || '';
+
+            document.getElementById('me_dt_inicio').value = c.dt_inicio || '';
+            document.getElementById('me_dt_termino').value = c.dt_termino || '';
+            document.getElementById('me_dt_assinatura').value = c.dt_assinatura || c.dt_inicio || '';
+
+            document.getElementById('me_representante_nome').value = c.representante_nome || 'MARIA EDNA DE SOUSA QUARESMA';
+            document.getElementById('me_representante_cargo').value = c.representante_cargo || 'Secretária Municipal de Educação';
+            document.getElementById('me_representante_rg_cpf').value = c.representante_rg_cpf || '676.079.263-72';
+            document.getElementById('me_representante_endereco').value = c.representante_endereco || 'Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI';
+
+            document.getElementById('modalEditarContrato').classList.remove('hidden');
+        }
+
+        function fecharModalEditar() {
+            document.getElementById('modalEditarContrato').classList.add('hidden');
+        }
+
+        function enviarEditarContrato(e) {
+            e.preventDefault();
+            var contratoId = document.getElementById('me_contrato_id').value;
+            var form = document.getElementById('formEditarContrato');
+            var formData = new FormData(form);
+
+            var btn = document.getElementById('btnSubmitEditarContrato');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Salvando...';
+
+            fetch('/contrato/editar/' + contratoId, {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ph ph-floppy-disk text-lg"></i> Salvar e Imprimir Novo Contrato';
+                if (data.success) {
+                    fecharModalEditar();
+                    window.open(data.view_url, '_blank');
+                    window.location.reload();
+                } else {
+                    alert('Erro ao editar contrato: ' + (data.message || 'Erro desconhecido'));
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ph ph-floppy-disk text-lg"></i> Salvar e Imprimir Novo Contrato';
+                alert('Erro ao processar requisição: ' + err);
+            });
         }
     </script>
 </body>
