@@ -563,7 +563,13 @@
                                     </a>
                                     
                                     {% if role == 'admin' or is_admin %}
-                                    {% set c_ex = buscar_contrato_existente(f) %}
+                                    {% set num_ex = mapa_contratos_gerados.get('id_' ~ f.id) or (mapa_contratos_gerados.get('cpf_' ~ f.cpf.strip()) if f.cpf else None) or (mapa_contratos_gerados.get('nome_' ~ f.nome.strip().upper()) if f.nome else None) %}
+                                    
+                                    {% if num_ex %}
+                                    <button type="button" onclick='mostrarAlertaContratoExistente({{ f.nome|tojson }}, {{ num_ex|tojson }})' class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Contrato Já Gerado (Nº {{ num_ex }})">
+                                        <i class="ph ph-file-text text-xl"></i>
+                                    </button>
+                                    {% else %}
                                     <button type="button" onclick='abrirModalGerarContrato({
                                         id: {{ f.id }},
                                         nome: {{ f.nome|tojson }},
@@ -576,12 +582,11 @@
                                         remuneracao: {{ (f.remuneracao or "")|tojson }},
                                         jornada_trabalho: {{ (f.jornada_trabalho or "20")|tojson }},
                                         dt_inicio: {{ (f.dt_inicio.isoformat() if f.dt_inicio else None)|tojson }},
-                                        dt_termino: {{ (f.dt_termino.isoformat() if f.dt_termino else None)|tojson }},
-                                        has_contrato: {{ "true" if c_ex else "false" }},
-                                        num_contrato_existente: {{ (c_ex.num_contrato if c_ex else "")|tojson }}
+                                        dt_termino: {{ (f.dt_termino.isoformat() if f.dt_termino else None)|tojson }}
                                     })' class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Gerar contrato">
                                         <i class="ph ph-file-text text-xl"></i>
                                     </button>
+                                    {% endif %}
 
                                     <button onclick="confirmAction('{{ url_for('excluir_ficha', id=f.id) }}', 'Excluir Ficha', 'Tem certeza que deseja excluir este registro permanentemente?')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Excluir">
                                         <i class="ph ph-trash text-xl"></i>
@@ -1070,11 +1075,15 @@
         }
 
         // --- FUNÇÕES DA GERAÇÃO DE CONTRATO ---
+        function mostrarAlertaContratoExistente(nome, numContrato) {
+            document.getElementById('mce_servidor_nome').innerText = nome || '';
+            document.getElementById('mce_num_contrato').innerText = 'Contrato Nº ' + numContrato;
+            document.getElementById('modalContratoExistente').classList.remove('hidden');
+        }
+
         function abrirModalGerarContrato(f) {
             if (f.has_contrato) {
-                document.getElementById('mce_servidor_nome').innerText = f.nome || '';
-                document.getElementById('mce_num_contrato').innerText = 'Contrato Nº ' + (f.num_contrato_existente || '');
-                document.getElementById('modalContratoExistente').classList.remove('hidden');
+                mostrarAlertaContratoExistente(f.nome, f.num_contrato_existente);
                 return;
             }
 

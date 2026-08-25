@@ -1678,6 +1678,17 @@ def sistema():
     ).first()
     funcao_apoio_id = funcao_apoio.id if funcao_apoio else None
 
+    # Mapeia contratos gerados por funcionario_id, CPF e Nome para identificação direta
+    contratos_gerados_todos = ContratoGerado.query.all()
+    mapa_contratos_gerados = {}
+    for cg in contratos_gerados_todos:
+        if cg.funcionario_id:
+            mapa_contratos_gerados[f"id_{cg.funcionario_id}"] = cg.num_contrato
+        if cg.contratado_cpf and cg.contratado_cpf.strip():
+            mapa_contratos_gerados[f"cpf_{cg.contratado_cpf.strip()}"] = cg.num_contrato
+        if cg.contratado_nome and cg.contratado_nome.strip():
+            mapa_contratos_gerados[f"nome_{cg.contratado_nome.strip().upper()}"] = cg.num_contrato
+
     return render_template(
         "sistema.html",
         nome_usuario=current_user.username,
@@ -1691,6 +1702,7 @@ def sistema():
         role=current_user.role,
         proximo_vinculo_form=proximo_vinculo_form,
         funcao_apoio_id=funcao_apoio_id,
+        mapa_contratos_gerados=mapa_contratos_gerados,
     )
 
 
