@@ -12,7 +12,7 @@
         body {
             font-family: 'Times New Roman', Times, serif;
             color: #000;
-            line-height: 1.5;
+            line-height: 1.6;
             margin: 0;
             padding: 0;
             background-color: #fff;
@@ -72,12 +72,12 @@
     <div class="extrato-content">
         <p class="extrato-text">
             <strong>CONTRATANTE:</strong> Município de Valença do Piauí – Secretaria de Educação. 
-            <strong>CONTRATADO:</strong> <span style="color: #d32f2f;">{{ contrato.contratado_nome }}</span>. 
-            <strong>OBJETO:</strong> Prestação de serviços na função de <span style="color: #d32f2f;">{{ contrato.funcao_nome }}</span>, atendido as determinações da Secretaria Municipal de Educação. 
-            <strong>RECURSOS:</strong> Orçamento Anual do Município do exercício de <span style="color: #d32f2f;">{{ contrato.ano_exercicio }}</span>, mais especificamente dos recursos do Fundo Nacional de Desenvolvimento da Educação (FUNDEB); Fundo de Participação dos Municípios (FPM); do Imposto sobre a Propriedade de Veículos Automotores (IPVA); do Imposto sobre a Circulação de Mercadorias e Serviços (ICMS) e da Arrecadação Própria do Município. 
-            <strong>VALOR:</strong> <span style="color: #d32f2f;">{{ contrato.remuneracao }} ({{ contrato.remuneracao_extenso }}) mensais</span>. 
-            <strong>VIGÊNCIA:</strong> <span style="color: #d32f2f;">{{ contrato.dt_termino_formatada }}</span>. 
-            <strong>DATA DA ASSINATURA:</strong> <span style="color: #d32f2f;">{{ contrato.dt_assinatura_formatada }}</span>.
+            <strong>CONTRATADO:</strong> {{ contrato.contratado_nome }}. 
+            <strong>OBJETO:</strong> Prestação de serviços na função de {{ contrato.funcao_nome }}, atendido as determinações da Secretaria Municipal de Educação. 
+            <strong>RECURSOS:</strong> Orçamento Anual do Município do exercício de {{ contrato.ano_exercicio }}, mais especificamente dos recursos do Fundo Nacional de Desenvolvimento da Educação (FUNDEB); Fundo de Participação dos Municípios (FPM); do Imposto sobre a Propriedade de Veículos Automotores (IPVA); do Imposto sobre a Circulação de Mercadorias e Serviços (ICMS) e da Arrecadação Própria do Município. 
+            <strong>VALOR:</strong> {{ contrato.remuneracao_formatada }} ({{ contrato.remuneracao_extenso }}) mensais. 
+            <strong>VIGÊNCIA:</strong> {{ contrato.dt_termino_formatada }}. 
+            <strong>DATA DA ASSINATURA:</strong> {{ contrato.dt_assinatura_formatada }}.
         </p>
     </div>
 

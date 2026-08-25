@@ -1936,6 +1936,15 @@ def pagina_contratos():
     return render_template("contratos_painel.html", historico=historico)
 
 
+def formatar_remuneracao_rs(valor_str):
+    if not valor_str:
+        return "R$0,00"
+    v = str(valor_str).strip()
+    if not v.startswith("R$"):
+        return f"R${v}"
+    return v
+
+
 @app.route("/contrato/documento/<int:id>")
 @login_required
 def visualizar_contrato_documento(id):
@@ -1956,6 +1965,7 @@ def visualizar_contrato_documento(id):
         "contratado_endereco": contrato.contratado_endereco or "",
         "funcao_nome": contrato.funcao_nome or "",
         "remuneracao": contrato.remuneracao or "",
+        "remuneracao_formatada": formatar_remuneracao_rs(contrato.remuneracao),
         "remuneracao_extenso": contrato.remuneracao_extenso or "",
         "jornada_trabalho": contrato.jornada_trabalho or "",
         "dt_inicio_extenso": formatar_data_extenso(contrato.dt_inicio),
@@ -1986,6 +1996,7 @@ def visualizar_contrato_extrato(id):
         "contratado_nome": contrato.contratado_nome,
         "funcao_nome": contrato.funcao_nome or "",
         "remuneracao": contrato.remuneracao or "",
+        "remuneracao_formatada": formatar_remuneracao_rs(contrato.remuneracao),
         "remuneracao_extenso": contrato.remuneracao_extenso or "",
         "dt_termino_formatada": contrato.dt_termino.strftime("%d/%m/%Y") if contrato.dt_termino else "",
         "dt_assinatura_formatada": contrato.dt_assinatura.strftime("%d/%m/%Y") if contrato.dt_assinatura else (contrato.dt_inicio.strftime("%d/%m/%Y") if contrato.dt_inicio else ""),
