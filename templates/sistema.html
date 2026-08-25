@@ -425,6 +425,7 @@
                                 <select id="jornada_trabalho" name="jornada_trabalho" class="form-input bg-white" required>
                                     <option value="" disabled selected>Selecione a jornada</option>
                                     <option value="20">20 horas</option>
+                                    <option value="30">30 horas</option>
                                     <option value="40">40 horas</option>
                                 </select>
                             </div>
@@ -1059,6 +1060,7 @@
             var j = f.jornada_trabalho || '20';
             if (j.indexOf('horas') === -1) {
                 if (j === '20') j = '20 (vinte) horas semanais';
+                else if (j === '30') j = '30 (trinta) horas semanais';
                 else if (j === '40') j = '40 (quarenta) horas semanais';
                 else j = j + ' horas semanais';
             }

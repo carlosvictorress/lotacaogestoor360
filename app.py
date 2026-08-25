@@ -2181,7 +2181,7 @@ def painel_ponto():
             return None
         try:
             num = int("".join([c for c in str(jornada_str) if c.isdigit()]))
-            if num in (20, 40):
+            if num in (20, 30, 40):
                 return num
         except:
             pass
