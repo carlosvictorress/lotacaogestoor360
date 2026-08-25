@@ -601,30 +601,27 @@
                             {% endfor %}
                         </tbody>
                     </table>
+            <!-- RODAPÉ DO DASHBOARD COM STATUS DO TERMO -->
+            <footer class="mt-12 pt-6 border-t border-slate-200/80 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div id="footer-termo-status">
+                    {% if current_user.termo_aceito %}
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                        <i class="ph ph-shield-check text-sm text-emerald-600"></i>
+                        Termo de Responsabilidade aceito por <strong>{{ current_user.username }}</strong> em {{ current_user.termo_aceito_em.strftime('%d/%m/%Y às %H:%M') if current_user.termo_aceito_em else '' }}
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
+                        <i class="ph ph-warning-circle text-sm text-amber-600"></i>
+                        Termo de Responsabilidade Pendente de Assinatura
+                    </span>
+                    {% endif %}
                 </div>
-            </div>
+                <button type="button" onclick="abrirModalTermoVisualizacao()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold transition text-xs border border-slate-200 shadow-sm">
+                    <i class="ph ph-file-text text-base text-purple-600"></i> Ver Termo de Responsabilidade
+                </button>
+            </footer>
         </div>
     </main>
-
-    <!-- RODAPÉ DO DASHBOARD COM STATUS DO TERMO -->
-    <footer class="max-w-7xl mx-auto px-6 my-8 pt-6 border-t border-slate-200/80 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div id="footer-termo-status">
-            {% if current_user.termo_aceito %}
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                <i class="ph ph-shield-check text-sm text-emerald-600"></i>
-                Termo de Responsabilidade aceito por <strong>{{ current_user.username }}</strong> em {{ current_user.termo_aceito_em.strftime('%d/%m/%Y às %H:%M') if current_user.termo_aceito_em else '' }}
-            </span>
-            {% else %}
-            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-semibold bg-amber-50 text-amber-700 border border-amber-200/80">
-                <i class="ph ph-warning-circle text-sm text-amber-600"></i>
-                Termo de Responsabilidade Pendente de Assinatura
-            </span>
-            {% endif %}
-        </div>
-        <button type="button" onclick="abrirModalTermoVisualizacao()" class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-semibold transition text-xs border border-slate-200 shadow-sm">
-            <i class="ph ph-file-text text-base text-purple-600"></i> Ver Termo de Responsabilidade
-        </button>
-    </footer>
 
     <!-- MODAL TERMO DE RESPONSABILIDADE LGPD -->
     <div id="modal-lgpd-obrigatorio" class="fixed inset-0 bg-black/80 {% if current_user.termo_aceito and not get_flashed_messages(category_filter=['aviso_lgpd']) %}hidden{% endif %} flex items-center justify-center z-[999999] backdrop-blur-sm p-4 font-sans">
