@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Extrato do Contrato Nº {{ contrato.num_contrato }} - {{ contrato.contratado_nome }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm 20mm;
+        }
+
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            color: #000;
+            line-height: 1.5;
+            margin: 0;
+            padding: 0;
+            background-color: #fff;
+            font-size: 11pt;
+        }
+
+        .timbre-header {
+            text-align: center;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+
+        .timbre-header img {
+            width: 100%;
+            max-height: 30mm;
+            object-fit: contain;
+        }
+
+        .extrato-header {
+            text-align: center;
+            font-weight: bold;
+            margin-top: 40px;
+            margin-bottom: 30px;
+            font-size: 12pt;
+            line-height: 1.6;
+        }
+
+        .extrato-content {
+            margin-top: 30px;
+            padding: 0 10px;
+        }
+
+        .extrato-text {
+            text-align: justify;
+            line-height: 1.8;
+            font-size: 11.5pt;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="timbre-header">
+        <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre da Prefeitura">
+    </div>
+
+    <div class="extrato-header">
+        MUNICÍPIO DE VALENÇA DO PIAUÍ – SECRETARIA DE EDUCAÇÃO<br>
+        EXTRATO CONTRATO
+    </div>
+
+    <div class="extrato-content">
+        <p class="extrato-text">
+            <strong>CONTRATANTE:</strong> Município de Valença do Piauí – Secretaria de Educação. 
+            <strong>CONTRATADO:</strong> <span style="color: #d32f2f;">{{ contrato.contratado_nome }}</span>. 
+            <strong>OBJETO:</strong> Prestação de serviços na função de <span style="color: #d32f2f;">{{ contrato.funcao_nome }}</span>, atendido as determinações da Secretaria Municipal de Educação. 
+            <strong>RECURSOS:</strong> Orçamento Anual do Município do exercício de <span style="color: #d32f2f;">{{ contrato.ano_exercicio }}</span>, mais especificamente dos recursos do Fundo Nacional de Desenvolvimento da Educação (FUNDEB); Fundo de Participação dos Municípios (FPM); do Imposto sobre a Propriedade de Veículos Automotores (IPVA); do Imposto sobre a Circulação de Mercadorias e Serviços (ICMS) e da Arrecadação Própria do Município. 
+            <strong>VALOR:</strong> <span style="color: #d32f2f;">{{ contrato.remuneracao }} ({{ contrato.remuneracao_extenso }}) mensais</span>. 
+            <strong>VIGÊNCIA:</strong> <span style="color: #d32f2f;">{{ contrato.dt_termino_formatada }}</span>. 
+            <strong>DATA DA ASSINATURA:</strong> <span style="color: #d32f2f;">{{ contrato.dt_assinatura_formatada }}</span>.
+        </p>
+    </div>
+
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+</body>
+</html>

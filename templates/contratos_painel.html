@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Contratos Gerados - Gestoor 360</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            background: #f8fafc; 
+            -webkit-font-smoothing: antialiased;
+        }
+        .fade-in { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="p-4 md:p-8 bg-slate-50 min-h-screen text-slate-800">
+    <div class="max-w-6xl mx-auto space-y-8">
+        
+        <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-4 pb-2 fade-in" style="animation-delay: 0.05s;">
+            <div>
+                <span class="text-xs font-bold uppercase tracking-widest text-purple-600 bg-purple-50 px-3 py-1 rounded-full">Módulo RH</span>
+                <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 mt-2">Contratos Gerados</h1>
+                <p class="text-slate-500 text-sm mt-0.5 font-medium">Histórico de contratos administrativos e extratos emitidos no sistema</p>
+            </div>
+            <div class="flex gap-3">
+                <a href="{{ url_for('sistema') }}" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white shadow-sm border border-slate-200 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all">
+                    <i class="ph ph-arrow-left font-bold"></i> Voltar ao Sistema
+                </a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="p-4 rounded-xl text-sm font-medium flex items-center gap-3 shadow-sm {{ 'bg-emerald-50 text-emerald-700 border border-emerald-100' if category == 'success' else 'bg-rose-50 text-rose-700 border border-rose-100' }}">
+                    <i class="ph {{ 'ph-check-circle' if category == 'success' else 'ph-warning-circle' }} text-lg"></i>
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden fade-in" style="animation-delay: 0.1s;">
+            <div class="p-6 md:p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center font-bold">
+                        <i class="ph ph-files text-xl"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 tracking-tight">Histórico de Contratos Emitidos</h2>
+                        <p class="text-xs text-slate-400 font-medium">Total de {{ historico|length }} contratos gerados</p>
+                    </div>
+                </div>
+
+                <div class="relative w-full md:w-80">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <i class="ph ph-magnifying-glass"></i>
+                    </div>
+                    <input type="text" id="inputBusca" onkeyup="filtrarTabela()" placeholder="Buscar por Servidor, CPF ou Nº..." 
+                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500">
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left" id="tabelaContratos">
+                    <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 border-b border-slate-100">
+                        <tr>
+                            <th class="px-6 py-4">Nº Contrato</th>
+                            <th class="px-6 py-4">Servidor / CPF</th>
+                            <th class="px-6 py-4">Função</th>
+                            <th class="px-6 py-4">Jornada</th>
+                            <th class="px-6 py-4">Data da Geração</th>
+                            <th class="px-6 py-4">Quem Gerou</th>
+                            <th class="px-6 py-4 text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for c in historico %}
+                        <tr class="hover:bg-slate-50/80 transition-colors">
+                            <td class="px-6 py-4 font-bold text-purple-700">{{ c.num_contrato }}</td>
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-slate-900">{{ c.contratado_nome }}</div>
+                                <div class="text-xs text-slate-400">CPF: {{ c.contratado_cpf or 'N/A' }}</div>
+                            </td>
+                            <td class="px-6 py-4 text-slate-600 font-medium">{{ c.funcao_nome or 'N/A' }}</td>
+                            <td class="px-6 py-4 text-slate-600">{{ c.jornada_trabalho or 'N/A' }}</td>
+                            <td class="px-6 py-4 text-slate-500 text-xs font-semibold">
+                                {{ c.data_geracao.strftime('%d/%m/%Y às %H:%M') if c.data_geracao else 'N/A' }}
+                            </td>
+                            <td class="px-6 py-4 text-slate-600 font-medium">
+                                {{ c.quem_gerou.username if c.quem_gerou else 'Sistema' }}
+                            </td>
+                            <td class="px-6 py-4 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <a href="{{ url_for('visualizar_contrato_documento', id=c.id) }}" target="_blank" 
+                                        class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition" title="Imprimir Contrato Completo (5 Págs)">
+                                        <i class="ph ph-printer text-xl"></i>
+                                    </a>
+                                    <a href="{{ url_for('visualizar_contrato_extrato', id=c.id) }}" target="_blank" 
+                                        class="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Imprimir Apenas Extrato">
+                                        <i class="ph ph-file-text text-xl"></i>
+                                    </a>
+                                    {% if current_user.is_admin %}
+                                    <form action="{{ url_for('excluir_contrato', id=c.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir o registro deste contrato?');" class="inline">
+                                        <button type="submit" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition" title="Excluir Registro">
+                                            <i class="ph ph-trash text-xl"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="px-6 py-12 text-center text-slate-400 font-medium">
+                                <i class="ph ph-files text-4xl block mb-2 text-slate-300"></i>
+                                Nenhum contrato gerado até o momento.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function filtrarTabela() {
+            var input = document.getElementById("inputBusca");
+            var filter = input.value.toUpperCase();
+            var table = document.getElementById("tabelaContratos");
+            var tr = table.getElementsByTagName("tr");
+
+            for (var i = 1; i < tr.length; i++) {
+                var text = tr[i].textContent || tr[i].innerText;
+                if (text.toUpperCase().indexOf(filter) > -1) {
+                    tr[i].style.display = "";
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -245,6 +245,128 @@ class RescisaoHistorico(db.Model):
     data_geracao = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class ContratoGerado(db.Model):
+    __tablename__ = "contrato_gerado"
+    id = db.Column(db.Integer, primary_key=True)
+    num_contrato = db.Column(db.String(50), nullable=False)
+    ano_exercicio = db.Column(db.Integer, nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey("funcionario.id"), nullable=True)
+    funcionario = db.relationship("Funcionario", backref="contratos_gerados")
+
+    # Contratado (Snapshot dos dados do Servidor)
+    contratado_nome = db.Column(db.String(150), nullable=False)
+    contratado_cpf = db.Column(db.String(14))
+    contratado_rg = db.Column(db.String(20))
+    contratado_nacionalidade = db.Column(db.String(50), default="brasileiro(a)")
+    contratado_naturalidade = db.Column(db.String(50), default="piauiense")
+    contratado_estado_civil = db.Column(db.String(50))
+    contratado_endereco = db.Column(db.String(200))
+    contratado_cidade = db.Column(db.String(100), default="Valença do Piauí")
+
+    # Contrato
+    funcao_nome = db.Column(db.String(100))
+    remuneracao = db.Column(db.String(50))
+    remuneracao_extenso = db.Column(db.String(200))
+    jornada_trabalho = db.Column(db.String(100))
+    dt_inicio = db.Column(db.Date)
+    dt_termino = db.Column(db.Date)
+    dt_assinatura = db.Column(db.Date)
+
+    # Contratante (Representante Oficial)
+    representante_nome = db.Column(db.String(150), default="MARIA EDNA DE SOUSA QUARESMA")
+    representante_cargo = db.Column(db.String(100), default="Secretária Municipal de Educação")
+    representante_rg_cpf = db.Column(db.String(50), default="676.079.263-72")
+    representante_endereco = db.Column(db.String(200), default="Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI")
+
+    # Audit Metadados
+    data_geracao = db.Column(db.DateTime, default=datetime.utcnow)
+    quem_gerou_id = db.Column(db.Integer, db.ForeignKey("user.id"))
+    quem_gerou = db.relationship("User")
+
+
+def gerar_proximo_numero_contrato(ano=None):
+    if not ano:
+        ano = datetime.now().year
+    try:
+        contratos = ContratoGerado.query.filter_by(ano_exercicio=int(ano)).all()
+        max_num = 0
+        for c in contratos:
+            if c.num_contrato and '/' in c.num_contrato:
+                try:
+                    num_part = int(c.num_contrato.split('/')[0])
+                    if num_part > max_num:
+                        max_num = num_part
+                except ValueError:
+                    pass
+        proximo = max_num + 1
+        return f"{proximo:02d}/{ano}"
+    except Exception:
+        return f"01/{ano}"
+
+
+def converter_valor_extenso(valor_str):
+    if not valor_str:
+        return ""
+    try:
+        v_clean = str(valor_str).replace("R$", "").replace(".", "").replace(",", ".").strip()
+        v_float = float(v_clean)
+        inteiro = int(v_float)
+        centavos = round((v_float - inteiro) * 100)
+        
+        unidades = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "oito", "nove"]
+        teens = ["dez", "onze", "doze", "treze", "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove"]
+        dezenas = ["", "", "vinte", "trinta", "quarenta", "cinquenta", "sessenta", "setenta", "oitenta", "noventa"]
+        centenas = ["", "cento", "duzentos", "trezentos", "quatrocentos", "quinhentos", "seiscentos", "setecentos", "oitocentos", "novecentos"]
+        
+        def _num_3(n):
+            if n == 0: return ""
+            if n == 100: return "cem"
+            c = n // 100
+            d = (n % 100) // 10
+            u = n % 10
+            res = []
+            if c > 0: res.append(centenas[c])
+            if d == 1: res.append(teens[u])
+            else:
+                if d > 1: res.append(dezenas[d])
+                if u > 0: res.append(unidades[u])
+            return " e ".join(res)
+
+        if inteiro == 0 and centavos == 0:
+            return "zero reais"
+            
+        partes = []
+        milhares = inteiro // 1000
+        resto = inteiro % 1000
+        
+        if milhares > 0:
+            if milhares == 1:
+                partes.append("um mil")
+            else:
+                partes.append(_num_3(milhares) + " mil")
+        if resto > 0:
+            partes.append(_num_3(resto))
+            
+        extenso_reais = " e ".join(partes) + (" real" if inteiro == 1 else " reais")
+        
+        if centavos > 0:
+            extenso_centavos = _num_3(centavos) + (" centavo" if centavos == 1 else " centavos")
+            return f"{extenso_reais} e {extenso_centavos}"
+        return extenso_reais
+    except Exception:
+        return ""
+
+
+def formatar_data_extenso(dt):
+    if not dt:
+        return ""
+    meses = [
+        "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+        "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"
+    ]
+    return f"{dt.day:02d} de {meses[dt.month - 1]} de {dt.year}"
+
+
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
@@ -1711,8 +1833,189 @@ def atualizar_schema():
                         conn.execute(text("UPDATE funcionario SET funcao_id = :id_novo WHERE funcao_id = :id_antigo"), {"id_novo": id_novo, "id_antigo": id_antigo})
                         conn.execute(text("DELETE FROM funcao WHERE id = :id_antigo"), {"id_antigo": id_antigo})
                     conn.commit()
+            # Garantir que a nova tabela contrato_gerado seja criada
+            try:
+                db.create_all()
             except Exception as e:
-                conn.rollback()
+                pass
+
+
+@app.route("/api/proximo_numero_contrato")
+@login_required
+def api_proximo_numero_contrato():
+    ano = request.args.get("ano", type=int) or datetime.now().year
+    proximo = gerar_proximo_numero_contrato(ano)
+    return {"num_contrato": proximo}
+
+
+@app.route("/gerar_contrato", methods=["POST"])
+@login_required
+def processar_gerar_contrato():
+    try:
+        funcionario_id = request.form.get("funcionario_id", type=int)
+        num_contrato = request.form.get("num_contrato")
+        dt_inicio_str = request.form.get("dt_inicio")
+        dt_termino_str = request.form.get("dt_termino")
+        dt_assinatura_str = request.form.get("dt_assinatura")
+        
+        contratado_nome = request.form.get("contratado_nome", "").strip()
+        contratado_cpf = request.form.get("contratado_cpf", "").strip()
+        contratado_rg = request.form.get("contratado_rg", "").strip()
+        contratado_nacionalidade = request.form.get("contratado_nacionalidade", "brasileiro(a)").strip()
+        contratado_naturalidade = request.form.get("contratado_naturalidade", "piauiense").strip()
+        contratado_estado_civil = request.form.get("contratado_estado_civil", "solteiro(a)").strip()
+        contratado_endereco = request.form.get("contratado_endereco", "").strip()
+        
+        funcao_nome = request.form.get("funcao_nome", "").strip()
+        jornada_trabalho = request.form.get("jornada_trabalho", "").strip()
+        remuneracao = request.form.get("remuneracao", "").strip()
+        remuneracao_extenso = request.form.get("remuneracao_extenso", "").strip()
+        
+        representante_nome = request.form.get("representante_nome", "MARIA EDNA DE SOUSA QUARESMA").strip()
+        representante_cargo = request.form.get("representante_cargo", "Secretária Municipal de Educação").strip()
+        representante_rg_cpf = request.form.get("representante_rg_cpf", "676.079.263-72").strip()
+        representante_endereco = request.form.get("representante_endereco", "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI").strip()
+
+        dt_inicio = parse_date(dt_inicio_str) if dt_inicio_str else date.today()
+        dt_termino = parse_date(dt_termino_str) if dt_termino_str else None
+        dt_assinatura = parse_date(dt_assinatura_str) if dt_assinatura_str else (dt_inicio or date.today())
+        
+        ano_exercicio = dt_inicio.year if dt_inicio else datetime.now().year
+        
+        if not num_contrato:
+            num_contrato = gerar_proximo_numero_contrato(ano_exercicio)
+
+        novo_contrato = ContratoGerado(
+            num_contrato=num_contrato,
+            ano_exercicio=ano_exercicio,
+            funcionario_id=funcionario_id,
+            contratado_nome=contratado_nome,
+            contratado_cpf=contratado_cpf,
+            contratado_rg=contratado_rg,
+            contratado_nacionalidade=contratado_nacionalidade,
+            contratado_naturalidade=contratado_naturalidade,
+            contratado_estado_civil=contratado_estado_civil,
+            contratado_endereco=contratado_endereco,
+            funcao_nome=funcao_nome,
+            remuneracao=remuneracao,
+            remuneracao_extenso=remuneracao_extenso,
+            jornada_trabalho=jornada_trabalho,
+            dt_inicio=dt_inicio,
+            dt_termino=dt_termino,
+            dt_assinatura=dt_assinatura,
+            representante_nome=representante_nome,
+            representante_cargo=representante_cargo,
+            representante_rg_cpf=representante_rg_cpf,
+            representante_endereco=representante_endereco,
+            quem_gerou_id=current_user.id,
+            data_geracao=datetime.utcnow()
+        )
+
+        db.session.add(novo_contrato)
+        db.session.commit()
+
+        registrar_log("Gerou Contrato", f"Contrato Nº {num_contrato} - {contratado_nome}")
+
+        return {
+            "success": True,
+            "contrato_id": novo_contrato.id,
+            "view_url": url_for("visualizar_contrato_documento", id=novo_contrato.id)
+        }
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
+
+
+@app.route("/contratos")
+@login_required
+def pagina_contratos():
+    historico = ContratoGerado.query.order_by(ContratoGerado.data_geracao.desc()).all()
+    return render_template("contratos_painel.html", historico=historico)
+
+
+@app.route("/contrato/documento/<int:id>")
+@login_required
+def visualizar_contrato_documento(id):
+    contrato = db.session.get(ContratoGerado, id)
+    if not contrato:
+        return "Contrato não encontrado", 404
+
+    contrato_dict = {
+        "id": contrato.id,
+        "num_contrato": contrato.num_contrato,
+        "ano_exercicio": contrato.ano_exercicio,
+        "contratado_nome": contrato.contratado_nome,
+        "contratado_cpf": contrato.contratado_cpf or "",
+        "contratado_rg": contrato.contratado_rg or "",
+        "contratado_nacionalidade": contrato.contratado_nacionalidade or "brasileiro(a)",
+        "contratado_naturalidade": contrato.contratado_naturalidade or "piauiense",
+        "contratado_estado_civil": contrato.contratado_estado_civil or "solteiro(a)",
+        "contratado_endereco": contrato.contratado_endereco or "",
+        "funcao_nome": contrato.funcao_nome or "",
+        "remuneracao": contrato.remuneracao or "",
+        "remuneracao_extenso": contrato.remuneracao_extenso or "",
+        "jornada_trabalho": contrato.jornada_trabalho or "",
+        "dt_inicio_extenso": formatar_data_extenso(contrato.dt_inicio),
+        "dt_termino_extenso": formatar_data_extenso(contrato.dt_termino),
+        "dt_assinatura_extenso": formatar_data_extenso(contrato.dt_assinatura or contrato.dt_inicio),
+        "dt_termino_formatada": contrato.dt_termino.strftime("%d/%m/%Y") if contrato.dt_termino else "",
+        "dt_assinatura_formatada": contrato.dt_assinatura.strftime("%d/%m/%Y") if contrato.dt_assinatura else (contrato.dt_inicio.strftime("%d/%m/%Y") if contrato.dt_inicio else ""),
+        "representante_nome": contrato.representante_nome,
+        "representante_cargo": contrato.representante_cargo,
+        "representante_rg_cpf": contrato.representante_rg_cpf,
+        "representante_endereco": contrato.representante_endereco,
+    }
+
+    return render_template("contrato_documento.html", contrato=contrato_dict)
+
+
+@app.route("/contrato/extrato/<int:id>")
+@login_required
+def visualizar_contrato_extrato(id):
+    contrato = db.session.get(ContratoGerado, id)
+    if not contrato:
+        return "Contrato não encontrado", 404
+
+    contrato_dict = {
+        "id": contrato.id,
+        "num_contrato": contrato.num_contrato,
+        "ano_exercicio": contrato.ano_exercicio,
+        "contratado_nome": contrato.contratado_nome,
+        "funcao_nome": contrato.funcao_nome or "",
+        "remuneracao": contrato.remuneracao or "",
+        "remuneracao_extenso": contrato.remuneracao_extenso or "",
+        "dt_termino_formatada": contrato.dt_termino.strftime("%d/%m/%Y") if contrato.dt_termino else "",
+        "dt_assinatura_formatada": contrato.dt_assinatura.strftime("%d/%m/%Y") if contrato.dt_assinatura else (contrato.dt_inicio.strftime("%d/%m/%Y") if contrato.dt_inicio else ""),
+    }
+
+    return render_template("contrato_extrato.html", contrato=contrato_dict)
+
+
+@app.route("/contrato/excluir/<int:id>", methods=["POST"])
+@login_required
+def excluir_contrato(id):
+    if not current_user.is_admin:
+        flash("Apenas administradores podem excluir registros de contratos.", "danger")
+        return redirect(url_for("pagina_contratos"))
+
+    contrato = db.session.get(ContratoGerado, id)
+    if not contrato:
+        flash("Contrato não encontrado.", "danger")
+        return redirect(url_for("pagina_contratos"))
+
+    try:
+        num = contrato.num_contrato
+        nome = contrato.contratado_nome
+        db.session.delete(contrato)
+        db.session.commit()
+        registrar_log("Excluiu Contrato", f"Contrato Nº {num} - {nome}")
+        flash(f"Contrato Nº {num} excluído com sucesso.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Erro ao excluir contrato: {str(e)}", "danger")
+
+    return redirect(url_for("pagina_contratos"))
+
 
 @app.route("/imprimir_encaminhamento/<int:id>")
 @login_required

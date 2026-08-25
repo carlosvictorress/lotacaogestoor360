@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Contrato Administrativo Nº {{ contrato.num_contrato }} - {{ contrato.contratado_nome }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm 20mm 15mm 20mm;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            color: #000;
+            line-height: 1.4;
+            margin: 0;
+            padding: 0;
+            background-color: #fff;
+            font-size: 11pt;
+        }
+
+        .page {
+            position: relative;
+            width: 100%;
+            min-height: 260mm;
+            page-break-after: always;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .page:last-of-type {
+            page-break-after: avoid;
+        }
+
+        .timbre-header {
+            text-align: center;
+            margin-bottom: 12px;
+            width: 100%;
+        }
+
+        .timbre-header img {
+            width: 100%;
+            max-height: 28mm;
+            object-fit: contain;
+        }
+
+        .title-section {
+            text-align: center;
+            font-weight: bold;
+            font-size: 12pt;
+            margin-bottom: 12px;
+        }
+
+        .summary-box {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 15px;
+        }
+
+        .summary-text {
+            width: 55%;
+            font-size: 9.5pt;
+            font-weight: bold;
+            text-align: justify;
+            line-height: 1.3;
+        }
+
+        .content-paragraph {
+            text-align: justify;
+            text-indent: 2em;
+            margin-bottom: 12px;
+            font-size: 11pt;
+        }
+
+        .section-heading {
+            font-weight: bold;
+            font-size: 11pt;
+            margin-top: 10px;
+            margin-bottom: 6px;
+        }
+
+        .clause {
+            text-align: justify;
+            margin-bottom: 10px;
+            font-size: 11pt;
+        }
+
+        .paragraph-inner {
+            text-align: justify;
+            margin-bottom: 10px;
+            font-size: 11pt;
+        }
+
+        .item-list {
+            text-align: justify;
+            margin-left: 20px;
+            margin-bottom: 6px;
+            font-size: 11pt;
+        }
+
+        .date-line {
+            text-align: center;
+            font-weight: bold;
+            color: #d32f2f; /* Destaque vermelho conforme original */
+            margin-top: 25px;
+            margin-bottom: 40px;
+        }
+
+        .signatures-container {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        .signature-box {
+            margin: 0 auto 35px auto;
+            width: 380px;
+        }
+
+        .signature-line {
+            border-top: 1px solid #000;
+            margin-bottom: 5px;
+        }
+
+        .witnesses-section {
+            margin-top: 25px;
+            font-size: 11pt;
+        }
+
+        .witness-line {
+            margin-top: 15px;
+        }
+
+        /* ESTILOS DA PÁGINA DE EXTRATO */
+        .extrato-header {
+            text-align: center;
+            font-weight: bold;
+            margin-top: 30px;
+            margin-bottom: 25px;
+            font-size: 11pt;
+            line-height: 1.5;
+        }
+
+        .extrato-content {
+            margin-top: 20px;
+        }
+
+        .extrato-text {
+            text-align: justify;
+            line-height: 1.6;
+            font-size: 11pt;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PÁGINA 1: CONTRATO ADMINISTRATIVO -->
+    <div class="page">
+        <div class="timbre-header">
+            <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre da Prefeitura">
+        </div>
+
+        <div class="title-section">
+            CONTRATO ADMINISTRATIVO Nº {{ contrato.num_contrato }}
+        </div>
+
+        <div class="summary-box">
+            <div class="summary-text">
+                CONTRATO DE PRESTAÇÃO DE SERVIÇOS TEMPORÁRIO FIRMADO ENTRE O MUNICÍPIO DE VALENÇA DO PIAUÍ – SECRETARIA DE EDUCAÇÃO E <span style="color: #d32f2f;">{{ contrato.contratado_nome|upper }}</span> PARA ATUAÇÃO COMO <span style="color: #d32f2f;">{{ contrato.funcao_nome|upper }}</span>, NOS TERMOS DO ART. 37, INCISO IX DA CONSTITUIÇÃO FEDERAL.
+            </div>
+        </div>
+
+        <p class="content-paragraph">
+            Pelo presente instrumento particular, de um lado o <strong>MUNICÍPIO DE VALENÇA DO PIAUI – SECRETARIA DE EDUCAÇÃO</strong>, CNPJ de Nº 06.095.146/0001-44, com sede na Rua Epaminondas Nogueira, n°1425, Bairro São Francisco, na cidade de Valença do Piauí-PI, representada neste ato pela Secretária Municipal de Educação a Sr.ª <span style="color: #d32f2f;">{{ contrato.representante_nome }}</span>, CPF/RG de nº <span style="color: #d32f2f;">{{ contrato.representante_rg_cpf }}</span>, residente e domiciliada na <span style="color: #d32f2f;">{{ contrato.representante_endereco }}</span>, doravante denominado <strong>CONTRATANTE</strong>, e de outro lado o Sr(a). <span style="color: #d32f2f;">{{ contrato.contratado_nome }}</span> <span style="color: #d32f2f;">{{ contrato.contratado_nacionalidade }}</span>, <span style="color: #d32f2f;">{{ contrato.contratado_naturalidade }}</span>, <span style="color: #d32f2f;">{{ contrato.contratado_estado_civil }}</span>, inscrito com RG nº <span style="color: #d32f2f;">{{ contrato.contratado_rg }}</span> e CPF nº <span style="color: #d32f2f;">{{ contrato.contratado_cpf }}</span> residente e domiciliado na <span style="color: #d32f2f;">{{ contrato.contratado_endereco }}</span>, doravante denominado <strong>CONTRATADO</strong> têm, entre si, justo e contratado, com base no que dispõe o Art. 37, inciso IX da Constituição Federal, mediante as cláusulas e condições que seguem:
+        </p>
+
+        <div class="section-heading">1 – DO OBJETO</div>
+        <p class="clause"><strong>CLÁUSULA PRIMEIRA</strong> – O objeto do presente contrato é a contratação do Servidor Temporário para atender ao Excepcional Interesse Público, para a prestação de serviços na função de {{ contrato.funcao_nome }}, atendido as determinações da Secretaria Municipal de Educação, conforme Constituição Federal, artigo 37, inciso IX.</p>
+        <p class="paragraph-inner"><strong>PARÁGRAFO ÚNICO</strong> - Os trabalhos serão desenvolvidos em estrita observância às cláusulas deste contrato, principalmente no tocante às obrigações do CONTRATADO.</p>
+
+        <div class="section-heading">2 – DO PREÇO</div>
+        <p class="clause"><strong>CLÁUSULA SEGUNDA</strong> – A CONTRATANTE pagará ao CONTRATADO o valor mensal de <span style="color: #d32f2f;">{{ contrato.remuneracao }} ({{ contrato.remuneracao_extenso }})</span>.</p>
+        <p class="clause">Pelos serviços contratados, estando incluídos nos mesmos todos os insumos, taxas, encargos e demais despesas;</p>
+
+        <div class="section-heading">3 – DA JORNADA DE TRABALHO</div>
+        <p class="clause"><strong>CLÁUSULA TERCEIRA</strong> - A jornada de trabalho do CONTRATADO durante a vigência do presente contrato é de <span style="color: #d32f2f;">{{ contrato.jornada_trabalho }}</span>;</p>
+
+        <div class="section-heading">4 – DO PRAZO</div>
+        <p class="clause"><strong>CLÁUSULA QUARTA</strong> – O contratado trabalhará em caráter de excepcionalidade, contados a partir de <span style="color: #d32f2f;">{{ contrato.dt_inicio_extenso }} a {{ contrato.dt_termino_extenso }}</span>.</p>
+    </div>
+
+    <!-- PÁGINA 2 -->
+    <div class="page">
+        <div class="timbre-header">
+            <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre da Prefeitura">
+        </div>
+
+        <p class="paragraph-inner" style="margin-top: 10px;"><strong>PARÁGRAFO ÚNICO</strong> - O presente contrato poderá ser rescindido a qualquer tempo por acordo entre as partes, ou unilateralmente pela CONTRATANTE no caso de o CONTRATADO deixar de cumprir qualquer uma das suas cláusulas, devendo prevalecer em todos os casos o interesse público.</p>
+
+        <div class="section-heading">5 – DA EXECUÇÃO DOS SERVIÇOS</div>
+        <p class="clause"><strong>CLÁUSULA QUINTA</strong> – Na execução dos serviços o CONTRATADO se obriga a respeitar, rigorosamente, durante o período de vigência deste contrato as normas de higiene e segurança, por cujos encargos responderá unilateralmente, devendo observar também os requisitos de qualidade, determinados pelo CONTRATANTE, através do setor responsável pela fiscalização, aprovação e liberação do serviço.</p>
+        <p class="paragraph-inner"><strong>PARÁGRAFO ÚNICO</strong>: O CONTRATADO, sem prejuízo de sua responsabilidade, deverá comunicar à fiscalização do CONTRATANTE, por escrito, qualquer anormalidade verificada na execução ou no controle dos serviços, bem como qualquer fato que possa colocar em risco a segurança e a qualidade dos mesmos e sua execução dentro do prazo pactuado.</p>
+
+        <div class="section-heading">6 – DAS OBRIGAÇÕES DO CONTRATANTE</div>
+        <p class="clause"><strong>CLÁUSULA SEXTA</strong> – São obrigações da CONTRATANTE:</p>
+        <p class="item-list">I - Fornecer elementos necessários à realização do objeto deste contrato;</p>
+        <p class="item-list">II - Receber os serviços, procedendo-lhe a vistoria necessária e compatível com o objeto deste;</p>
+        <p class="item-list">III - Efetuar a retenção da contribuição previdenciária obrigatória sobre sua remuneração, para os fins da Lei 8212/91 e Lei 8213/91.</p>
+
+        <div class="section-heading">7 – DAS OBRIGAÇÕES DO CONTRATADO</div>
+        <p class="clause"><strong>CLÁUSULA SÉTIMA</strong> - São obrigações do CONTRATADO:</p>
+        <p class="item-list">I - Todas as despesas referentes ao objeto deste contrato, mão de obra, locomoção, seguro de acidente, impostos federais, estaduais e municipais, contribuições previdenciárias, encargos trabalhistas e quaisquer outras que forem devidas, relativamente a execução dos serviços ora contratado;</p>
+        <p class="item-list">II - Executar serviços ora contratados com esmero e dentro da melhor técnica, responsabilizando-se por quaisquer erros, falhas ou imperfeições que por ventura ocorram;</p>
+        <p class="item-list">III - Responsabilizar-se pelos danos causados diretamente à Administração ou a terceiros, decorrentes de seus serviços;</p>
+        <p class="item-list">IV - Sujeitar-se a mais ampla e irrestrita fiscalização por parte do CONTRATANTE, prestando todos os esclarecimentos solicitados e atendendo as reclamações solicitadas;</p>
+    </div>
+
+    <!-- PÁGINA 3 -->
+    <div class="page">
+        <div class="timbre-header">
+            <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre da Prefeitura">
+        </div>
+
+        <div class="section-heading" style="margin-top: 10px;">8 – DA DOTAÇÃO ORÇAMENTÁRIA</div>
+        <p class="clause"><strong>CLÁUSULA OITAVA</strong> - As despesas decorrentes do presente contrato correrão por conta de recursos orçamentários consignados no Orçamento Anual do Município do exercício de <span style="color: #d32f2f;">{{ contrato.ano_exercicio }}</span>, mais especificamente dos recursos do Fundo Nacional de Desenvolvimento da Educação (FUNDEB); Fundo de Participação dos Municípios (FPM); do Imposto sobre a Propriedade de Veículos Automotores (IPVA); do Imposto sobre a Circulação de Mercadorias e Serviços (ICMS) e da Arrecadação Própria do Município.</p>
+
+        <div class="section-heading">9 – DAS PENALIDADES</div>
+        <p class="clause"><strong>CLÁUSULA NONA</strong> – Se o CONTRATADO não satisfazer os compromissos assumidos serão aplicadas as penalidades previstas na Lei Municipal n.º 861/97(Estatuto dos Servidores Públicos do Município de Valença do Piauí).</p>
+
+        <div class="section-heading">10 – DA RESCISÃO</div>
+        <p class="clause"><strong>CLÁUSULA DÉCIMA</strong> – Este contrato estará rescindido, automaticamente:</p>
+        <p class="item-list">a) No final do prazo estipulado na Cláusula Quarta, desde que não tenha ocorrido prorrogação;</p>
+        <p class="item-list">b) Se a parte CONTRATADA incidir em qualquer das faltas arroladas no Estatuto dos Servidores Públicos do Município de Valença do Piauí.</p>
+
+        <div class="section-heading">11 - DAS DISPOSIÇÕES GERAIS</div>
+        <p class="clause"><strong>CLÁUSULA DÉCIMA PRIMEIRA</strong> - Além das cláusulas que compõem o presente contrato, ficam sujeitos também, às normas previstas na Lei Municipal n.º 861/97 (Estatuto dos Servidores Públicos do Município de Valença do Piauí).</p>
+        <p class="paragraph-inner"><strong>PARÁGRAFO PRIMEIRO</strong> – O CONTRATADO assume exclusiva responsabilidade pelo cumprimento de todas as obrigações decorrentes da execução deste contrato, sejam estas de natureza trabalhistas, previdenciária, civil ou fiscal, inexistindo solidariedade do CONTRATANTE relativamente a esses encargos, inclusive os que eventualmente advirem de prejuízos causados a terceiros.</p>
+        <p class="paragraph-inner"><strong>PARÁGRAFO SEGUNDO</strong> – O CONTRATADO assumirá inteira responsabilidade por todos os prejuízos que venha, dolosa ou culposamente, causar ao Município quando da prestação dos serviços.</p>
+        <p class="paragraph-inner"><strong>PARÁGRAFO TERCEIRO</strong> – O CONTRATADO prestará todos os esclarecimentos que forem solicitados pelo Município, cujas reclamações se obrigam a atender, prontamente, mantendo um representante ou preposto com poderes para com o Município.</p>
+        <p class="paragraph-inner"><strong>PARÁGRAFO QUARTO</strong> – No caso de recusa no atendimento de qualquer reclamação, independentemente das sanções cabíveis, o Município poderá confiar a outrem a prestação dos serviços não executados, notificando brevemente ao CONTRATADO, descontando o seu custo de uma</p>
+    </div>
+
+    <!-- PÁGINA 4 -->
+    <div class="page">
+        <div class="timbre-header">
+            <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre da Prefeitura">
+        </div>
+
+        <p class="paragraph-inner" style="margin-top: 10px;">só vez, no primeiro pagamento subsequente ou no valor da garantia, sem que a mesma possa impugnar seu valor.</p>
+
+        <div class="section-heading">12 – DO FORO</div>
+        <p class="clause"><strong>CLÁUSULA DÉCIMA SEGUNDA</strong> - Fica eleito o FORO da Comarca de Valença do Piauí – PI, com expressa renúncia de qualquer outro, para serem dirimidas quaisquer dúvidas pertinentes ao presente contrato.</p>
+        <p class="clause">As partes firmam o presente instrumento em 02 (duas) vias de igual teor e forma, obrigando-se por si e seus sucessores, ao fiel cumprimento do que ora ficou ajustado, elegendo-o.</p>
+
+        <p class="date-line">Valença do Piauí/PI, {{ contrato.dt_assinatura_extenso }}.</p>
+
+        <div class="signatures-container">
+            <div class="signature-box">
+                <div class="signature-line"></div>
+                <strong>Município de Valença do Piauí – Secretaria de Educação</strong>
+            </div>
+            <div class="signature-box" style="margin-top: 45px;">
+                <div class="signature-line"></div>
+                <strong>Contratado</strong>
+            </div>
+        </div>
+
+        <div class="witnesses-section">
+            <strong>Testemunhas:</strong>
+            <div class="witness-line">Nome: ___________________________.</div>
+            <div class="witness-line">CPF: ____________________________.</div>
+            <div class="witness-line" style="margin-top: 20px;">Nome: ___________________________.</div>
+            <div class="witness-line">CPF: ____________________________.</div>
+        </div>
+    </div>
+
+    <!-- PÁGINA 5: EXTRATO DO CONTRATO -->
+    <div class="page">
+        <div class="timbre-header">
+            <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre da Prefeitura">
+        </div>
+
+        <div class="extrato-header">
+            MUNICÍPIO DE VALENÇA DO PIAUÍ – SECRETARIA DE EDUCAÇÃO<br>
+            EXTRATO CONTRATO
+        </div>
+
+        <div class="extrato-content">
+            <p class="extrato-text">
+                <strong>CONTRATANTE:</strong> Município de Valença do Piauí – Secretaria de Educação. 
+                <strong>CONTRATADO:</strong> <span style="color: #d32f2f;">{{ contrato.contratado_nome }}</span>. 
+                <strong>OBJETO:</strong> Prestação de serviços na função de <span style="color: #d32f2f;">{{ contrato.funcao_nome }}</span>, atendido as determinações da Secretaria Municipal de Educação. 
+                <strong>RECURSOS:</strong> Orçamento Anual do Município do exercício de <span style="color: #d32f2f;">{{ contrato.ano_exercicio }}</span>, mais especificamente dos recursos do Fundo Nacional de Desenvolvimento da Educação (FUNDEB); Fundo de Participação dos Municípios (FPM); do Imposto sobre a Propriedade de Veículos Automotores (IPVA); do Imposto sobre a Circulação de Mercadorias e Serviços (ICMS) e da Arrecadação Própria do Município. 
+                <strong>VALOR:</strong> <span style="color: #d32f2f;">{{ contrato.remuneracao }} ({{ contrato.remuneracao_extenso }}) mensais</span>. 
+                <strong>VIGÊNCIA:</strong> <span style="color: #d32f2f;">{{ contrato.dt_termino_formatada }}</span>. 
+                <strong>DATA DA ASSINATURA:</strong> <span style="color: #d32f2f;">{{ contrato.dt_assinatura_formatada }}</span>.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+</body>
+</html>

@@ -230,6 +230,7 @@
                     </div>
                 </div>
                 <div class="text-right hidden sm:block"><p class="text-xs font-semibold text-gray-900">{{ nome_usuario }}</p><p class="text-[10px] text-gray-500">{% if role == 'admin' or is_admin %} ADMINISTRADOR {% elif role == 'rh_supervisor' %} SUPERVISOR {% else %} RH SECRETARIA {% endif %}</p></div>
+                <a href="{{ url_for('pagina_contratos') }}" class="text-xs font-medium text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-lg transition border border-purple-100 flex items-center gap-1" title="Contratos Gerados"><i class="ph ph-files text-sm"></i> Contratos Gerados</a>
                 {% if role == 'admin' or is_admin or role == 'rh_supervisor' %}<a href="{{ url_for('admin_dashboard') }}" class="text-xs font-medium text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition border border-blue-100">Painel Admin</a>{% endif %}
                 <button onclick="confirmAction('{{ url_for('logout') }}', 'Sair do Sistema', 'Tem certeza que deseja encerrar sua sessão?')" class="text-xs font-medium text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition border border-red-100">Sair</button>
             </div>
@@ -557,6 +558,23 @@
                                     <a href="{{ url_for('imprimir_encaminhamento', id=f.id) }}" target="_blank" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg" title="Imprimir Encaminhamento">
                                         <i class="ph ph-paper-plane-tilt text-xl"></i>
                                     </a>
+                                    
+                                    <button type="button" onclick='abrirModalGerarContrato({
+                                        id: {{ f.id }},
+                                        nome: {{ f.nome|tojson }},
+                                        cpf: {{ f.cpf|tojson }},
+                                        rg: {{ f.rg|tojson }},
+                                        nacionalidade: {{ (f.nacionalidade or "BRASILEIRA")|tojson }},
+                                        estado_civil: {{ (f.estado_civil or "")|tojson }},
+                                        endereco: {{ (f.endereco or "")|tojson }},
+                                        funcao_nome: {{ (f.funcao.nome if f.funcao else "")|tojson }},
+                                        remuneracao: {{ (f.remuneracao or "")|tojson }},
+                                        jornada_trabalho: {{ (f.jornada_trabalho or "20")|tojson }},
+                                        dt_inicio: {{ (f.dt_inicio.isoformat() if f.dt_inicio else None)|tojson }},
+                                        dt_termino: {{ (f.dt_termino.isoformat() if f.dt_termino else None)|tojson }}
+                                    })' class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg" title="Gerar contrato">
+                                        <i class="ph ph-file-text text-xl"></i>
+                                    </button>
 
                                     {% if role == 'admin' or is_admin %}
                                     <button onclick="confirmAction('{{ url_for('excluir_ficha', id=f.id) }}', 'Excluir Ficha', 'Tem certeza que deseja excluir este registro permanentemente?')" class="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Excluir">
@@ -1022,6 +1040,248 @@
                 }
             }
         }
+
+        // --- FUNÇÕES DA GERAÇÃO DE CONTRATO ---
+        function abrirModalGerarContrato(f) {
+            document.getElementById('mc_funcionario_id').value = f.id || '';
+            document.getElementById('mc_contratado_nome').value = f.nome || '';
+            document.getElementById('mc_contratado_cpf').value = f.cpf || '';
+            document.getElementById('mc_contratado_rg').value = f.rg || '';
+            document.getElementById('mc_contratado_estado_civil').value = f.estado_civil || 'solteiro(a)';
+            document.getElementById('mc_contratado_nacionalidade').value = f.nacionalidade || 'brasileiro(a)';
+            document.getElementById('mc_contratado_naturalidade').value = 'piauiense';
+            document.getElementById('mc_contratado_endereco').value = f.endereco || '';
+            
+            document.getElementById('mc_funcao_nome').value = f.funcao_nome || '';
+            
+            var j = f.jornada_trabalho || '20';
+            if (j.indexOf('horas') === -1) {
+                if (j === '20') j = '20 (vinte) horas semanais';
+                else if (j === '40') j = '40 (quarenta) horas semanais';
+                else j = j + ' horas semanais';
+            }
+            document.getElementById('mc_jornada_trabalho').value = j;
+            
+            var rem = f.remuneracao || '';
+            if (rem && !rem.startsWith('R$')) rem = 'R$ ' + rem;
+            document.getElementById('mc_remuneracao').value = rem;
+            
+            if (f.dt_inicio) {
+                document.getElementById('mc_dt_inicio').value = f.dt_inicio;
+                document.getElementById('mc_dt_assinatura').value = f.dt_inicio;
+            } else {
+                var hoje = new Date().toISOString().split('T')[0];
+                document.getElementById('mc_dt_inicio').value = hoje;
+                document.getElementById('mc_dt_assinatura').value = hoje;
+            }
+            
+            if (f.dt_termino) {
+                document.getElementById('mc_dt_termino').value = f.dt_termino;
+            } else {
+                document.getElementById('mc_dt_termino').value = '';
+            }
+
+            var anoAtual = new Date().getFullYear();
+            if (f.dt_inicio) {
+                anoAtual = f.dt_inicio.split('-')[0];
+            }
+            
+            fetch('/api/proximo_numero_contrato?ano=' + anoAtual)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('mc_num_contrato').value = data.num_contrato || ('01/' + anoAtual);
+                })
+                .catch(err => {
+                    document.getElementById('mc_num_contrato').value = '01/' + anoAtual;
+                });
+
+            atualizarExtensoAutomatico(rem);
+
+            document.getElementById('modalGerarContrato').classList.remove('hidden');
+        }
+
+        function fecharModalContrato() {
+            document.getElementById('modalGerarContrato').classList.add('hidden');
+        }
+
+        function atualizarExtensoAutomatico(val) {
+            if (!val) {
+                document.getElementById('mc_remuneracao_extenso').value = '';
+                return;
+            }
+            var valClean = val.replace('R$', '').replace(/\./g, '').replace(',', '.').trim();
+            var num = parseFloat(valClean);
+            if (isNaN(num)) return;
+            
+            if (num === 1621 || num === 1621.00) {
+                document.getElementById('mc_remuneracao_extenso').value = 'um mil, seiscentos e vinte e um reais';
+            } else if (num === 1412 || num === 1412.00) {
+                document.getElementById('mc_remuneracao_extenso').value = 'um mil, quatrocentos e doze reais';
+            } else if (num === 1518 || num === 1518.00) {
+                document.getElementById('mc_remuneracao_extenso').value = 'um mil, quinhentos e dezoito reais';
+            }
+        }
+
+        function enviarGerarContrato(e) {
+            e.preventDefault();
+            var form = document.getElementById('formGerarContrato');
+            var formData = new FormData(form);
+            
+            var btn = document.getElementById('btnSubmitGerarContrato');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Gerando...';
+
+            fetch('/gerar_contrato', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ph ph-file-text text-lg"></i> Gerar e Imprimir Contrato';
+                if (data.success) {
+                    fecharModalContrato();
+                    window.open(data.view_url, '_blank');
+                } else {
+                    alert('Erro ao gerar contrato: ' + (data.message || 'Erro desconhecido'));
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ph ph-file-text text-lg"></i> Gerar e Imprimir Contrato';
+                alert('Erro ao processar requisição: ' + err);
+            });
+        }
     </script>
+
+    <!-- MODAL DE CONFERÊNCIA DO CONTRATO -->
+    <div id="modalGerarContrato" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[70] backdrop-blur-sm transition-opacity duration-300 p-4 overflow-y-auto">
+        <div class="bg-white rounded-3xl w-full max-w-3xl p-6 md:p-8 shadow-2xl transform scale-100 transition-transform duration-300 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 my-8">
+            <div class="flex justify-between items-center pb-4 border-b border-gray-100 dark:border-gray-700 mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center font-bold dark:bg-purple-900/40 dark:text-purple-300">
+                        <i class="ph ph-file-text text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">Conferência de Dados do Contrato</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Verifique todas as informações antes de emitir o contrato oficial</p>
+                    </div>
+                </div>
+                <button onclick="fecharModalContrato()" class="text-gray-400 hover:text-gray-600 dark:hover:text-white text-xl p-1"><i class="ph ph-x"></i></button>
+            </div>
+
+            <form id="formGerarContrato" onsubmit="enviarGerarContrato(event)" class="space-y-6">
+                <input type="hidden" name="funcionario_id" id="mc_funcionario_id">
+
+                <!-- IDENTIFICAÇÃO DO CONTRATO -->
+                <div class="bg-purple-50/60 border border-purple-100 rounded-2xl p-4 dark:bg-purple-900/20 dark:border-purple-800/40 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label text-purple-700 dark:text-purple-300">Número do Contrato*</label>
+                        <input type="text" name="num_contrato" id="mc_num_contrato" class="form-input font-bold text-purple-900 dark:text-purple-100" required placeholder="Ex: 01/2026">
+                    </div>
+                    <div>
+                        <label class="form-label text-purple-700 dark:text-purple-300">Data de Assinatura*</label>
+                        <input type="date" name="dt_assinatura" id="mc_dt_assinatura" class="form-input" required>
+                    </div>
+                </div>
+
+                <!-- DADOS DO CONTRATADO (SERVIDOR) -->
+                <div>
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 dark:text-gray-400 flex items-center gap-1"><i class="ph ph-user text-blue-500"></i> Servidor Contratado</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="form-label">Nome Completo</label>
+                            <input type="text" name="contratado_nome" id="mc_contratado_nome" class="form-input uppercase" required>
+                        </div>
+                        <div>
+                            <label class="form-label">CPF</label>
+                            <input type="text" name="contratado_cpf" id="mc_contratado_cpf" class="form-input">
+                        </div>
+                        <div>
+                            <label class="form-label">RG</label>
+                            <input type="text" name="contratado_rg" id="mc_contratado_rg" class="form-input">
+                        </div>
+                        <div>
+                            <label class="form-label">Estado Civil</label>
+                            <input type="text" name="contratado_estado_civil" id="mc_contratado_estado_civil" class="form-input" placeholder="Ex: casado(a)">
+                        </div>
+                        <div>
+                            <label class="form-label">Nacionalidade</label>
+                            <input type="text" name="contratado_nacionalidade" id="mc_contratado_nacionalidade" class="form-input" value="brasileiro(a)">
+                        </div>
+                        <div>
+                            <label class="form-label">Naturalidade</label>
+                            <input type="text" name="contratado_naturalidade" id="mc_contratado_naturalidade" class="form-input" value="piauiense">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="form-label">Endereço Completo</label>
+                            <input type="text" name="contratado_endereco" id="mc_contratado_endereco" class="form-input" placeholder="Rua, Número, Bairro, Cidade-UF">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DADOS DO CONTRATO E JORNADA -->
+                <div>
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 dark:text-gray-400 flex items-center gap-1"><i class="ph ph-briefcase text-emerald-500"></i> Função & Vigência</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="form-label">Função / Cargo*</label>
+                            <input type="text" name="funcao_nome" id="mc_funcao_nome" class="form-input" required>
+                        </div>
+                        <div>
+                            <label class="form-label">Jornada de Trabalho*</label>
+                            <input type="text" name="jornada_trabalho" id="mc_jornada_trabalho" class="form-input" placeholder="Ex: 20 (vinte) horas semanais" required>
+                        </div>
+                        <div>
+                            <label class="form-label">Remuneração Mensal (R$)</label>
+                            <input type="text" name="remuneracao" id="mc_remuneracao" class="form-input" onkeyup="atualizarExtensoAutomatico(this.value)">
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="form-label">Valor por Extenso</label>
+                            <input type="text" name="remuneracao_extenso" id="mc_remuneracao_extenso" class="form-input" placeholder="Ex: um mil, seiscentos e vinte e um reais">
+                        </div>
+                        <div>
+                            <label class="form-label">Data Início*</label>
+                            <input type="date" name="dt_inicio" id="mc_dt_inicio" class="form-input" required>
+                        </div>
+                        <div>
+                            <label class="form-label">Data Término*</label>
+                            <input type="date" name="dt_termino" id="mc_dt_termino" class="form-input" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DADOS DA CONTRATANTE -->
+                <div>
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 dark:text-gray-400 flex items-center gap-1"><i class="ph ph-buildings text-amber-500"></i> Representante da Contratante</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label">Nome do Representante</label>
+                            <input type="text" name="representante_nome" id="mc_representante_nome" class="form-input font-semibold" value="MARIA EDNA DE SOUSA QUARESMA">
+                        </div>
+                        <div>
+                            <label class="form-label">Cargo / Título</label>
+                            <input type="text" name="representante_cargo" id="mc_representante_cargo" class="form-input" value="Secretária Municipal de Educação">
+                        </div>
+                        <div>
+                            <label class="form-label">CPF / RG do Representante</label>
+                            <input type="text" name="representante_rg_cpf" id="mc_representante_rg_cpf" class="form-input" value="676.079.263-72">
+                        </div>
+                        <div>
+                            <label class="form-label">Endereço do Representante</label>
+                            <input type="text" name="representante_endereco" id="mc_representante_endereco" class="form-input" value="Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-gray-100 dark:border-gray-700 flex justify-end gap-3">
+                    <button type="button" onclick="fecharModalContrato()" class="py-2.5 px-5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition dark:bg-gray-700 dark:text-gray-300">Cancelar</button>
+                    <button type="submit" id="btnSubmitGerarContrato" class="py-2.5 px-6 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 shadow-lg shadow-purple-200 dark:shadow-none transition flex items-center gap-2">
+                        <i class="ph ph-file-text text-lg"></i> Gerar e Imprimir Contrato
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </body>
 </html>
