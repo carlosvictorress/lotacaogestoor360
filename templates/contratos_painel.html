@@ -166,127 +166,138 @@
     </div>
 
     <!-- MODAL DE EDIÇÃO DE CONTRATO -->
-    <div id="modalEditarContrato" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[70] backdrop-blur-sm transition-opacity duration-300 p-4 overflow-y-auto">
-        <div class="bg-white rounded-3xl w-full max-w-3xl p-6 md:p-8 shadow-2xl transform scale-100 transition-transform duration-300 border border-slate-100 my-8">
-            <div class="flex justify-between items-center pb-4 border-b border-slate-100 mb-6">
+    <div id="modalEditarContrato" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[70] backdrop-blur-sm transition-opacity duration-300 p-4">
+        <div class="bg-white rounded-3xl w-full max-w-3xl shadow-2xl border border-slate-100 flex flex-col max-h-[90vh] overflow-hidden my-auto">
+            
+            <!-- HEADER DO MODAL (FIXO NO TOPO) -->
+            <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white shrink-0">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center font-bold">
-                        <i class="ph ph-pencil-simple-line text-2xl"></i>
+                    <div class="w-9 h-9 bg-amber-100 text-amber-700 rounded-xl flex items-center justify-center font-bold shrink-0">
+                        <i class="ph ph-pencil-simple-line text-xl"></i>
                     </div>
                     <div>
-                        <h3 class="text-lg font-bold text-slate-900">Editar Contrato Nº <span id="me_num_contrato_title" class="text-purple-700"></span></h3>
-                        <p class="text-xs text-slate-500">O número do contrato permanecerá inalterado. Informe o motivo obrigatoriamente.</p>
+                        <h3 class="text-base font-bold text-slate-900 leading-tight">Editar Contrato Nº <span id="me_num_contrato_title" class="text-purple-700"></span></h3>
+                        <p class="text-[11px] text-slate-500 font-medium">O número do contrato permanecerá inalterado. Informe o motivo obrigatoriamente.</p>
                     </div>
                 </div>
-                <button onclick="fecharModalEditar()" class="text-slate-400 hover:text-slate-600 text-xl p-1"><i class="ph ph-x"></i></button>
+                <button onclick="fecharModalEditar()" class="text-slate-400 hover:text-slate-600 text-xl p-1 rounded-lg hover:bg-slate-100 transition"><i class="ph ph-x"></i></button>
             </div>
 
-            <form id="formEditarContrato" onsubmit="enviarEditarContrato(event)" class="space-y-6">
+            <!-- FORMULÁRIO DE EDIÇÃO COM ROLAGEM INTERNA -->
+            <form id="formEditarContrato" onsubmit="enviarEditarContrato(event)" class="flex flex-col flex-1 overflow-hidden">
                 <input type="hidden" id="me_contrato_id" name="contrato_id">
 
-                <!-- CAMPO OBRIGATÓRIO: MOTIVO DA EDIÇÃO -->
-                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                    <label class="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-2">Motivo / Justificativa da Edição*</label>
-                    <textarea name="motivo_edicao" id="me_motivo_edicao" required rows="2" class="w-full p-3 bg-white border border-amber-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="Descreva o motivo da alteração dos dados deste contrato..."></textarea>
-                </div>
+                <!-- CORPO ROLANTE DO FORMULÁRIO -->
+                <div class="flex-1 overflow-y-auto p-6 space-y-5">
 
-                <!-- DADOS DO CONTRATADO -->
-                <div>
-                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1"><i class="ph ph-user text-blue-500"></i> Servidor Contratado</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="md:col-span-2">
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Nome Completo</label>
-                            <input type="text" name="contratado_nome" id="me_contratado_nome" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold uppercase" required>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">CPF</label>
-                            <input type="text" name="contratado_cpf" id="me_contratado_cpf" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">RG</label>
-                            <input type="text" name="contratado_rg" id="me_contratado_rg" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Estado Civil</label>
-                            <input type="text" name="contratado_estado_civil" id="me_contratado_estado_civil" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Nacionalidade</label>
-                            <input type="text" name="contratado_nacionalidade" id="me_contratado_nacionalidade" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Naturalidade</label>
-                            <input type="text" name="contratado_naturalidade" id="me_contratado_naturalidade" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Endereço Completo</label>
-                            <input type="text" name="contratado_endereco" id="me_contratado_endereco" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                    <!-- CAMPO OBRIGATÓRIO: MOTIVO DA EDIÇÃO -->
+                    <div class="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3.5">
+                        <label class="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                            <i class="ph ph-warning-circle text-amber-600 text-sm"></i> Motivo / Justificativa da Edição*
+                        </label>
+                        <textarea name="motivo_edicao" id="me_motivo_edicao" required rows="2" class="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm" placeholder="Descreva o motivo da alteração dos dados deste contrato..."></textarea>
+                    </div>
+
+                    <!-- DADOS DO CONTRATADO -->
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1"><i class="ph ph-user text-blue-500"></i> Servidor Contratado</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Nome Completo</label>
+                                <input type="text" name="contratado_nome" id="me_contratado_nome" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold uppercase" required>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">CPF</label>
+                                <input type="text" name="contratado_cpf" id="me_contratado_cpf" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">RG</label>
+                                <input type="text" name="contratado_rg" id="me_contratado_rg" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Estado Civil</label>
+                                <input type="text" name="contratado_estado_civil" id="me_contratado_estado_civil" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Nacionalidade</label>
+                                <input type="text" name="contratado_nacionalidade" id="me_contratado_nacionalidade" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Naturalidade</label>
+                                <input type="text" name="contratado_naturalidade" id="me_contratado_naturalidade" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Endereço Completo</label>
+                                <input type="text" name="contratado_endereco" id="me_contratado_endereco" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- FUNÇÃO & JORNADA -->
-                <div>
-                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1"><i class="ph ph-briefcase text-emerald-500"></i> Função & Vigência</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="md:col-span-2">
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Função / Cargo*</label>
-                            <input type="text" name="funcao_nome" id="me_funcao_nome" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" required>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Jornada de Trabalho*</label>
-                            <input type="text" name="jornada_trabalho" id="me_jornada_trabalho" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" required>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Remuneração Mensal</label>
-                            <input type="text" name="remuneracao" id="me_remuneracao" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Valor por Extenso</label>
-                            <input type="text" name="remuneracao_extenso" id="me_remuneracao_extenso" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Data Início*</label>
-                            <input type="date" name="dt_inicio" id="me_dt_inicio" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" required>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Data Término*</label>
-                            <input type="date" name="dt_termino" id="me_dt_termino" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" required>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Data Assinatura*</label>
-                            <input type="date" name="dt_assinatura" id="me_dt_assinatura" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm" required>
+                    <!-- FUNÇÃO & JORNADA -->
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1"><i class="ph ph-briefcase text-emerald-500"></i> Função & Vigência</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Função / Cargo*</label>
+                                <input type="text" name="funcao_nome" id="me_funcao_nome" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" required>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Jornada de Trabalho*</label>
+                                <input type="text" name="jornada_trabalho" id="me_jornada_trabalho" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" required>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Remuneração Mensal</label>
+                                <input type="text" name="remuneracao" id="me_remuneracao" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Valor por Extenso</label>
+                                <input type="text" name="remuneracao_extenso" id="me_remuneracao_extenso" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Data Início*</label>
+                                <input type="date" name="dt_inicio" id="me_dt_inicio" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" required>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Data Término*</label>
+                                <input type="date" name="dt_termino" id="me_dt_termino" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" required>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Data Assinatura*</label>
+                                <input type="date" name="dt_assinatura" id="me_dt_assinatura" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs" required>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- REPRESENTANTE CONTRATANTE -->
-                <div>
-                    <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1"><i class="ph ph-buildings text-amber-500"></i> Representante da Contratante</h4>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Nome do Representante</label>
-                            <input type="text" name="representante_nome" id="me_representante_nome" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Cargo / Título</label>
-                            <input type="text" name="representante_cargo" id="me_representante_cargo" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">CPF / RG do Representante</label>
-                            <input type="text" name="representante_rg_cpf" id="me_representante_rg_cpf" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-500 mb-1 uppercase">Endereço do Representante</label>
-                            <input type="text" name="representante_endereco" id="me_representante_endereco" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm">
+                    <!-- REPRESENTANTE CONTRATANTE -->
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1"><i class="ph ph-buildings text-amber-500"></i> Representante da Contratante</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Nome do Representante</label>
+                                <input type="text" name="representante_nome" id="me_representante_nome" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Cargo / Título</label>
+                                <input type="text" name="representante_cargo" id="me_representante_cargo" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">CPF / RG do Representante</label>
+                                <input type="text" name="representante_rg_cpf" id="me_representante_rg_cpf" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-500 mb-1 uppercase">Endereço do Representante</label>
+                                <input type="text" name="representante_endereco" id="me_representante_endereco" class="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                            </div>
                         </div>
                     </div>
+
                 </div>
 
-                <div class="pt-4 border-t border-slate-100 flex justify-end gap-3">
-                    <button type="button" onclick="fecharModalEditar()" class="py-2.5 px-5 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition">Cancelar</button>
-                    <button type="submit" id="btnSubmitEditarContrato" class="py-2.5 px-6 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 shadow-lg shadow-amber-200 transition flex items-center gap-2">
-                        <i class="ph ph-floppy-disk text-lg"></i> Salvar e Imprimir Novo Contrato
+                <!-- FOOTER DO MODAL (FIXO NO RODAPÉ) -->
+                <div class="px-6 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+                    <button type="button" onclick="fecharModalEditar()" class="py-2 px-4 bg-white border border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-100 transition text-xs">Cancelar</button>
+                    <button type="submit" id="btnSubmitEditarContrato" class="py-2 px-5 bg-amber-600 text-white font-bold rounded-xl hover:bg-amber-700 shadow-md shadow-amber-200 transition flex items-center gap-2 text-xs">
+                        <i class="ph ph-floppy-disk text-base"></i> Salvar e Imprimir Novo Contrato
                     </button>
                 </div>
             </form>
