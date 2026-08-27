@@ -1520,7 +1520,7 @@ function abrirModalAuditoria(btn) {
                     Object.keys(quantCargos).sort().forEach(cargo => {
                         const qtd = quantCargos[cargo];
                         htmlContent += `
-                            <div style="background-color: #ffffff; border: 1px solid #475569; border-radius: 3px; padding: 3px 8px; font-size: 8pt; display: inline-flex; align-items: center; gap: 6px;">
+                            <div style="background-color: #ffffff; border: 1px solid #475569; border-radius: 3px; padding: 3px 8px; font-size: 8pt; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
                                 <span style="font-weight: bold; color: #0f172a;">${cargo}</span>
                                 <span style="background-color: #1e40af; color: #ffffff; font-weight: bold; padding: 1px 7px; border-radius: 3px; font-size: 8pt;">${qtd}</span>
                             </div>
@@ -1534,9 +1534,9 @@ function abrirModalAuditoria(btn) {
                             <table class="pdf-table" style="width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 8pt;">
                                 <thead>
                                     <tr>
-                                        <th style="width: 45%; text-align: left; background-color: #e5e5e5; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">SERVIDOR (NOME / CPF)</th>
-                                        <th style="width: 30%; text-align: left; background-color: #e5e5e5; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">FUNÇÃO / CARGO</th>
-                                        <th style="width: 25%; text-align: left; background-color: #e5e5e5; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">LOCAL DE TRABALHO</th>
+                                        <th style="width: 38%; text-align: left; background-color: #e2e8f0; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">SERVIDOR (NOME / CPF)</th>
+                                        <th style="width: 32%; text-align: left; background-color: #e2e8f0; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">FUNÇÃO / CARGO</th>
+                                        <th style="width: 30%; text-align: left; background-color: #e2e8f0; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">LOCAL DE TRABALHO</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1571,11 +1571,11 @@ function abrirModalAuditoria(btn) {
 
             setTimeout(() => {
                 const opt = {
-                    margin: [10, 10, 10, 10],
+                    margin: 5,
                     filename: escolaFiltro === 'TODAS' ? 'relatorio_por_escola.pdf' : `relatorio_${escolaFiltro.toLowerCase().replace(/[^a-z0-9]/g, '_')}.pdf`,
                     image: { type: 'jpeg', quality: 0.98 },
                     html2canvas: { scale: 2, useCORS: true, logging: false },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
                     pagebreak: { mode: ['css', 'legacy'] }
                 };
 
