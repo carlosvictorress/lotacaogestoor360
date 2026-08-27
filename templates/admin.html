@@ -364,6 +364,10 @@
                                 class="text-xs bg-orange-100 text-orange-700 hover:bg-orange-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition">
                                 <i class="ph ph-file-text text-lg"></i> PDF Simplificado
                             </button>
+                            <button onclick="generateReportPDFPorEscola()"
+                                class="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition">
+                                <i class="ph ph-buildings text-lg"></i> PDF por Escola
+                            </button>
                         </div>
                     </div>
                     <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
@@ -510,6 +514,18 @@
                             </tr>{% endfor %}
                         </tbody>
                     </table>
+                    <script id="funcionarios-data" type="application/json">
+                    [
+                        {% for f in funcionarios %}
+                        {
+                            "nome": {{ f.nome|tojson }},
+                            "cpf": {{ f.cpf|tojson }},
+                            "funcao": {{ (f.funcao.nome if f.funcao else 'Não Definido')|tojson }},
+                            "local": {{ (f.local_trabalho.nome if f.local_trabalho else 'Não Definido')|tojson }}
+                        }{% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    ]
+                    </script>
                 </div>
             </div>
 
@@ -1356,6 +1372,148 @@ function abrirModalAuditoria(btn) {
                 document.getElementById('loading').style.display = 'none';
             }).catch(err => {
                 console.error("Erro ao gerar PDF:", err);
+                if (pdfWindow) pdfWindow.close();
+                alert("Erro ao gerar PDF");
+                element.style.display = 'none';
+                document.getElementById('loading').style.display = 'none';
+            });
+        }
+
+        function generateReportPDFPorEscola() {
+            const pdfWindow = window.open('', '_blank');
+            if (pdfWindow) {
+                pdfWindow.document.write('<title>Relatório PDF Por Escola</title><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#f9fafb;"><div style="text-align:center;"><h2>Carregando Relatório PDF...</h2><p style="color:#666;">Aguarde um instante enquanto o relatório por escola é gerado.</p></div></body>');
+            }
+            document.getElementById('loading').style.display = 'flex';
+            const selectSec = document.getElementById('filter_sec');
+            const selectedText = selectSec.options[selectSec.selectedIndex].text;
+
+            let subtitle = (selectSec.value === "") ? "FILTRO: GERAL - RELATÓRIO POR ESCOLA" : "FILTRO: " + selectedText + " - RELATÓRIO POR ESCOLA";
+            document.getElementById('report-subtitle').innerText = subtitle;
+
+            const dataHoje = new Date();
+            const diaHoje = String(dataHoje.getDate()).padStart(2, '0');
+            const mesHoje = String(dataHoje.getMonth() + 1).padStart(2, '0');
+            const anoHoje = dataHoje.getFullYear();
+            document.getElementById('report-date').innerText = `${diaHoje}/${mesHoje}/${anoHoje}`;
+
+            let funcionariosData = [];
+            try {
+                const dataEl = document.getElementById('funcionarios-data');
+                if (dataEl) {
+                    funcionariosData = JSON.parse(dataEl.textContent);
+                }
+            } catch (e) {
+                console.error("Erro ao carregar dados dos funcionários:", e);
+            }
+
+            const porEscola = {};
+            funcionariosData.forEach(f => {
+                const local = f.local || 'Não Definido';
+                if (!porEscola[local]) porEscola[local] = [];
+                porEscola[local].push(f);
+            });
+
+            const escolasOrdenadas = Object.keys(porEscola).sort();
+
+            let htmlContent = '';
+
+            if (escolasOrdenadas.length === 0) {
+                htmlContent = '<p style="text-align:center; padding: 20px;">Nenhum registro encontrado.</p>';
+            } else {
+                escolasOrdenadas.forEach(escola => {
+                    const lista = porEscola[escola];
+                    
+                    const quantCargos = {};
+                    lista.forEach(f => {
+                        const func = f.funcao || 'Não Definido';
+                        quantCargos[func] = (quantCargos[func] || 0) + 1;
+                    });
+
+                    htmlContent += `
+                        <div style="margin-top: 15px; margin-bottom: 25px; page-break-inside: avoid;">
+                            <div style="background-color: #1f2937; color: white; padding: 8px 12px; font-size: 11pt; font-weight: bold; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                                <span>LOCAL DE TRABALHO: ${escola.toUpperCase()}</span>
+                                <span style="font-size: 8.5pt; background: #374151; padding: 2px 8px; border-radius: 10px;">TOTAL: ${lista.length} SERVIDOR(ES)</span>
+                            </div>
+                            
+                            <div style="margin-top: 8px; margin-bottom: 10px; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
+                                <div style="font-size: 8pt; font-weight: bold; color: #475569; margin-bottom: 6px; text-transform: uppercase;">
+                                    QUANTITATIVO DE CARGOS POR ESTA ESCOLA:
+                                </div>
+                                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    `;
+
+                    Object.keys(quantCargos).sort().forEach(cargo => {
+                        const qtd = quantCargos[cargo];
+                        htmlContent += `
+                            <div style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px; font-size: 7.5pt; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                                <span style="font-weight: 600; color: #1e293b;">${cargo}</span>
+                                <span style="background: #2563eb; color: white; border-radius: 9999px; padding: 0px 6px; font-weight: bold; font-size: 7.5pt;">${qtd}</span>
+                            </div>
+                        `;
+                    });
+
+                    htmlContent += `
+                                </div>
+                            </div>
+
+                            <table class="pdf-table" style="width: 100%; border-collapse: collapse; margin-top: 5px;">
+                                <thead>
+                                    <tr style="background-color: #f1f5f9; font-size: 8pt;">
+                                        <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left; width: 45%;">SERVIDOR</th>
+                                        <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left; width: 30%;">FUNÇÃO</th>
+                                        <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left; width: 25%;">LOCAL DE TRABALHO</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+
+                    lista.forEach(f => {
+                        htmlContent += `
+                            <tr style="font-size: 8pt;">
+                                <td style="border: 1px solid #cbd5e1; padding: 5px;">
+                                    <strong>${f.nome}</strong>
+                                    ${f.cpf ? '<br><span style="font-size: 7pt; color: #64748b;">CPF: ' + f.cpf + '</span>' : ''}
+                                </td>
+                                <td style="border: 1px solid #cbd5e1; padding: 5px; color: #334155;">${f.funcao}</td>
+                                <td style="border: 1px solid #cbd5e1; padding: 5px; color: #334155;">${f.local}</td>
+                            </tr>
+                        `;
+                    });
+
+                    htmlContent += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                });
+            }
+
+            const container = document.getElementById('pdf-table-container');
+            container.innerHTML = htmlContent;
+
+            const element = document.getElementById('pdf-report');
+            element.style.display = 'block';
+
+            const opt = {
+                margin: 5,
+                filename: 'relatorio_por_escola.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(element).outputPdf('bloburl').then((pdfUrl) => {
+                if (pdfWindow) {
+                    pdfWindow.location.href = pdfUrl;
+                } else {
+                    window.open(pdfUrl, '_blank');
+                }
+                element.style.display = 'none';
+                document.getElementById('loading').style.display = 'none';
+            }).catch(err => {
+                console.error("Erro ao gerar PDF Por Escola:", err);
                 if (pdfWindow) pdfWindow.close();
                 alert("Erro ao gerar PDF");
                 element.style.display = 'none';
