@@ -53,37 +53,46 @@
         #pdf-report {
             display: none;
             width: 275mm;
-            padding: 10mm;
+            padding: 8mm 10mm;
             background: white;
-            font-family: 'Times New Roman', serif;
-            color: black;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
             box-sizing: border-box;
         }
 
         .pdf-header {
             text-align: center;
-            border-bottom: 2px solid black;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
+            border-bottom: 2px solid #1e293b;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
         }
 
         .pdf-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8pt;
+            font-size: 8.5pt;
         }
 
         .pdf-table th {
-            background-color: #e5e5e5;
-            border: 1px solid #000;
-            padding: 4px;
+            background-color: #f1f5f9;
+            color: #1e293b;
+            border: 1px solid #cbd5e1;
+            padding: 8px 10px;
             text-transform: uppercase;
-            font-weight: bold;
+            font-weight: 700;
+            font-size: 8.5pt;
+            letter-spacing: 0.3px;
         }
 
         .pdf-table td {
-            border: 1px solid #000;
-            padding: 4px;
+            border: 1px solid #e2e8f0;
+            padding: 7px 10px;
+            color: #1e293b;
+            font-size: 8.5pt;
+        }
+
+        .pdf-table tr:nth-child(even) td {
+            background-color: #f8fafc;
         }
 
         .menu-scroll::-webkit-scrollbar {
@@ -1492,7 +1501,7 @@ function abrirModalAuditoria(btn) {
             let htmlContent = '';
 
             if (escolasOrdenadas.length === 0) {
-                htmlContent = '<p style="text-align:center; padding: 30px; font-size: 11pt; font-family: serif;">Nenhum registro encontrado para a unidade selecionada.</p>';
+                htmlContent = '<p style="text-align:center; padding: 40px; font-size: 11pt; color: #64748b;">Nenhum registro encontrado para a unidade selecionada.</p>';
             } else {
                 escolasOrdenadas.forEach(escola => {
                     const lista = porEscola[escola];
@@ -1504,25 +1513,25 @@ function abrirModalAuditoria(btn) {
                     });
 
                     htmlContent += `
-                        <div style="margin-top: 15px; margin-bottom: 25px; page-break-inside: avoid;">
-                            <div style="background-color: #1f2937; color: #ffffff; padding: 6px 10px; font-size: 10pt; font-weight: bold; border: 1px solid #000; display: flex; justify-content: space-between; align-items: center;">
-                                <span>UNIDADE ESCOLAR / LOCAL: ${escola.toUpperCase()}</span>
-                                <span style="font-size: 8.5pt; background-color: #374151; padding: 2px 8px; border-radius: 3px;">TOTAL DE SERVIDORES: ${lista.length}</span>
+                        <div style="margin-top: 18px; margin-bottom: 28px; page-break-inside: avoid;">
+                            <div style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #ffffff; padding: 8px 14px; border-radius: 6px 6px 0 0; display: flex; justify-content: space-between; align-items: center;">
+                                <span style="font-size: 10.5pt; font-weight: 700; letter-spacing: 0.3px;">UNIDADE ESCOLAR / LOCAL: ${escola.toUpperCase()}</span>
+                                <span style="font-size: 8.5pt; background-color: #2563eb; color: #ffffff; padding: 3px 10px; border-radius: 20px; font-weight: 700;">TOTAL: ${lista.length} SERVIDORES</span>
                             </div>
                             
-                            <div style="border: 1px solid #000; border-top: none; background-color: #f8fafc; padding: 8px 10px; margin-bottom: 8px;">
-                                <div style="font-size: 8pt; font-weight: bold; color: #111; text-transform: uppercase; margin-bottom: 5px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 3px;">
+                            <div style="border: 1px solid #cbd5e1; border-top: none; background-color: #f8fafc; padding: 10px 14px; margin-bottom: 12px; border-radius: 0 0 6px 6px;">
+                                <div style="font-size: 8pt; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 6px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px; letter-spacing: 0.5px;">
                                     INDICADOR QUANTITATIVO DE CARGOS NA UNIDADE:
                                 </div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px;">
+                                <div style="display: flex; flex-wrap: wrap; gap: 6px 10px; padding-top: 4px;">
                     `;
 
                     Object.keys(quantCargos).sort().forEach(cargo => {
                         const qtd = quantCargos[cargo];
                         htmlContent += `
-                            <div style="background-color: #ffffff; border: 1px solid #475569; border-radius: 3px; padding: 3px 8px; font-size: 8pt; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;">
-                                <span style="font-weight: bold; color: #0f172a;">${cargo}</span>
-                                <span style="background-color: #1e40af; color: #ffffff; font-weight: bold; padding: 1px 7px; border-radius: 3px; font-size: 8pt;">${qtd}</span>
+                            <div style="background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 10px; font-size: 8.5pt; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                                <span style="font-weight: 600; color: #1e293b;">${cargo}</span>
+                                <span style="background-color: #2563eb; color: #ffffff; font-weight: 700; padding: 1px 8px; border-radius: 12px; font-size: 8pt;">${qtd}</span>
                             </div>
                         `;
                     });
@@ -1531,12 +1540,12 @@ function abrirModalAuditoria(btn) {
                                 </div>
                             </div>
 
-                            <table class="pdf-table" style="width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 8pt;">
+                            <table class="pdf-table" style="width: 100%; border-collapse: collapse; margin-top: 6px;">
                                 <thead>
                                     <tr>
-                                        <th style="width: 38%; text-align: left; background-color: #e2e8f0; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">SERVIDOR (NOME / CPF)</th>
-                                        <th style="width: 32%; text-align: left; background-color: #e2e8f0; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">FUNÇÃO / CARGO</th>
-                                        <th style="width: 30%; text-align: left; background-color: #e2e8f0; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">LOCAL DE TRABALHO</th>
+                                        <th style="width: 40%; text-align: left;">SERVIDOR (NOME / CPF)</th>
+                                        <th style="width: 32%; text-align: left;">FUNÇÃO / CARGO</th>
+                                        <th style="width: 28%; text-align: left;">LOCAL DE TRABALHO</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1545,12 +1554,12 @@ function abrirModalAuditoria(btn) {
                     lista.forEach(f => {
                         htmlContent += `
                             <tr>
-                                <td style="border: 1px solid #000; padding: 4px 6px;">
-                                    <strong style="color: #000;">${f.nome}</strong>
-                                    ${f.cpf ? ' <span style="font-size: 7.5pt; color: #444;">(' + f.cpf + ')</span>' : ''}
+                                <td>
+                                    <span style="font-weight: 700; color: #0f172a; font-size: 9pt;">${f.nome}</span>
+                                    ${f.cpf ? ' <span style="font-size: 8pt; color: #64748b; margin-left: 4px;">(CPF: ' + f.cpf + ')</span>' : ''}
                                 </td>
-                                <td style="border: 1px solid #000; padding: 4px 6px; color: #111;">${f.funcao}</td>
-                                <td style="border: 1px solid #000; padding: 4px 6px; color: #111;">${f.local}</td>
+                                <td style="color: #334155; font-size: 8.5pt; font-weight: 500;">${f.funcao}</td>
+                                <td style="color: #475569; font-size: 8.5pt;">${f.local}</td>
                             </tr>
                         `;
                     });
