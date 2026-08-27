@@ -364,7 +364,7 @@
                                 class="text-xs bg-orange-100 text-orange-700 hover:bg-orange-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition">
                                 <i class="ph ph-file-text text-lg"></i> PDF Simplificado
                             </button>
-                            <button onclick="generateReportPDFPorEscola()"
+                            <button onclick="abrirModalRelatorioEscola()"
                                 class="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition">
                                 <i class="ph ph-buildings text-lg"></i> PDF por Escola
                             </button>
@@ -930,6 +930,51 @@
         </div>
     </div>
 
+    <div id="modalRelatorioEscola"
+        class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[70] backdrop-blur-sm">
+        <div
+            class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl dark:bg-gray-800 border border-gray-100 dark:border-gray-700 transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <i class="ph ph-buildings text-xl text-blue-600"></i> Relatório por Escola
+                </h3>
+                <button onclick="fecharModalRelatorioEscola()"
+                    class="text-gray-400 hover:text-black dark:hover:text-white transition-colors">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+
+            <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                Selecione a unidade escolar para a qual deseja emitir o relatório em PDF com o quantitativo de cargos.
+            </p>
+
+            <div class="space-y-4">
+                <div>
+                    <label
+                        class="block text-[11px] font-bold text-gray-500 uppercase mb-2 dark:text-gray-400 tracking-widest">Unidade Escolar / Local</label>
+                    <select id="select_escola_relatorio"
+                        class="w-full border border-gray-200 bg-gray-50 p-3 rounded-xl text-sm font-semibold dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                        <option value="TODAS">TODAS AS ESCOLAS (GERAL)</option>
+                        {% for l in locais_trabalho %}
+                        <option value="{{ l.nome }}">{{ l.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                    <button onclick="fecharModalRelatorioEscola()"
+                        class="w-1/2 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 transition-all text-sm">
+                        Cancelar
+                    </button>
+                    <button onclick="confirmarGerarPDFPorEscola()"
+                        class="w-1/2 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2 text-sm">
+                        <i class="ph ph-file-pdf text-lg"></i> Gerar PDF
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modalEditarLocal"
         class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[80] backdrop-blur-sm">
         <div
@@ -1379,7 +1424,28 @@ function abrirModalAuditoria(btn) {
             });
         }
 
-        function generateReportPDFPorEscola() {
+        function abrirModalRelatorioEscola() {
+            const modal = document.getElementById('modalRelatorioEscola');
+            if (modal) {
+                modal.classList.remove('hidden');
+            }
+        }
+
+        function fecharModalRelatorioEscola() {
+            const modal = document.getElementById('modalRelatorioEscola');
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function confirmarGerarPDFPorEscola() {
+            const select = document.getElementById('select_escola_relatorio');
+            const escolaSelecionada = select ? select.value : 'TODAS';
+            fecharModalRelatorioEscola();
+            generateReportPDFPorEscola(escolaSelecionada);
+        }
+
+        function generateReportPDFPorEscola(escolaFiltro = 'TODAS') {
             const pdfWindow = window.open('', '_blank');
             if (pdfWindow) {
                 pdfWindow.document.write('<title>Relatório PDF Por Escola</title><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#f9fafb;"><div style="text-align:center;"><h2>Carregando Relatório PDF...</h2><p style="color:#666;">Aguarde um instante enquanto o relatório por escola é gerado.</p></div></body>');
@@ -1389,6 +1455,9 @@ function abrirModalAuditoria(btn) {
             const selectedText = selectSec.options[selectSec.selectedIndex].text;
 
             let subtitle = (selectSec.value === "") ? "FILTRO: GERAL - RELATÓRIO POR ESCOLA" : "FILTRO: " + selectedText + " - RELATÓRIO POR ESCOLA";
+            if (escolaFiltro !== 'TODAS') {
+                subtitle += " (" + escolaFiltro.toUpperCase() + ")";
+            }
             document.getElementById('report-subtitle').innerText = subtitle;
 
             const dataHoje = new Date();
@@ -1407,6 +1476,10 @@ function abrirModalAuditoria(btn) {
                 console.error("Erro ao carregar dados dos funcionários:", e);
             }
 
+            if (escolaFiltro !== 'TODAS') {
+                funcionariosData = funcionariosData.filter(f => (f.local || 'Não Definido').trim().toUpperCase() === escolaFiltro.trim().toUpperCase());
+            }
+
             const porEscola = {};
             funcionariosData.forEach(f => {
                 const local = f.local || 'Não Definido';
@@ -1419,7 +1492,7 @@ function abrirModalAuditoria(btn) {
             let htmlContent = '';
 
             if (escolasOrdenadas.length === 0) {
-                htmlContent = '<p style="text-align:center; padding: 20px;">Nenhum registro encontrado.</p>';
+                htmlContent = '<p style="text-align:center; padding: 20px; font-size: 11pt;">Nenhum registro encontrado para a unidade selecionada.</p>';
             } else {
                 escolasOrdenadas.forEach(escola => {
                     const lista = porEscola[escola];
@@ -1496,29 +1569,32 @@ function abrirModalAuditoria(btn) {
             const element = document.getElementById('pdf-report');
             element.style.display = 'block';
 
-            const opt = {
-                margin: 5,
-                filename: 'relatorio_por_escola.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
+            setTimeout(() => {
+                const opt = {
+                    margin: [10, 10, 10, 10],
+                    filename: escolaFiltro === 'TODAS' ? 'relatorio_por_escola.pdf' : `relatorio_${escolaFiltro.toLowerCase().replace(/[^a-z0-9]/g, '_')}.pdf`,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, logging: false },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak: { mode: ['css', 'legacy'] }
+                };
 
-            html2pdf().set(opt).from(element).outputPdf('bloburl').then((pdfUrl) => {
-                if (pdfWindow) {
-                    pdfWindow.location.href = pdfUrl;
-                } else {
-                    window.open(pdfUrl, '_blank');
-                }
-                element.style.display = 'none';
-                document.getElementById('loading').style.display = 'none';
-            }).catch(err => {
-                console.error("Erro ao gerar PDF Por Escola:", err);
-                if (pdfWindow) pdfWindow.close();
-                alert("Erro ao gerar PDF");
-                element.style.display = 'none';
-                document.getElementById('loading').style.display = 'none';
-            });
+                html2pdf().set(opt).from(element).outputPdf('bloburl').then((pdfUrl) => {
+                    if (pdfWindow) {
+                        pdfWindow.location.href = pdfUrl;
+                    } else {
+                        window.open(pdfUrl, '_blank');
+                    }
+                    element.style.display = 'none';
+                    document.getElementById('loading').style.display = 'none';
+                }).catch(err => {
+                    console.error("Erro ao gerar PDF Por Escola:", err);
+                    if (pdfWindow) pdfWindow.close();
+                    alert("Erro ao gerar PDF");
+                    element.style.display = 'none';
+                    document.getElementById('loading').style.display = 'none';
+                });
+            }, 300);
         }
 
         const dataVinculo = {{ stats_vinculo| tojson }};
