@@ -1452,9 +1452,9 @@ function abrirModalAuditoria(btn) {
             }
             document.getElementById('loading').style.display = 'flex';
             const selectSec = document.getElementById('filter_sec');
-            const selectedText = selectSec.options[selectSec.selectedIndex].text;
+            const selectedText = (selectSec && selectSec.options.length > 0) ? selectSec.options[selectSec.selectedIndex].text : "Todas";
 
-            let subtitle = (selectSec.value === "") ? "FILTRO: GERAL - RELATÓRIO POR ESCOLA" : "FILTRO: " + selectedText + " - RELATÓRIO POR ESCOLA";
+            let subtitle = (selectSec && selectSec.value === "") ? "FILTRO: GERAL - QUANTITATIVO POR ESCOLA" : "FILTRO: " + selectedText + " - QUANTITATIVO POR ESCOLA";
             if (escolaFiltro !== 'TODAS') {
                 subtitle += " (" + escolaFiltro.toUpperCase() + ")";
             }
@@ -1492,7 +1492,7 @@ function abrirModalAuditoria(btn) {
             let htmlContent = '';
 
             if (escolasOrdenadas.length === 0) {
-                htmlContent = '<p style="text-align:center; padding: 20px; font-size: 11pt;">Nenhum registro encontrado para a unidade selecionada.</p>';
+                htmlContent = '<p style="text-align:center; padding: 30px; font-size: 11pt; font-family: serif;">Nenhum registro encontrado para a unidade selecionada.</p>';
             } else {
                 escolasOrdenadas.forEach(escola => {
                     const lista = porEscola[escola];
@@ -1505,24 +1505,24 @@ function abrirModalAuditoria(btn) {
 
                     htmlContent += `
                         <div style="margin-top: 15px; margin-bottom: 25px; page-break-inside: avoid;">
-                            <div style="background-color: #1f2937; color: white; padding: 8px 12px; font-size: 11pt; font-weight: bold; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
-                                <span>LOCAL DE TRABALHO: ${escola.toUpperCase()}</span>
-                                <span style="font-size: 8.5pt; background: #374151; padding: 2px 8px; border-radius: 10px;">TOTAL: ${lista.length} SERVIDOR(ES)</span>
+                            <div style="background-color: #1f2937; color: #ffffff; padding: 6px 10px; font-size: 10pt; font-weight: bold; border: 1px solid #000; display: flex; justify-content: space-between; align-items: center;">
+                                <span>UNIDADE ESCOLAR / LOCAL: ${escola.toUpperCase()}</span>
+                                <span style="font-size: 8.5pt; background-color: #374151; padding: 2px 8px; border-radius: 3px;">TOTAL DE SERVIDORES: ${lista.length}</span>
                             </div>
                             
-                            <div style="margin-top: 8px; margin-bottom: 10px; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;">
-                                <div style="font-size: 8pt; font-weight: bold; color: #475569; margin-bottom: 6px; text-transform: uppercase;">
-                                    QUANTITATIVO DE CARGOS POR ESTA ESCOLA:
+                            <div style="border: 1px solid #000; border-top: none; background-color: #f8fafc; padding: 8px 10px; margin-bottom: 8px;">
+                                <div style="font-size: 8pt; font-weight: bold; color: #111; text-transform: uppercase; margin-bottom: 5px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 3px;">
+                                    INDICADOR QUANTITATIVO DE CARGOS NA UNIDADE:
                                 </div>
-                                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                <div style="display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px;">
                     `;
 
                     Object.keys(quantCargos).sort().forEach(cargo => {
                         const qtd = quantCargos[cargo];
                         htmlContent += `
-                            <div style="background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 8px; font-size: 7.5pt; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
-                                <span style="font-weight: 600; color: #1e293b;">${cargo}</span>
-                                <span style="background: #2563eb; color: white; border-radius: 9999px; padding: 0px 6px; font-weight: bold; font-size: 7.5pt;">${qtd}</span>
+                            <div style="background-color: #ffffff; border: 1px solid #475569; border-radius: 3px; padding: 3px 8px; font-size: 8pt; display: inline-flex; align-items: center; gap: 6px;">
+                                <span style="font-weight: bold; color: #0f172a;">${cargo}</span>
+                                <span style="background-color: #1e40af; color: #ffffff; font-weight: bold; padding: 1px 7px; border-radius: 3px; font-size: 8pt;">${qtd}</span>
                             </div>
                         `;
                     });
@@ -1531,12 +1531,12 @@ function abrirModalAuditoria(btn) {
                                 </div>
                             </div>
 
-                            <table class="pdf-table" style="width: 100%; border-collapse: collapse; margin-top: 5px;">
+                            <table class="pdf-table" style="width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 8pt;">
                                 <thead>
-                                    <tr style="background-color: #f1f5f9; font-size: 8pt;">
-                                        <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left; width: 45%;">SERVIDOR</th>
-                                        <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left; width: 30%;">FUNÇÃO</th>
-                                        <th style="border: 1px solid #cbd5e1; padding: 6px; text-align: left; width: 25%;">LOCAL DE TRABALHO</th>
+                                    <tr>
+                                        <th style="width: 45%; text-align: left; background-color: #e5e5e5; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">SERVIDOR (NOME / CPF)</th>
+                                        <th style="width: 30%; text-align: left; background-color: #e5e5e5; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">FUNÇÃO / CARGO</th>
+                                        <th style="width: 25%; text-align: left; background-color: #e5e5e5; border: 1px solid #000; padding: 5px; text-transform: uppercase; font-weight: bold;">LOCAL DE TRABALHO</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1544,13 +1544,13 @@ function abrirModalAuditoria(btn) {
 
                     lista.forEach(f => {
                         htmlContent += `
-                            <tr style="font-size: 8pt;">
-                                <td style="border: 1px solid #cbd5e1; padding: 5px;">
-                                    <strong>${f.nome}</strong>
-                                    ${f.cpf ? '<br><span style="font-size: 7pt; color: #64748b;">CPF: ' + f.cpf + '</span>' : ''}
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 4px 6px;">
+                                    <strong style="color: #000;">${f.nome}</strong>
+                                    ${f.cpf ? ' <span style="font-size: 7.5pt; color: #444;">(' + f.cpf + ')</span>' : ''}
                                 </td>
-                                <td style="border: 1px solid #cbd5e1; padding: 5px; color: #334155;">${f.funcao}</td>
-                                <td style="border: 1px solid #cbd5e1; padding: 5px; color: #334155;">${f.local}</td>
+                                <td style="border: 1px solid #000; padding: 4px 6px; color: #111;">${f.funcao}</td>
+                                <td style="border: 1px solid #000; padding: 4px 6px; color: #111;">${f.local}</td>
                             </tr>
                         `;
                     });
