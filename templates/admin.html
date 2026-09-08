@@ -1036,15 +1036,44 @@
                         <i class="ph ph-funnel text-indigo-600 dark:text-indigo-400 text-base"></i> Filtrar Servidores por Função e Jornada
                     </span>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1">Filtrar por Função</label>
-                            <select id="filter_pdf_funcao" class="w-full border border-gray-300 bg-white p-2.5 rounded-lg text-xs font-semibold dark:bg-gray-800 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
-                                <option value="TODAS">TODAS AS FUNÇÕES</option>
-                                {% for f in funcoes %}
-                                <option value="{{ f.nome }}">{{ f.nome }}</option>
-                                {% endfor %}
-                            </select>
+                        <!-- FILTRO MULTI-SELECT FUNÇÃO -->
+                        <div class="relative">
+                            <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex justify-between items-center">
+                                <span>Filtrar por Função (Múltipla Seleção)</span>
+                                <span id="count_funcoes_badge" class="text-[10px] text-indigo-600 font-bold hidden bg-indigo-100 px-1.5 py-0.5 rounded-full dark:bg-indigo-900/50 dark:text-indigo-300">0</span>
+                            </label>
+                            
+                            <button type="button" id="btn_dropdown_funcoes" onclick="toggleDropdownFuncoes()"
+                                class="w-full border border-gray-300 bg-white p-2.5 rounded-lg text-xs font-semibold dark:bg-gray-800 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm flex justify-between items-center text-left">
+                                <span id="lbl_funcoes_selecionadas" class="truncate">TODAS AS FUNÇÕES</span>
+                                <i class="ph ph-caret-down text-gray-400 ml-2 flex-shrink-0"></i>
+                            </button>
+
+                            <!-- MENU SUSPENSO COM CHECKBOXES -->
+                            <div id="dropdown_funcoes_menu" class="hidden absolute left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl z-[90] p-2 max-h-64 flex flex-col">
+                                <div class="p-1 border-b border-gray-100 dark:border-gray-700 mb-1 flex items-center gap-1 bg-gray-50 dark:bg-gray-700/50 rounded-lg px-2">
+                                    <i class="ph ph-magnifying-glass text-gray-400 text-sm"></i>
+                                    <input type="text" id="input_busca_funcao_pdf" placeholder="Buscar função..." onkeyup="filtrarListaFuncoesPDF(this.value)"
+                                        class="w-full bg-transparent p-1 text-xs outline-none dark:text-white">
+                                </div>
+
+                                <div class="flex justify-between items-center px-1 py-1 text-[11px] font-bold border-b border-gray-100 dark:border-gray-700 mb-1">
+                                    <button type="button" onclick="marcarTodasFuncoesPDF(true)" class="text-indigo-600 dark:text-indigo-400 hover:underline">Marcar Todas</button>
+                                    <button type="button" onclick="marcarTodasFuncoesPDF(false)" class="text-gray-500 dark:text-gray-400 hover:underline">Desmarcar Todas</button>
+                                </div>
+
+                                <div id="lista_funcoes_checkboxes" class="overflow-y-auto space-y-0.5 flex-1 menu-scroll pr-1">
+                                    {% for f in funcoes %}
+                                    <label class="item-funcao-row flex items-center gap-2 px-2 py-1.5 hover:bg-indigo-50 dark:hover:bg-gray-700/70 rounded-lg cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-200 transition-colors">
+                                        <input type="checkbox" value="{{ f.nome }}" class="chk-funcao-item w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500" onchange="atualizarLabelFuncoes()">
+                                        <span class="truncate">{{ f.nome }}</span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
                         </div>
+
+                        <!-- FILTRO JORNADA -->
                         <div>
                             <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1">Filtrar por Jornada</label>
                             <select id="filter_pdf_jornada" class="w-full border border-gray-300 bg-white p-2.5 rounded-lg text-xs font-semibold dark:bg-gray-800 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
@@ -1804,6 +1833,62 @@ function abrirModalAuditoria(btn) {
             }, 300);
         }
 
+        function toggleDropdownFuncoes() {
+            const menu = document.getElementById('dropdown_funcoes_menu');
+            if (menu) {
+                menu.classList.toggle('hidden');
+            }
+        }
+
+        function atualizarLabelFuncoes() {
+            const checkedItems = Array.from(document.querySelectorAll('.chk-funcao-item:checked'));
+            const totalItems = document.querySelectorAll('.chk-funcao-item').length;
+            const labelSpan = document.getElementById('lbl_funcoes_selecionadas');
+            const badge = document.getElementById('count_funcoes_badge');
+
+            if (!labelSpan) return;
+
+            if (checkedItems.length === 0 || checkedItems.length === totalItems) {
+                labelSpan.innerText = 'TODAS AS FUNÇÕES';
+                if (badge) badge.classList.add('hidden');
+            } else if (checkedItems.length === 1) {
+                labelSpan.innerText = checkedItems[0].value;
+                if (badge) {
+                    badge.innerText = '1';
+                    badge.classList.remove('hidden');
+                }
+            } else {
+                labelSpan.innerText = `${checkedItems.length} FUNÇÕES SELECIONADAS`;
+                if (badge) {
+                    badge.innerText = checkedItems.length;
+                    badge.classList.remove('hidden');
+                }
+            }
+        }
+
+        function marcarTodasFuncoesPDF(marcar = true) {
+            document.querySelectorAll('.chk-funcao-item').forEach(chk => {
+                chk.checked = marcar;
+            });
+            atualizarLabelFuncoes();
+        }
+
+        function filtrarListaFuncoesPDF(termo) {
+            const busca = (termo || '').trim().toLowerCase();
+            document.querySelectorAll('.item-funcao-row').forEach(row => {
+                const text = row.innerText.toLowerCase();
+                row.style.display = text.includes(busca) ? 'flex' : 'none';
+            });
+        }
+
+        document.addEventListener('click', function (e) {
+            const menu = document.getElementById('dropdown_funcoes_menu');
+            const btn = document.getElementById('btn_dropdown_funcoes');
+            if (menu && !menu.classList.contains('hidden') && !menu.contains(e.target) && !btn.contains(e.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
         function abrirModalPDFPersonalizado() {
             const modal = document.getElementById('modalPDFPersonalizado');
             if (!modal) return;
@@ -1828,12 +1913,15 @@ function abrirModalAuditoria(btn) {
                 });
             }
 
+            atualizarLabelFuncoes();
             modal.classList.remove('hidden');
         }
 
         function fecharModalPDFPersonalizado() {
             const modal = document.getElementById('modalPDFPersonalizado');
             if (modal) modal.classList.add('hidden');
+            const menu = document.getElementById('dropdown_funcoes_menu');
+            if (menu) menu.classList.add('hidden');
         }
 
         function marcarTodosCamposPDF(marcar = true) {
@@ -1848,7 +1936,8 @@ function abrirModalAuditoria(btn) {
         }
 
         function generateReportPDFPersonalizado() {
-            const selectedFuncao = document.getElementById('filter_pdf_funcao') ? document.getElementById('filter_pdf_funcao').value : 'TODAS';
+            const checkedFuncoes = Array.from(document.querySelectorAll('.chk-funcao-item:checked')).map(chk => chk.value.trim().toUpperCase());
+            const totalFuncoesCount = document.querySelectorAll('.chk-funcao-item').length;
             const selectedJornada = document.getElementById('filter_pdf_jornada') ? document.getElementById('filter_pdf_jornada').value : 'TODAS';
 
             const columnsConfig = [
@@ -1892,11 +1981,14 @@ function abrirModalAuditoria(btn) {
             }
             document.getElementById('loading').style.display = 'flex';
 
-            // Filtra as linhas da tabela por Função e Jornada se selecionados
+            // Filtra as linhas da tabela por Funções (Múltipla Seleção) e Jornada
             let domRows = Array.from(document.querySelectorAll('#mainTable tbody tr[data-nome]'));
 
-            if (selectedFuncao && selectedFuncao !== 'TODAS') {
-                domRows = domRows.filter(tr => tr.dataset.funcao && tr.dataset.funcao.trim().toUpperCase() === selectedFuncao.trim().toUpperCase());
+            if (checkedFuncoes.length > 0 && checkedFuncoes.length < totalFuncoesCount) {
+                domRows = domRows.filter(tr => {
+                    const func = tr.dataset.funcao ? tr.dataset.funcao.trim().toUpperCase() : '';
+                    return checkedFuncoes.includes(func);
+                });
             }
 
             if (selectedJornada && selectedJornada !== 'TODAS') {
@@ -1911,8 +2003,12 @@ function abrirModalAuditoria(btn) {
             if (selectSec && selectSec.value !== "") {
                 subtitleParts.push(`SEC: ${selectedSecText.toUpperCase()}`);
             }
-            if (selectedFuncao !== 'TODAS') {
-                subtitleParts.push(`FUNÇÃO: ${selectedFuncao.toUpperCase()}`);
+            if (checkedFuncoes.length > 0 && checkedFuncoes.length < totalFuncoesCount) {
+                if (checkedFuncoes.length === 1) {
+                    subtitleParts.push(`FUNÇÃO: ${checkedFuncoes[0]}`);
+                } else {
+                    subtitleParts.push(`FUNÇÕES: ${checkedFuncoes.length} SELECIONADAS`);
+                }
             }
             if (selectedJornada !== 'TODAS') {
                 subtitleParts.push(`JORNADA: ${selectedJornada.toUpperCase()}`);
