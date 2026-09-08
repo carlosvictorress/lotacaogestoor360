@@ -377,6 +377,10 @@
                                 class="text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition">
                                 <i class="ph ph-buildings text-lg"></i> PDF por Escola
                             </button>
+                            <button onclick="abrirModalPDFPersonalizado()"
+                                class="text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition dark:bg-indigo-900/40 dark:text-indigo-300">
+                                <i class="ph ph-sliders text-lg"></i> PDF Personalizado
+                            </button>
                         </div>
                     </div>
                     <form method="GET" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
@@ -980,6 +984,156 @@
                         <i class="ph ph-file-pdf text-lg"></i> Gerar PDF
                     </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PDF PERSONALIZADO -->
+    <div id="modalPDFPersonalizado"
+        class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[70] backdrop-blur-sm p-4"
+        onclick="if(event.target === this) fecharModalPDFPersonalizado()">
+        <div
+            class="bg-white rounded-2xl w-full max-w-2xl p-6 shadow-2xl dark:bg-gray-800 border border-gray-100 dark:border-gray-700 transform transition-all max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center pb-4 border-b border-gray-100 dark:border-gray-700">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <i class="ph ph-sliders text-xl text-indigo-600"></i> Relatório PDF Personalizado
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        Selecione as informações que deseja incluir no documento gerado.
+                    </p>
+                </div>
+                <button onclick="fecharModalPDFPersonalizado()"
+                    class="text-gray-400 hover:text-black dark:hover:text-white transition-colors p-1">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+
+            <div class="py-4 overflow-y-auto space-y-5 flex-1 pr-1 menu-scroll">
+                <!-- SEÇÃO 1: OBRIGATÓRIOS (AUTOMÁTICOS) -->
+                <div>
+                    <span class="block text-[11px] font-bold text-gray-500 uppercase dark:text-gray-400 tracking-wider mb-2">
+                        Dados Principais Identificadores (Fixos)
+                    </span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-gray-50 dark:bg-gray-700/50 p-3 rounded-xl border border-gray-200 dark:border-gray-700">
+                        <label class="flex items-center gap-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-not-allowed opacity-90">
+                            <input type="checkbox" checked disabled class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Nome Completo <span class="text-red-500 font-bold">*</span></span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 cursor-not-allowed opacity-90">
+                            <input type="checkbox" checked disabled class="w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>CPF <span class="text-red-500 font-bold">*</span></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- SEÇÃO 2: CAMPOS PRINCIPAIS -->
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-[11px] font-bold text-gray-500 uppercase dark:text-gray-400 tracking-wider">
+                            Informações Funcionais Principais
+                        </span>
+                        <div class="flex gap-3 text-xs">
+                            <button type="button" onclick="marcarTodosCamposPDF(true)" class="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">Marcar Todos</button>
+                            <span class="text-gray-300 dark:text-gray-600">|</span>
+                            <button type="button" onclick="marcarTodosCamposPDF(false)" class="text-gray-500 dark:text-gray-400 hover:underline font-medium">Desmarcar Opcionais</button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-indigo-50/50 dark:bg-indigo-900/10 p-3.5 rounded-xl border border-indigo-100 dark:border-indigo-900/30">
+                        <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_funcao" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Função / Cargo</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_lotacao" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Lotação / Local de Trabalho</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_jornada" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Jornada de Trabalho</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_formacao" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Formação / Escolaridade</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- SEÇÃO 3: OUTROS CAMPOS -->
+                <div>
+                    <span class="block text-[11px] font-bold text-gray-500 uppercase dark:text-gray-400 tracking-wider mb-2">
+                        Outros Dados Complementares
+                    </span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_secretaria" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Secretaria</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_tipo_vinculo" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Tipo de Vínculo</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_rg" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>RG</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_data_nasc" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Data de Nascimento</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_telefone" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Telefone</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_email" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>E-mail</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_endereco" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Endereço / Bairro</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_pis" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>PIS / PASEP</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_dt_inicio" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Data de Admissão</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_remuneracao" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Remuneração</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_dados_bancarios" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Dados Bancários</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_padrinho" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Quem Indicou</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_tipo_sanguineo" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Tipo Sanguíneo</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_dependentes" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Qtd. Dependentes</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-4 border-t border-gray-100 dark:border-gray-700">
+                <button onclick="fecharModalPDFPersonalizado()"
+                    class="w-1/2 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 transition-all text-sm">
+                    Cancelar
+                </button>
+                <button onclick="confirmarGerarPDFPersonalizado()"
+                    class="w-1/2 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-500/30 transition-all flex items-center justify-center gap-2 text-sm">
+                    <i class="ph ph-file-pdf text-lg"></i> Gerar PDF Personalizado
+                </button>
             </div>
         </div>
     </div>
@@ -1600,6 +1754,180 @@ function abrirModalAuditoria(btn) {
                     console.error("Erro ao gerar PDF Por Escola:", err);
                     if (pdfWindow) pdfWindow.close();
                     alert("Erro ao gerar PDF");
+                    element.style.display = 'none';
+                    document.getElementById('loading').style.display = 'none';
+                });
+            }, 300);
+        }
+
+        const funcionariosData = [
+            {% for f in funcionarios %}
+            {
+                id: {{ f.id }},
+                nome: {{ f.nome|tojson }},
+                cpf: {{ (f.cpf or '---')|tojson }},
+                rg: {{ (f.rg or '---')|tojson }},
+                data_nasc: {{ (f.data_nasc.strftime('%d/%m/%Y') if f.data_nasc else '---')|tojson }},
+                funcao: {{ (f.funcao.nome if f.funcao else 'Não Definido')|tojson }},
+                secretaria: {{ (f.secretaria.nome if f.secretaria else 'Não Definido')|tojson }},
+                lotacao: {{ (f.local_trabalho.nome if f.local_trabalho else (f.lotacao or 'Não Definido'))|tojson }},
+                jornada: {{ (f.jornada_trabalho or 'Não Definida')|tojson }},
+                escolaridade: {{ (f.escolaridade or 'Não Informada')|tojson }},
+                especialidade: {{ (f.especialidade or '')|tojson }},
+                formacao: {{ (((f.escolaridade or '') + (' (' + f.especialidade + ')' if f.especialidade else '')) or 'Não Informada')|tojson }},
+                tipo_vinculo: {{ (f.tipo_vinculo or 'Não Definido')|tojson }},
+                telefone: {{ (f.telefone or '---')|tojson }},
+                email: {{ (f.email or '---')|tojson }},
+                endereco: {{ (((f.endereco or '') + (' - ' + f.bairro if f.bairro else '')) or '---')|tojson }},
+                pis: {{ (f.pis or '---')|tojson }},
+                dt_inicio: {{ (f.dt_inicio.strftime('%d/%m/%Y') if f.dt_inicio else '---')|tojson }},
+                remuneracao: {{ (('R$ ' + f.remuneracao) if f.remuneracao else '---')|tojson }},
+                dados_bancarios: {{ (((f.banco or '') + (' Ag: ' + f.agencia if f.agencia else '') + (' C/C: ' + f.conta if f.conta else '')) or '---')|tojson }},
+                padrinho: {{ (f.padrinho.nome if f.padrinho else '---')|tojson }},
+                tipo_sanguineo: {{ (f.tipo_sanguineo or '---')|tojson }},
+                qtd_dependentes: {{ (f.qtd_dependentes or 0)|tojson }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+
+        function abrirModalPDFPersonalizado() {
+            const modal = document.getElementById('modalPDFPersonalizado');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function fecharModalPDFPersonalizado() {
+            const modal = document.getElementById('modalPDFPersonalizado');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function marcarTodosCamposPDF(marcar = true) {
+            document.querySelectorAll('.chk-pdf-field').forEach(chk => {
+                chk.checked = marcar;
+            });
+        }
+
+        function confirmarGerarPDFPersonalizado() {
+            fecharModalPDFPersonalizado();
+            generateReportPDFPersonalizado();
+        }
+
+        function generateReportPDFPersonalizado() {
+            const columnsConfig = [
+                { id: 'nome', label: 'Nome Completo', fixed: true, getValue: f => f.nome },
+                { id: 'cpf', label: 'CPF', fixed: true, getValue: f => f.cpf },
+                { id: 'funcao', chkId: 'chk_col_funcao', label: 'Função / Cargo', getValue: f => f.funcao },
+                { id: 'lotacao', chkId: 'chk_col_lotacao', label: 'Lotação / Local', getValue: f => f.lotacao },
+                { id: 'jornada', chkId: 'chk_col_jornada', label: 'Jornada', getValue: f => f.jornada },
+                { id: 'formacao', chkId: 'chk_col_formacao', label: 'Formação / Escolaridade', getValue: f => f.formacao },
+                { id: 'secretaria', chkId: 'chk_col_secretaria', label: 'Secretaria', getValue: f => f.secretaria },
+                { id: 'tipo_vinculo', chkId: 'chk_col_tipo_vinculo', label: 'Vínculo', getValue: f => f.tipo_vinculo },
+                { id: 'rg', chkId: 'chk_col_rg', label: 'RG', getValue: f => f.rg },
+                { id: 'data_nasc', chkId: 'chk_col_data_nasc', label: 'Data Nasc.', getValue: f => f.data_nasc },
+                { id: 'telefone', chkId: 'chk_col_telefone', label: 'Telefone', getValue: f => f.telefone },
+                { id: 'email', chkId: 'chk_col_email', label: 'E-mail', getValue: f => f.email },
+                { id: 'endereco', chkId: 'chk_col_endereco', label: 'Endereço', getValue: f => f.endereco },
+                { id: 'pis', chkId: 'chk_col_pis', label: 'PIS/PASEP', getValue: f => f.pis },
+                { id: 'dt_inicio', chkId: 'chk_col_dt_inicio', label: 'Data Admissão', getValue: f => f.dt_inicio },
+                { id: 'remuneracao', chkId: 'chk_col_remuneracao', label: 'Remuneração', getValue: f => f.remuneracao },
+                { id: 'dados_bancarios', chkId: 'chk_col_dados_bancarios', label: 'Dados Bancários', getValue: f => f.dados_bancarios },
+                { id: 'padrinho', chkId: 'chk_col_padrinho', label: 'Quem Indicou', getValue: f => f.padrinho },
+                { id: 'tipo_sanguineo', chkId: 'chk_col_tipo_sanguineo', label: 'Tipo Sang.', getValue: f => f.tipo_sanguineo },
+                { id: 'dependentes', chkId: 'chk_col_dependentes', label: 'Dep.', getValue: f => f.qtd_dependentes }
+            ];
+
+            const selectedColumns = columnsConfig.filter(col => {
+                if (col.fixed) return true;
+                const el = document.getElementById(col.chkId);
+                return el && el.checked;
+            });
+
+            if (selectedColumns.length === 0) {
+                alert("Por favor, selecione ao menos uma informação para o relatório.");
+                return;
+            }
+
+            const pdfWindow = window.open('', '_blank');
+            if (pdfWindow) {
+                pdfWindow.document.write('<title>Relatório PDF Personalizado</title><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#f9fafb;"><div style="text-align:center;"><h2>Carregando Relatório Personalizado...</h2><p style="color:#666;">Aguarde um instante enquanto seu PDF é gerado.</p></div></body>');
+            }
+            document.getElementById('loading').style.display = 'flex';
+
+            setTimeout(() => {
+                const selectSec = document.getElementById('filter_sec');
+                const selectedText = selectSec && selectSec.selectedIndex >= 0 ? selectSec.options[selectSec.selectedIndex].text : '';
+                let subtitle = (!selectSec || selectSec.value === "") ? "RELATÓRIO PERSONALIZADO DE SERVIDORES" : `RELATÓRIO PERSONALIZADO - ${selectedText.toUpperCase()}`;
+                document.getElementById('report-subtitle').innerText = subtitle;
+
+                const dataHoje = new Date();
+                const diaHoje = String(dataHoje.getDate()).padStart(2, '0');
+                const mesHoje = String(dataHoje.getMonth() + 1).padStart(2, '0');
+                const anoHoje = dataHoje.getFullYear();
+                document.getElementById('report-date').innerText = `${diaHoje}/${mesHoje}/${anoHoje}`;
+
+                const table = document.createElement('table');
+                table.classList.add('pdf-table');
+
+                const thead = document.createElement('thead');
+                const trHead = document.createElement('tr');
+                selectedColumns.forEach(col => {
+                    const th = document.createElement('th');
+                    th.innerText = col.label;
+                    trHead.appendChild(th);
+                });
+                thead.appendChild(trHead);
+                table.appendChild(thead);
+
+                const tbody = document.createElement('tbody');
+                if (typeof funcionariosData !== 'undefined' && funcionariosData.length > 0) {
+                    funcionariosData.forEach(f => {
+                        const tr = document.createElement('tr');
+                        selectedColumns.forEach(col => {
+                            const td = document.createElement('td');
+                            td.innerText = col.getValue(f) || '---';
+                            tr.appendChild(td);
+                        });
+                        tbody.appendChild(tr);
+                    });
+                } else {
+                    const tr = document.createElement('tr');
+                    const td = document.createElement('td');
+                    td.colSpan = selectedColumns.length;
+                    td.style.textAlign = 'center';
+                    td.innerText = 'Nenhum registro encontrado.';
+                    tr.appendChild(td);
+                    tbody.appendChild(tr);
+                }
+                table.appendChild(tbody);
+
+                const container = document.getElementById('pdf-table-container');
+                container.innerHTML = '';
+                container.appendChild(table);
+
+                const element = document.getElementById('pdf-report');
+                element.style.display = 'block';
+
+                const isLandscape = selectedColumns.length > 5;
+                const opt = {
+                    margin: 5,
+                    filename: 'relatorio_personalizado.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, logging: false },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: isLandscape ? 'landscape' : 'portrait' },
+                    pagebreak: { mode: ['css', 'legacy'] }
+                };
+
+                html2pdf().set(opt).from(element).outputPdf('bloburl').then((pdfUrl) => {
+                    if (pdfWindow) {
+                        pdfWindow.location.href = pdfUrl;
+                    } else {
+                        window.open(pdfUrl, '_blank');
+                    }
+                    element.style.display = 'none';
+                    document.getElementById('loading').style.display = 'none';
+                }).catch(err => {
+                    console.error("Erro ao gerar PDF Personalizado:", err);
+                    if (pdfWindow) pdfWindow.close();
+                    alert("Erro ao gerar PDF Personalizado");
                     element.style.display = 'none';
                     document.getElementById('loading').style.display = 'none';
                 });
