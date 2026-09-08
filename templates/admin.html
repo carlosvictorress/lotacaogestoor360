@@ -492,26 +492,26 @@
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
                             {% for f in funcionarios %}
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                                data-nome="{{ f.nome or '' }}"
-                                data-cpf="{{ f.cpf or '---' }}"
-                                data-funcao="{{ f.funcao.nome if f.funcao else 'Não Definido' }}"
-                                data-lotacao="{{ f.local_trabalho.nome if f.local_trabalho else (f.lotacao or 'Não Definido') }}"
-                                data-jornada="{{ f.jornada_trabalho or 'Não Definida' }}"
-                                data-formacao="{{ ((f.escolaridade or '') + (' (' + f.especialidade + ')' if f.especialidade else '')) or 'Não Informada' }}"
-                                data-secretaria="{{ f.secretaria.nome if f.secretaria else 'Não Definido' }}"
-                                data-tipo-vinculo="{{ f.tipo_vinculo or 'Não Definido' }}"
-                                data-rg="{{ f.rg or '---' }}"
-                                data-nasc="{{ f.data_nasc.strftime('%d/%m/%Y') if f.data_nasc else '---' }}"
-                                data-telefone="{{ f.telefone or '---' }}"
-                                data-email="{{ f.email or '---' }}"
-                                data-endereco="{{ ((f.endereco or '') + (' - ' + f.bairro if f.bairro else '')) or '---' }}"
-                                data-pis="{{ f.pis or '---' }}"
-                                data-admissao="{{ f.dt_inicio.strftime('%d/%m/%Y') if f.dt_inicio else '---' }}"
-                                data-remuneracao="{{ ('R$ ' + f.remuneracao) if f.remuneracao else '---' }}"
-                                data-banco="{{ ((f.banco or '') + (' Ag: ' + f.agencia if f.agencia else '') + (' C/C: ' + f.conta if f.conta else '')) or '---' }}"
-                                data-padrinho="{{ f.padrinho.nome if f.padrinho else '---' }}"
-                                data-sangue="{{ f.tipo_sanguineo or '---' }}"
-                                data-dependentes="{{ f.qtd_dependentes or 0 }}">
+                                data-nome="{{ (f.nome or '')|e }}"
+                                data-cpf="{{ (f.cpf or '---')|e }}"
+                                data-funcao="{{ (f.funcao.nome if f.funcao else 'Não Definido')|e }}"
+                                data-lotacao="{{ (f.local_trabalho.nome if f.local_trabalho else (f.lotacao or 'Não Definido'))|e }}"
+                                data-jornada="{{ (f.jornada_trabalho or 'Não Definida')|e }}"
+                                data-formacao="{{ (((f.escolaridade or '') + (' (' + f.especialidade + ')' if f.especialidade else '')) or 'Não Informada')|e }}"
+                                data-secretaria="{{ (f.secretaria.nome if f.secretaria else 'Não Definido')|e }}"
+                                data-tipo-vinculo="{{ (f.tipo_vinculo or 'Não Definido')|e }}"
+                                data-rg="{{ (f.rg or '---')|e }}"
+                                data-nasc="{{ (f.data_nasc.strftime('%d/%m/%Y') if f.data_nasc else '---')|e }}"
+                                data-telefone="{{ (f.telefone or '---')|e }}"
+                                data-email="{{ (f.email or '---')|e }}"
+                                data-endereco="{{ (((f.endereco or '') + (' - ' + f.bairro if f.bairro else '')) or '---')|e }}"
+                                data-pis="{{ (f.pis or '---')|e }}"
+                                data-admissao="{{ (f.dt_inicio.strftime('%d/%m/%Y') if f.dt_inicio else '---')|e }}"
+                                data-remuneracao="{{ (('R$ ' + f.remuneracao) if f.remuneracao else '---')|e }}"
+                                data-banco="{{ (((f.banco or '') + (' Ag: ' + f.agencia if f.agencia else '') + (' C/C: ' + f.conta if f.conta else '')) or '---')|e }}"
+                                data-padrinho="{{ (f.padrinho.nome if f.padrinho else '---')|e }}"
+                                data-sangue="{{ (f.tipo_sanguineo or '---')|e }}"
+                                data-dependentes="{{ (f.qtd_dependentes or 0)|e }}">
                                 <td class="px-6 py-4"><span class="block font-bold text-gray-900 dark:text-white">{{
                                         f.nome }}</span><span class="text-xs text-gray-400">{{ f.cpf }}</span></td>
                                 <td class="px-6 py-4"><span
@@ -1030,6 +1030,30 @@
             </div>
 
             <div class="py-4 overflow-y-auto space-y-5 flex-1 pr-1 menu-scroll">
+                <!-- SEÇÃO 0: FILTROS ESPECÍFICOS (FUNÇÃO E JORNADA) -->
+                <div class="bg-indigo-50/70 dark:bg-gray-700/60 p-4 rounded-xl border border-indigo-100 dark:border-gray-600">
+                    <span class="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                        <i class="ph ph-funnel text-indigo-600 dark:text-indigo-400 text-base"></i> Filtrar Servidores por Função e Jornada
+                    </span>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1">Filtrar por Função</label>
+                            <select id="filter_pdf_funcao" class="w-full border border-gray-300 bg-white p-2.5 rounded-lg text-xs font-semibold dark:bg-gray-800 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                                <option value="TODAS">TODAS AS FUNÇÕES</option>
+                                {% for f in funcoes %}
+                                <option value="{{ f.nome }}">{{ f.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1">Filtrar por Jornada</label>
+                            <select id="filter_pdf_jornada" class="w-full border border-gray-300 bg-white p-2.5 rounded-lg text-xs font-semibold dark:bg-gray-800 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                                <option value="TODAS">TODAS AS JORNADAS</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- SEÇÃO 1: OBRIGATÓRIOS (AUTOMÁTICOS) -->
                 <div>
                     <span class="block text-[11px] font-bold text-gray-500 uppercase dark:text-gray-400 tracking-wider mb-2">
@@ -1782,7 +1806,29 @@ function abrirModalAuditoria(btn) {
 
         function abrirModalPDFPersonalizado() {
             const modal = document.getElementById('modalPDFPersonalizado');
-            if (modal) modal.classList.remove('hidden');
+            if (!modal) return;
+
+            // Popula dinamicamente as opções de Jornada presentes na tabela
+            const selectJornada = document.getElementById('filter_pdf_jornada');
+            if (selectJornada) {
+                const jornadasSet = new Set();
+                document.querySelectorAll('#mainTable tbody tr[data-jornada]').forEach(tr => {
+                    const j = tr.dataset.jornada;
+                    if (j && j.trim() !== '' && j !== 'Não Definida' && j !== '---') {
+                        jornadasSet.add(j.trim());
+                    }
+                });
+
+                selectJornada.innerHTML = '<option value="TODAS">TODAS AS JORNADAS</option>';
+                Array.from(jornadasSet).sort().forEach(j => {
+                    const opt = document.createElement('option');
+                    opt.value = j;
+                    opt.textContent = j;
+                    selectJornada.appendChild(opt);
+                });
+            }
+
+            modal.classList.remove('hidden');
         }
 
         function fecharModalPDFPersonalizado() {
@@ -1802,6 +1848,9 @@ function abrirModalAuditoria(btn) {
         }
 
         function generateReportPDFPersonalizado() {
+            const selectedFuncao = document.getElementById('filter_pdf_funcao') ? document.getElementById('filter_pdf_funcao').value : 'TODAS';
+            const selectedJornada = document.getElementById('filter_pdf_jornada') ? document.getElementById('filter_pdf_jornada').value : 'TODAS';
+
             const columnsConfig = [
                 { id: 'nome', label: 'Nome Completo', fixed: true, getValue: tr => tr.dataset.nome },
                 { id: 'cpf', label: 'CPF', fixed: true, getValue: tr => tr.dataset.cpf },
@@ -1839,12 +1888,40 @@ function abrirModalAuditoria(btn) {
             const pdfWindow = window.open('', '_blank');
             if (pdfWindow) {
                 pdfWindow.document.write('<title>Relatório PDF Personalizado</title><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;background:#f9fafb;"><div style="text-align:center;"><h2>Carregando Relatório Personalizado...</h2><p style="color:#666;">Aguarde um instante enquanto seu PDF é gerado.</p></div></body>');
+                pdfWindow.document.close();
             }
             document.getElementById('loading').style.display = 'flex';
 
+            // Filtra as linhas da tabela por Função e Jornada se selecionados
+            let domRows = Array.from(document.querySelectorAll('#mainTable tbody tr[data-nome]'));
+
+            if (selectedFuncao && selectedFuncao !== 'TODAS') {
+                domRows = domRows.filter(tr => tr.dataset.funcao && tr.dataset.funcao.trim().toUpperCase() === selectedFuncao.trim().toUpperCase());
+            }
+
+            if (selectedJornada && selectedJornada !== 'TODAS') {
+                domRows = domRows.filter(tr => tr.dataset.jornada && tr.dataset.jornada.trim().toUpperCase() === selectedJornada.trim().toUpperCase());
+            }
+
+            // Subtítulo descritivo do relatório
             const selectSec = document.getElementById('filter_sec');
-            const selectedText = selectSec && selectSec.selectedIndex >= 0 ? selectSec.options[selectSec.selectedIndex].text : '';
-            let subtitle = (!selectSec || selectSec.value === "") ? "RELATÓRIO PERSONALIZADO DE SERVIDORES" : `RELATÓRIO PERSONALIZADO - ${selectedText.toUpperCase()}`;
+            const selectedSecText = selectSec && selectSec.selectedIndex >= 0 ? selectSec.options[selectSec.selectedIndex].text : '';
+            let subtitleParts = [];
+
+            if (selectSec && selectSec.value !== "") {
+                subtitleParts.push(`SEC: ${selectedSecText.toUpperCase()}`);
+            }
+            if (selectedFuncao !== 'TODAS') {
+                subtitleParts.push(`FUNÇÃO: ${selectedFuncao.toUpperCase()}`);
+            }
+            if (selectedJornada !== 'TODAS') {
+                subtitleParts.push(`JORNADA: ${selectedJornada.toUpperCase()}`);
+            }
+
+            let subtitle = "RELATÓRIO PERSONALIZADO DE SERVIDORES";
+            if (subtitleParts.length > 0) {
+                subtitle += " (" + subtitleParts.join(" | ") + ")";
+            }
             document.getElementById('report-subtitle').innerText = subtitle;
 
             const dataHoje = new Date();
@@ -1852,8 +1929,6 @@ function abrirModalAuditoria(btn) {
             const mesHoje = String(dataHoje.getMonth() + 1).padStart(2, '0');
             const anoHoje = dataHoje.getFullYear();
             document.getElementById('report-date').innerText = `${diaHoje}/${mesHoje}/${anoHoje}`;
-
-            const domRows = document.querySelectorAll('#mainTable tbody tr[data-nome]');
 
             const table = document.createElement('table');
             table.classList.add('pdf-table');
@@ -1884,7 +1959,7 @@ function abrirModalAuditoria(btn) {
                 const td = document.createElement('td');
                 td.colSpan = selectedColumns.length;
                 td.style.textAlign = 'center';
-                td.innerText = 'Nenhum registro encontrado.';
+                td.innerText = 'Nenhum registro encontrado para os filtros selecionados.';
                 tr.appendChild(td);
                 tbody.appendChild(tr);
             }
@@ -1897,29 +1972,31 @@ function abrirModalAuditoria(btn) {
             const element = document.getElementById('pdf-report');
             element.style.display = 'block';
 
-            const opt = {
-                margin: 5,
-                filename: 'relatorio_personalizado.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-            };
+            setTimeout(() => {
+                const opt = {
+                    margin: 5,
+                    filename: 'relatorio_personalizado.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2 },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                };
 
-            html2pdf().set(opt).from(element).outputPdf('bloburl').then((pdfUrl) => {
-                if (pdfWindow) {
-                    pdfWindow.location.href = pdfUrl;
-                } else {
-                    window.open(pdfUrl, '_blank');
-                }
-                element.style.display = 'none';
-                document.getElementById('loading').style.display = 'none';
-            }).catch(err => {
-                console.error("Erro ao gerar PDF Personalizado:", err);
-                if (pdfWindow) pdfWindow.close();
-                alert("Erro ao gerar PDF Personalizado");
-                element.style.display = 'none';
-                document.getElementById('loading').style.display = 'none';
-            });
+                html2pdf().set(opt).from(element).outputPdf('bloburl').then((pdfUrl) => {
+                    if (pdfWindow) {
+                        pdfWindow.location.href = pdfUrl;
+                    } else {
+                        window.open(pdfUrl, '_blank');
+                    }
+                    element.style.display = 'none';
+                    document.getElementById('loading').style.display = 'none';
+                }).catch(err => {
+                    console.error("Erro ao gerar PDF Personalizado:", err);
+                    if (pdfWindow) pdfWindow.close();
+                    alert("Erro ao gerar PDF Personalizado");
+                    element.style.display = 'none';
+                    document.getElementById('loading').style.display = 'none';
+                });
+            }, 300);
         }
 
         const dataVinculo = {{ stats_vinculo| tojson }};
