@@ -52,43 +52,45 @@
 
         #pdf-report {
             display: none;
-            width: 275mm;
-            padding: 8mm 10mm;
+            width: 285mm;
+            padding: 6mm 8mm;
             background: white;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: #0f172a;
             box-sizing: border-box;
         }
 
         .pdf-header {
-            text-align: center;
-            border-bottom: 2px solid #1e293b;
-            padding-bottom: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
 
         .pdf-table {
             width: 100%;
             border-collapse: collapse;
-            font-size: 8.5pt;
+            font-size: 7.5pt;
+            margin-top: 8px;
+            table-layout: auto;
         }
 
         .pdf-table th {
-            background-color: #f1f5f9;
-            color: #1e293b;
-            border: 1px solid #cbd5e1;
-            padding: 8px 10px;
+            background-color: #1e293b;
+            color: #ffffff;
+            border: 1px solid #0f172a;
+            padding: 6px 8px;
             text-transform: uppercase;
             font-weight: 700;
-            font-size: 8.5pt;
+            font-size: 7.5pt;
             letter-spacing: 0.3px;
+            text-align: left;
         }
 
         .pdf-table td {
-            border: 1px solid #e2e8f0;
-            padding: 7px 10px;
+            border: 1px solid #cbd5e1;
+            padding: 5px 7px;
             color: #1e293b;
-            font-size: 8.5pt;
+            font-size: 7.5pt;
+            vertical-align: middle;
+            word-break: break-word;
         }
 
         .pdf-table tr:nth-child(even) td {
@@ -504,7 +506,7 @@
                                 data-nasc="{{ (f.data_nasc.strftime('%d/%m/%Y') if f.data_nasc else '---')|e }}"
                                 data-telefone="{{ (f.telefone or '---')|e }}"
                                 data-email="{{ (f.email or '---')|e }}"
-                                data-endereco="{{ (((f.endereco or '') + (' - ' + f.bairro if f.bairro else '')) or '---')|e }}"
+                                data-endereco="{{ (((f.endereco or '') + (', ' + f.bairro if f.bairro else '') + (', ' + f.cidade if f.cidade else '') + ('/' + f.uf if f.uf else '') + (' - CEP: ' + f.cep if f.cep else '')) or '---')|e }}"
                                 data-pis="{{ (f.pis or '---')|e }}"
                                 data-admissao="{{ (f.dt_inicio.strftime('%d/%m/%Y') if f.dt_inicio else '---')|e }}"
                                 data-remuneracao="{{ (('R$ ' + f.remuneracao) if f.remuneracao else '---')|e }}"
@@ -900,20 +902,28 @@
     </div>
 
     <div id="pdf-report">
-        <div class="pdf-header"><img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão"
-                style="height: 60px; margin-bottom: 10px;">
-            <h2 style="margin: 0; font-size: 14pt; font-weight: bold;">ESTADO DO PIAUÍ</h2>
-            <h2 style="margin: 0; font-size: 14pt; font-weight: bold;">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h2>
-            <h3 style="margin: 10px 0; font-size: 12pt; text-decoration: underline;">RELATÓRIO GERENCIAL DE PESSOAL</h3>
-            <p id="report-subtitle" style="font-size: 10pt; font-weight: bold;">FILTRO: GERAL</p>
+        <div class="pdf-header">
+            <div style="display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 10px; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px;">
+                <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão" style="height: 52px; width: auto;">
+                <div style="text-align: center;">
+                    <h2 style="margin: 0; font-size: 13pt; font-weight: 800; color: #1e3a8a; letter-spacing: 0.5px; text-transform: uppercase;">ESTADO DO PIAUÍ</h2>
+                    <h2 style="margin: 0; font-size: 11.5pt; font-weight: 700; color: #1e293b; text-transform: uppercase;">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h2>
+                    <h3 style="margin: 2px 0 0 0; font-size: 9.5pt; font-weight: 600; color: #475569; text-transform: uppercase;">SECRETARIA MUNICIPAL DE EDUCAÇÃO</h3>
+                </div>
+            </div>
+            <div style="background-color: #1e3a8a; color: white; padding: 6px 12px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
+                <span id="report-subtitle" style="font-size: 8.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px;">RELATÓRIO PERSONALIZADO DE SERVIDORES</span>
+                <span id="report-record-count" style="font-size: 8pt; font-weight: 700; background-color: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 3px;">TOTAL: 0 SERVIDORES</span>
+            </div>
         </div>
         <div id="pdf-table-container"></div>
-        <div
-            style="margin-top: 15px; padding-top: 8px; border-top: 0.5px solid #eee; display: flex; align-items: center; justify-content: center; gap: 3px; text-align: center; font-size: 6pt;">
-            <span style="color: #999;">Gerado por</span><img src="{{ url_for('static', filename='logo.png') }}"
-                alt="Logo" style="height: 5mm; width: auto; display: inline-block; opacity: 0.7;"><span
-                style="color: #999;">no
-                dia</span><span id="report-date" style="color: #888;"></span>
+        <div style="margin-top: 14px; padding-top: 6px; border-top: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: space-between; font-size: 7pt; color: #64748b;">
+            <span>Sistema Gestor 360 - Prefeitura Municipal de Valença do Piauí</span>
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span>Gerado em: <strong id="report-date" style="color: #334155;"></strong></span>
+                <span>•</span>
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="height: 4.5mm; width: auto; opacity: 0.8;">
+            </div>
         </div>
     </div>
     <div id="loading"
@@ -1030,12 +1040,23 @@
             </div>
 
             <div class="py-4 overflow-y-auto space-y-5 flex-1 pr-1 menu-scroll">
-                <!-- SEÇÃO 0: FILTROS ESPECÍFICOS (FUNÇÃO E JORNADA) -->
+                <!-- SEÇÃO 0: FILTROS ESPECÍFICOS (ESCOLA, FUNÇÃO E JORNADA) -->
                 <div class="bg-indigo-50/70 dark:bg-gray-700/60 p-4 rounded-xl border border-indigo-100 dark:border-gray-600">
                     <span class="block text-[11px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                        <i class="ph ph-funnel text-indigo-600 dark:text-indigo-400 text-base"></i> Filtrar Servidores por Função e Jornada
+                        <i class="ph ph-funnel text-indigo-600 dark:text-indigo-400 text-base"></i> Filtrar Servidores por Escola, Função e Jornada
                     </span>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <!-- FILTRO ESCOLA / LOCAL -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1">Filtrar por Escola / Local</label>
+                            <select id="filter_pdf_escola" class="w-full border border-gray-300 bg-white p-2.5 rounded-lg text-xs font-semibold dark:bg-gray-800 dark:border-gray-600 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm">
+                                <option value="TODAS">TODAS AS ESCOLAS (GERAL)</option>
+                                {% for l in locais_trabalho %}
+                                <option value="{{ l.nome }}">{{ l.nome }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
                         <!-- FILTRO MULTI-SELECT FUNÇÃO -->
                         <div class="relative">
                             <label class="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-1 flex justify-between items-center">
@@ -1104,10 +1125,12 @@
                 <div>
                     <div class="flex justify-between items-center mb-2">
                         <span class="text-[11px] font-bold text-gray-500 uppercase dark:text-gray-400 tracking-wider">
-                            Informações Funcionais Principais
+                            Informações Funcionais e Pessoais Principais
                         </span>
-                        <div class="flex gap-3 text-xs">
-                            <button type="button" onclick="marcarTodosCamposPDF(true)" class="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">Marcar Todos</button>
+                        <div class="flex gap-2 text-xs">
+                            <button type="button" onclick="marcarPrincipaisPDF()" class="text-indigo-600 dark:text-indigo-400 hover:underline font-bold">Principais Solicitados</button>
+                            <span class="text-gray-300 dark:text-gray-600">|</span>
+                            <button type="button" onclick="marcarTodosCamposPDF(true)" class="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold">Marcar Todos</button>
                             <span class="text-gray-300 dark:text-gray-600">|</span>
                             <button type="button" onclick="marcarTodosCamposPDF(false)" class="text-gray-500 dark:text-gray-400 hover:underline font-medium">Desmarcar Opcionais</button>
                         </div>
@@ -1118,16 +1141,28 @@
                             <span>Função / Cargo</span>
                         </label>
                         <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_formacao" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Formação / Escolaridade</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_tipo_vinculo" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Tipo de Vínculo</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_data_nasc" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Data de Nascimento</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_endereco" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Endereço Completo</span>
+                        </label>
+                        <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
                             <input type="checkbox" id="chk_col_lotacao" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
                             <span>Lotação / Local de Trabalho</span>
                         </label>
                         <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
                             <input type="checkbox" id="chk_col_jornada" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
                             <span>Jornada de Trabalho</span>
-                        </label>
-                        <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
-                            <input type="checkbox" id="chk_col_formacao" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
-                            <span>Formação / Escolaridade</span>
                         </label>
                     </div>
                 </div>
@@ -1143,16 +1178,8 @@
                             <span>Secretaria</span>
                         </label>
                         <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
-                            <input type="checkbox" id="chk_col_tipo_vinculo" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
-                            <span>Tipo de Vínculo</span>
-                        </label>
-                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
                             <input type="checkbox" id="chk_col_rg" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
                             <span>RG</span>
-                        </label>
-                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
-                            <input type="checkbox" id="chk_col_data_nasc" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
-                            <span>Data de Nascimento</span>
                         </label>
                         <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
                             <input type="checkbox" id="chk_col_telefone" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
@@ -1161,10 +1188,6 @@
                         <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
                             <input type="checkbox" id="chk_col_email" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
                             <span>E-mail</span>
-                        </label>
-                        <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
-                            <input type="checkbox" id="chk_col_endereco" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
-                            <span>Endereço / Bairro</span>
                         </label>
                         <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
                             <input type="checkbox" id="chk_col_pis" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
@@ -1893,6 +1916,26 @@ function abrirModalAuditoria(btn) {
             const modal = document.getElementById('modalPDFPersonalizado');
             if (!modal) return;
 
+            // Popula dinamicamente as opções de Escola / Local de Trabalho presentes na tabela
+            const selectEscola = document.getElementById('filter_pdf_escola');
+            if (selectEscola) {
+                const escolasSet = new Set();
+                document.querySelectorAll('#mainTable tbody tr[data-lotacao]').forEach(tr => {
+                    const l = tr.dataset.lotacao;
+                    if (l && l.trim() !== '' && l !== 'Não Definido' && l !== '---') {
+                        escolasSet.add(l.trim());
+                    }
+                });
+
+                selectEscola.innerHTML = '<option value="TODAS">TODAS AS ESCOLAS (GERAL)</option>';
+                Array.from(escolasSet).sort().forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e;
+                    opt.textContent = e;
+                    selectEscola.appendChild(opt);
+                });
+            }
+
             // Popula dinamicamente as opções de Jornada presentes na tabela
             const selectJornada = document.getElementById('filter_pdf_jornada');
             if (selectJornada) {
@@ -1930,6 +1973,15 @@ function abrirModalAuditoria(btn) {
             });
         }
 
+        function marcarPrincipaisPDF() {
+            document.querySelectorAll('.chk-pdf-field').forEach(chk => chk.checked = false);
+            const principais = ['chk_col_funcao', 'chk_col_formacao', 'chk_col_tipo_vinculo', 'chk_col_data_nasc', 'chk_col_endereco'];
+            principais.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.checked = true;
+            });
+        }
+
         function confirmarGerarPDFPersonalizado() {
             fecharModalPDFPersonalizado();
             generateReportPDFPersonalizado();
@@ -1938,6 +1990,7 @@ function abrirModalAuditoria(btn) {
         function generateReportPDFPersonalizado() {
             const checkedFuncoes = Array.from(document.querySelectorAll('.chk-funcao-item:checked')).map(chk => chk.value.trim().toUpperCase());
             const totalFuncoesCount = document.querySelectorAll('.chk-funcao-item').length;
+            const selectedEscola = document.getElementById('filter_pdf_escola') ? document.getElementById('filter_pdf_escola').value : 'TODAS';
             const selectedJornada = document.getElementById('filter_pdf_jornada') ? document.getElementById('filter_pdf_jornada').value : 'TODAS';
 
             const columnsConfig = [
@@ -1953,7 +2006,7 @@ function abrirModalAuditoria(btn) {
                 { id: 'data_nasc', chkId: 'chk_col_data_nasc', label: 'Data Nasc.', getValue: tr => tr.dataset.nasc },
                 { id: 'telefone', chkId: 'chk_col_telefone', label: 'Telefone', getValue: tr => tr.dataset.telefone },
                 { id: 'email', chkId: 'chk_col_email', label: 'E-mail', getValue: tr => tr.dataset.email },
-                { id: 'endereco', chkId: 'chk_col_endereco', label: 'Endereço', getValue: tr => tr.dataset.endereco },
+                { id: 'endereco', chkId: 'chk_col_endereco', label: 'Endereço Completo', getValue: tr => tr.dataset.endereco },
                 { id: 'pis', chkId: 'chk_col_pis', label: 'PIS/PASEP', getValue: tr => tr.dataset.pis },
                 { id: 'dt_inicio', chkId: 'chk_col_dt_inicio', label: 'Data Admissão', getValue: tr => tr.dataset.admissao },
                 { id: 'remuneracao', chkId: 'chk_col_remuneracao', label: 'Remuneração', getValue: tr => tr.dataset.remuneracao },
@@ -1981,8 +2034,12 @@ function abrirModalAuditoria(btn) {
             }
             document.getElementById('loading').style.display = 'flex';
 
-            // Filtra as linhas da tabela por Funções (Múltipla Seleção) e Jornada
+            // Filtra as linhas da tabela por Escola, Funções (Múltipla Seleção) e Jornada
             let domRows = Array.from(document.querySelectorAll('#mainTable tbody tr[data-nome]'));
+
+            if (selectedEscola && selectedEscola !== 'TODAS') {
+                domRows = domRows.filter(tr => tr.dataset.lotacao && tr.dataset.lotacao.trim().toUpperCase() === selectedEscola.trim().toUpperCase());
+            }
 
             if (checkedFuncoes.length > 0 && checkedFuncoes.length < totalFuncoesCount) {
                 domRows = domRows.filter(tr => {
@@ -2003,6 +2060,9 @@ function abrirModalAuditoria(btn) {
             if (selectSec && selectSec.value !== "") {
                 subtitleParts.push(`SEC: ${selectedSecText.toUpperCase()}`);
             }
+            if (selectedEscola !== 'TODAS') {
+                subtitleParts.push(`ESCOLA: ${selectedEscola.toUpperCase()}`);
+            }
             if (checkedFuncoes.length > 0 && checkedFuncoes.length < totalFuncoesCount) {
                 if (checkedFuncoes.length === 1) {
                     subtitleParts.push(`FUNÇÃO: ${checkedFuncoes[0]}`);
@@ -2019,6 +2079,10 @@ function abrirModalAuditoria(btn) {
                 subtitle += " (" + subtitleParts.join(" | ") + ")";
             }
             document.getElementById('report-subtitle').innerText = subtitle;
+            const recordCountEl = document.getElementById('report-record-count');
+            if (recordCountEl) {
+                recordCountEl.innerText = `TOTAL: ${domRows.length} SERVIDORES`;
+            }
 
             const dataHoje = new Date();
             const diaHoje = String(dataHoje.getDate()).padStart(2, '0');
