@@ -52,8 +52,8 @@
 
         #pdf-report {
             display: none;
-            width: 285mm;
-            padding: 6mm 8mm;
+            width: 280mm;
+            padding: 5mm 6mm;
             background: white;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             color: #0f172a;
@@ -61,14 +61,16 @@
         }
 
         .pdf-header {
-            margin-bottom: 12px;
+            margin-bottom: 8px;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
         }
 
         .pdf-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 7.5pt;
-            margin-top: 8px;
+            margin-top: 6px;
             table-layout: auto;
         }
 
@@ -76,21 +78,31 @@
             background-color: #1e293b;
             color: #ffffff;
             border: 1px solid #0f172a;
-            padding: 6px 8px;
+            padding: 5px 6px;
             text-transform: uppercase;
             font-weight: 700;
             font-size: 7.5pt;
             letter-spacing: 0.3px;
             text-align: left;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
         }
 
         .pdf-table td {
             border: 1px solid #cbd5e1;
-            padding: 5px 7px;
+            padding: 5px 6px;
             color: #1e293b;
             font-size: 7.5pt;
             vertical-align: middle;
             word-break: break-word;
+            overflow-wrap: break-word;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+
+        .pdf-table tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
         }
 
         .pdf-table tr:nth-child(even) td {
@@ -1994,26 +2006,26 @@ function abrirModalAuditoria(btn) {
             const selectedJornada = document.getElementById('filter_pdf_jornada') ? document.getElementById('filter_pdf_jornada').value : 'TODAS';
 
             const columnsConfig = [
-                { id: 'nome', label: 'Nome Completo', fixed: true, getValue: tr => tr.dataset.nome },
-                { id: 'cpf', label: 'CPF', fixed: true, getValue: tr => tr.dataset.cpf },
+                { id: 'nome', label: 'Nome Completo', fixed: true, getValue: tr => tr.dataset.nome, style: 'font-weight: 600; color: #0f172a;' },
+                { id: 'cpf', label: 'CPF', fixed: true, getValue: tr => tr.dataset.cpf, style: 'white-space: nowrap; font-family: monospace; font-size: 7pt; text-align: center;' },
                 { id: 'funcao', chkId: 'chk_col_funcao', label: 'Função / Cargo', getValue: tr => tr.dataset.funcao },
                 { id: 'lotacao', chkId: 'chk_col_lotacao', label: 'Lotação / Local', getValue: tr => tr.dataset.lotacao },
-                { id: 'jornada', chkId: 'chk_col_jornada', label: 'Jornada', getValue: tr => tr.dataset.jornada },
+                { id: 'jornada', chkId: 'chk_col_jornada', label: 'Jornada', getValue: tr => tr.dataset.jornada, style: 'white-space: nowrap; text-align: center;' },
                 { id: 'formacao', chkId: 'chk_col_formacao', label: 'Formação / Escolaridade', getValue: tr => tr.dataset.formacao },
                 { id: 'secretaria', chkId: 'chk_col_secretaria', label: 'Secretaria', getValue: tr => tr.dataset.secretaria },
-                { id: 'tipo_vinculo', chkId: 'chk_col_tipo_vinculo', label: 'Vínculo', getValue: tr => tr.dataset.tipoVinculo },
-                { id: 'rg', chkId: 'chk_col_rg', label: 'RG', getValue: tr => tr.dataset.rg },
-                { id: 'data_nasc', chkId: 'chk_col_data_nasc', label: 'Data Nasc.', getValue: tr => tr.dataset.nasc },
-                { id: 'telefone', chkId: 'chk_col_telefone', label: 'Telefone', getValue: tr => tr.dataset.telefone },
+                { id: 'tipo_vinculo', chkId: 'chk_col_tipo_vinculo', label: 'Vínculo', getValue: tr => tr.dataset.tipoVinculo, style: 'white-space: nowrap; text-align: center;' },
+                { id: 'rg', chkId: 'chk_col_rg', label: 'RG', getValue: tr => tr.dataset.rg, style: 'white-space: nowrap; text-align: center;' },
+                { id: 'data_nasc', chkId: 'chk_col_data_nasc', label: 'Data Nasc.', getValue: tr => tr.dataset.nasc, style: 'white-space: nowrap; text-align: center;' },
+                { id: 'telefone', chkId: 'chk_col_telefone', label: 'Telefone', getValue: tr => tr.dataset.telefone, style: 'white-space: nowrap;' },
                 { id: 'email', chkId: 'chk_col_email', label: 'E-mail', getValue: tr => tr.dataset.email },
-                { id: 'endereco', chkId: 'chk_col_endereco', label: 'Endereço Completo', getValue: tr => tr.dataset.endereco },
-                { id: 'pis', chkId: 'chk_col_pis', label: 'PIS/PASEP', getValue: tr => tr.dataset.pis },
-                { id: 'dt_inicio', chkId: 'chk_col_dt_inicio', label: 'Data Admissão', getValue: tr => tr.dataset.admissao },
-                { id: 'remuneracao', chkId: 'chk_col_remuneracao', label: 'Remuneração', getValue: tr => tr.dataset.remuneracao },
+                { id: 'endereco', chkId: 'chk_col_endereco', label: 'Endereço Completo', getValue: tr => tr.dataset.endereco, style: 'font-size: 7pt;' },
+                { id: 'pis', chkId: 'chk_col_pis', label: 'PIS/PASEP', getValue: tr => tr.dataset.pis, style: 'white-space: nowrap; text-align: center;' },
+                { id: 'dt_inicio', chkId: 'chk_col_dt_inicio', label: 'Data Admissão', getValue: tr => tr.dataset.admissao, style: 'white-space: nowrap; text-align: center;' },
+                { id: 'remuneracao', chkId: 'chk_col_remuneracao', label: 'Remuneração', getValue: tr => tr.dataset.remuneracao, style: 'white-space: nowrap;' },
                 { id: 'dados_bancarios', chkId: 'chk_col_dados_bancarios', label: 'Dados Bancários', getValue: tr => tr.dataset.banco },
                 { id: 'padrinho', chkId: 'chk_col_padrinho', label: 'Quem Indicou', getValue: tr => tr.dataset.padrinho },
-                { id: 'tipo_sanguineo', chkId: 'chk_col_tipo_sanguineo', label: 'Tipo Sang.', getValue: tr => tr.dataset.sangue },
-                { id: 'dependentes', chkId: 'chk_col_dependentes', label: 'Dep.', getValue: tr => tr.dataset.dependentes }
+                { id: 'tipo_sanguineo', chkId: 'chk_col_tipo_sanguineo', label: 'Tipo Sang.', getValue: tr => tr.dataset.sangue, style: 'white-space: nowrap; text-align: center;' },
+                { id: 'dependentes', chkId: 'chk_col_dependentes', label: 'Dep.', getValue: tr => tr.dataset.dependentes, style: 'text-align: center;' }
             ];
 
             const selectedColumns = columnsConfig.filter(col => {
@@ -2098,6 +2110,7 @@ function abrirModalAuditoria(btn) {
             selectedColumns.forEach(col => {
                 const th = document.createElement('th');
                 th.innerText = col.label;
+                if (col.style) th.style.cssText = col.style;
                 trHead.appendChild(th);
             });
             thead.appendChild(trHead);
@@ -2110,6 +2123,7 @@ function abrirModalAuditoria(btn) {
                     selectedColumns.forEach(col => {
                         const td = document.createElement('td');
                         td.innerText = col.getValue(trDom) || '---';
+                        if (col.style) td.style.cssText = col.style;
                         tr.appendChild(td);
                     });
                     tbody.appendChild(tr);
@@ -2134,11 +2148,12 @@ function abrirModalAuditoria(btn) {
 
             setTimeout(() => {
                 const opt = {
-                    margin: 5,
+                    margin: [6, 6, 6, 6],
                     filename: 'relatorio_personalizado.pdf',
                     image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2 },
-                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                    html2canvas: { scale: 2, useCORS: true, logging: false },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
                 };
 
                 html2pdf().set(opt).from(element).outputPdf('bloburl').then((pdfUrl) => {
