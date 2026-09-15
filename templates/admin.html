@@ -1176,6 +1176,10 @@
                             <input type="checkbox" id="chk_col_jornada" checked class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
                             <span>Jornada de Trabalho</span>
                         </label>
+                        <label class="flex items-center gap-2.5 text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer hover:text-indigo-700">
+                            <input type="checkbox" id="chk_col_assinatura" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
+                            <span>Assinatura do Servidor</span>
+                        </label>
                     </div>
                 </div>
 
@@ -2025,7 +2029,8 @@ function abrirModalAuditoria(btn) {
                 { id: 'dados_bancarios', chkId: 'chk_col_dados_bancarios', label: 'Dados Bancários', getValue: tr => tr.dataset.banco },
                 { id: 'padrinho', chkId: 'chk_col_padrinho', label: 'Quem Indicou', getValue: tr => tr.dataset.padrinho },
                 { id: 'tipo_sanguineo', chkId: 'chk_col_tipo_sanguineo', label: 'Tipo Sang.', getValue: tr => tr.dataset.sangue, style: 'white-space: nowrap; text-align: center;' },
-                { id: 'dependentes', chkId: 'chk_col_dependentes', label: 'Dep.', getValue: tr => tr.dataset.dependentes, style: 'text-align: center;' }
+                { id: 'dependentes', chkId: 'chk_col_dependentes', label: 'Dep.', getValue: tr => tr.dataset.dependentes, style: 'text-align: center;' },
+                { id: 'assinatura', chkId: 'chk_col_assinatura', label: 'Assinatura do Servidor', getValue: () => '', style: 'min-width: 140px; text-align: center;' }
             ];
 
             const selectedColumns = columnsConfig.filter(col => {
@@ -2122,7 +2127,8 @@ function abrirModalAuditoria(btn) {
                     const tr = document.createElement('tr');
                     selectedColumns.forEach(col => {
                         const td = document.createElement('td');
-                        td.innerText = col.getValue(trDom) || '---';
+                        const val = col.getValue(trDom);
+                        td.innerText = (val !== null && val !== undefined) ? val : '---';
                         if (col.style) td.style.cssText = col.style;
                         tr.appendChild(td);
                     });
