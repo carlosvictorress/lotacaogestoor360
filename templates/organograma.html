@@ -1,0 +1,1136 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-gray-50 dark:bg-gray-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organograma & Quadro de Cargos da Secretaria</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        indigo: { 50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- D3.js & d3-org-chart -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3-org-chart@3.1.0"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        .chart-container {
+            height: 650px;
+            width: 100%;
+            background-color: #f8fafc;
+            border-radius: 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .dark .chart-container {
+            background-color: #0f172a;
+        }
+        .menu-scroll::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .menu-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .menu-scroll::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 9999px;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+
+    <!-- CABEÇALHO SUPERIOR -->
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <a href="{{ url_for('sistema') }}" class="p-2 rounded-xl text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-white dark:hover:bg-gray-700 transition-all" title="Voltar ao Painel">
+                    <i class="ph ph-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <h1 class="text-xl font-black tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
+                        <i class="ph ph-tree-structure text-indigo-600 dark:text-indigo-400 text-2xl"></i>
+                        Organograma & Quadro de Cargos
+                    </h1>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                        Gestão da Estrutura Organizacional, Portarias e Atos Administrativos
+                    </p>
+                </div>
+            </div>
+
+            <!-- SELETOR DE EXERCÍCIO E BOTÕES -->
+            <div class="flex flex-wrap items-center gap-2.5">
+                <div class="flex items-center bg-gray-100 dark:bg-gray-700/60 p-1 rounded-xl border border-gray-200 dark:border-gray-600">
+                    <span class="text-xs font-bold text-gray-500 dark:text-gray-300 px-2 flex items-center gap-1">
+                        <i class="ph ph-calendar"></i> Exercício:
+                    </span>
+                    <select id="select_exercicio" onchange="trocarExercicio(this.value)" class="bg-white dark:bg-gray-800 text-xs font-bold py-1.5 px-3 rounded-lg border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white shadow-sm">
+                        {% for ex in exercicios %}
+                        <option value="{{ ex.id }}" {% if selected_exercicio and ex.id == selected_exercicio.id %}selected{% endif %}>
+                            {{ ex.ano }} - {{ ex.titulo }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button onclick="abrirModalExercicio()" class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all flex items-center gap-1.5 shadow-sm">
+                    <i class="ph ph-plus-circle text-base text-indigo-600"></i> Novo Exercício
+                </button>
+
+                <button onclick="abrirModalNode()" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-indigo-500/20">
+                    <i class="ph ph-plus text-base"></i> Nova Unidade / Cargo
+                </button>
+
+                <div class="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
+
+                <button onclick="exportarExcel()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm">
+                    <i class="ph ph-file-xls text-base"></i> Excel
+                </button>
+
+                <button onclick="exportarPDF()" class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm">
+                    <i class="ph ph-file-pdf text-base"></i> PDF
+                </button>
+            </div>
+        </div>
+
+        <!-- NAVEGAÇÃO POR ABAS -->
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <nav class="flex space-x-6 border-b border-transparent -mb-px overflow-x-auto menu-scroll">
+                <button onclick="trocarAba('aba-grafico')" id="btn-aba-grafico" class="tab-btn py-3 px-1 border-b-2 border-indigo-600 text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center gap-2 whitespace-nowrap">
+                    <i class="ph ph-chart-tree text-lg"></i> 1. Organograma Interativo
+                </button>
+                <button onclick="trocarAba('aba-quadro')" id="btn-aba-quadro" class="tab-btn py-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-semibold text-xs flex items-center gap-2 whitespace-nowrap">
+                    <i class="ph ph-table text-lg"></i> 2. Quadro de Cargos
+                </button>
+                <button onclick="trocarAba('aba-servidores')" id="btn-aba-servidores" class="tab-btn py-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-semibold text-xs flex items-center gap-2 whitespace-nowrap">
+                    <i class="ph ph-users text-lg"></i> 3. Servidores do Quadro
+                </button>
+                <button onclick="trocarAba('aba-timeline')" id="btn-aba-timeline" class="tab-btn py-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-semibold text-xs flex items-center gap-2 whitespace-nowrap">
+                    <i class="ph ph-clock-counter-clockwise text-lg"></i> 4. Linha do Tempo & Portarias
+                </button>
+                <button onclick="trocarAba('aba-kpis')" id="btn-aba-kpis" class="tab-btn py-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 font-semibold text-xs flex items-center gap-2 whitespace-nowrap">
+                    <i class="ph ph-chart-pie-slice text-lg"></i> 5. Indicadores & Estimativas
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+        <!-- CARDS KPIS NO TOPO -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
+            <div class="bg-white dark:bg-gray-800 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Total Cargos</span>
+                <div class="flex items-baseline justify-between mt-2">
+                    <span id="kpi-total-cargos" class="text-2xl font-black text-gray-900 dark:text-white">0</span>
+                    <i class="ph ph-briefcase text-xl text-indigo-500"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Vagas Previstas</span>
+                <div class="flex items-baseline justify-between mt-2">
+                    <span id="kpi-total-vagas" class="text-2xl font-black text-gray-900 dark:text-white">0</span>
+                    <i class="ph ph-check-square-offset text-xl text-blue-500"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Servidores Nomeados</span>
+                <div class="flex items-baseline justify-between mt-2">
+                    <span id="kpi-total-ocupadas" class="text-2xl font-black text-emerald-600 dark:text-emerald-400">0</span>
+                    <i class="ph ph-user-check text-xl text-emerald-500"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Vagas Vagas</span>
+                <div class="flex items-baseline justify-between mt-2">
+                    <span id="kpi-total-vagas-vagas" class="text-2xl font-black text-rose-600 dark:text-rose-400">0</span>
+                    <i class="ph ph-warning-circle text-xl text-rose-500"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Taxa de Ocupação</span>
+                <div class="flex items-baseline justify-between mt-2">
+                    <span id="kpi-taxa-ocupacao" class="text-2xl font-black text-indigo-600 dark:text-indigo-400">0%</span>
+                    <i class="ph ph-percent text-xl text-indigo-500"></i>
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
+                <span class="text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Custo Est. Folha</span>
+                <div class="flex items-baseline justify-between mt-2">
+                    <span id="kpi-custo-estimado" class="text-lg font-black text-amber-600 dark:text-amber-400">R$ 0,00</span>
+                    <i class="ph ph-currency-dollar text-xl text-amber-500"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA 1: ORGANOGRAMA INTERATIVO (GRÁFICO) -->
+        <div id="aba-grafico" class="tab-content space-y-6">
+            <!-- BARRA DE FERRAMENTAS DO GRÁFICO -->
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-wrap justify-between items-center gap-3">
+                <div class="flex items-center gap-2 flex-1 max-w-md">
+                    <div class="relative w-full">
+                        <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="input_busca_organograma" onkeyup="buscarNoOrganograma(this.value)" placeholder="Buscar cargo, setor ou servidor no gráfico..." class="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button onclick="chartZoomIn()" class="p-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-xl text-gray-700 dark:text-gray-200 text-xs font-bold transition-all" title="Aumentar Zoom">
+                        <i class="ph ph-magnifying-glass-plus text-base"></i>
+                    </button>
+                    <button onclick="chartZoomOut()" class="p-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-xl text-gray-700 dark:text-gray-200 text-xs font-bold transition-all" title="Diminuir Zoom">
+                        <i class="ph ph-magnifying-glass-minus text-base"></i>
+                    </button>
+                    <button onclick="chartFit()" class="p-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-xl text-gray-700 dark:text-gray-200 text-xs font-bold transition-all" title="Centralizar Gráfico">
+                        <i class="ph ph-corners-out text-base"></i>
+                    </button>
+                    <button onclick="chartExpandAll()" class="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-xl text-gray-700 dark:text-gray-200 text-xs font-bold transition-all">
+                        Expandir Tudo
+                    </button>
+                    <button onclick="chartCollapseAll()" class="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 rounded-xl text-gray-700 dark:text-gray-200 text-xs font-bold transition-all">
+                        Recolher Tudo
+                    </button>
+                </div>
+            </div>
+
+            <!-- CONTAINER DO GRÁFICO D3 -->
+            <div id="print-area" class="bg-white dark:bg-gray-800 p-2 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-lg">
+                <div id="chart-container" class="chart-container"></div>
+            </div>
+
+            <!-- TABELA INFERIOR DE MUDANÇAS RECENTES (LINHA DO TEMPO) -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                <div class="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <i class="ph ph-clock-counter-clockwise text-indigo-600 text-lg"></i>
+                        Mudanças Recentes no Quadro de Cargos (Atos Administrativos)
+                    </h3>
+                    <span class="text-xs text-gray-500">Exibindo últimas movimentações</span>
+                </div>
+                <div class="overflow-x-auto menu-scroll">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-gray-50 dark:bg-gray-900/60 uppercase text-[10px] font-bold text-gray-500 dark:text-gray-400 tracking-wider">
+                            <tr>
+                                <th class="p-3">Data / Hora</th>
+                                <th class="p-3">Tipo de Evento</th>
+                                <th class="p-3">Descrição da Movimentação</th>
+                                <th class="p-3">Portaria Ref.</th>
+                                <th class="p-3">Usuário Resp.</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-historico-recente" class="divide-y divide-gray-100 dark:divide-gray-700/60 font-medium">
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA 2: QUADRO DE CARGOS E UNIDADES -->
+        <div id="aba-quadro" class="tab-content hidden space-y-6">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                <div class="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <i class="ph ph-table text-indigo-600 text-lg"></i>
+                        Estrutura Hierárquica e Vagas Previstas
+                    </h3>
+                    <button onclick="abrirModalNode()" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700">
+                        + Nova Unidade/Cargo
+                    </button>
+                </div>
+                <div class="overflow-x-auto menu-scroll">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-gray-50 dark:bg-gray-900/60 uppercase text-[10px] font-bold text-gray-500 dark:text-gray-400 tracking-wider">
+                            <tr>
+                                <th class="p-3">Sigla / Cód</th>
+                                <th class="p-3">Título da Unidade / Cargo</th>
+                                <th class="p-3">Tipo</th>
+                                <th class="p-3">Vínculo Requerido</th>
+                                <th class="p-3 text-center">Vagas Prev.</th>
+                                <th class="p-3 text-center">Ocupadas</th>
+                                <th class="p-3 text-center">Livres</th>
+                                <th class="p-3 text-center">Status</th>
+                                <th class="p-3 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-quadro-cargos" class="divide-y divide-gray-100 dark:divide-gray-700/60 font-medium">
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA 3: SERVIDORES DO QUADRO -->
+        <div id="aba-servidores" class="tab-content hidden space-y-6">
+            <div class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+                <div class="p-4 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                    <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <i class="ph ph-users text-indigo-600 text-lg"></i>
+                        Relação de Servidores Nomeados no Quadro
+                    </h3>
+                    <span class="text-xs text-gray-500">Listagem de ocupantes ativos</span>
+                </div>
+                <div class="overflow-x-auto menu-scroll">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-gray-50 dark:bg-gray-900/60 uppercase text-[10px] font-bold text-gray-500 dark:text-gray-400 tracking-wider">
+                            <tr>
+                                <th class="p-3">Servidor</th>
+                                <th class="p-3">CPF</th>
+                                <th class="p-3">Cargo / Lotação</th>
+                                <th class="p-3">Vínculo</th>
+                                <th class="p-3">Portaria Nomeação</th>
+                                <th class="p-3">Data Nomeação</th>
+                                <th class="p-3">Remuneração Est.</th>
+                                <th class="p-3 text-right">Ações Atos ADM</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-servidores-quadro" class="divide-y divide-gray-100 dark:divide-gray-700/60 font-medium">
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA 4: LINHA DO TEMPO & AUDITORIA -->
+        <div id="aba-timeline" class="tab-content hidden space-y-6">
+            <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                <h3 class="text-base font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <i class="ph ph-clock-counter-clockwise text-indigo-600 text-xl"></i>
+                    Histórico Cronológico Auditável de Portarias e Atos Administrativos
+                </h3>
+                <div id="timeline-container" class="relative border-l-2 border-indigo-200 dark:border-indigo-900 ml-4 space-y-6 py-2">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ABA 5: INDICADORES & ESTIMATIVAS -->
+        <div id="aba-kpis" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <h4 class="text-sm font-bold text-gray-900 dark:text-white mb-4">Distribuição de Cargos por Tipo de Vínculo</h4>
+                    <div class="h-64 flex justify-center">
+                        <canvas id="chartVinculoCanvas"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm">
+                    <h4 class="text-sm font-bold text-gray-900 dark:text-white mb-4">Ocupação de Vagas por Nível Hierárquico</h4>
+                    <div class="h-64 flex justify-center">
+                        <canvas id="chartStatusCanvas"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAIS -->
+
+    <!-- MODAL 1: EXERCÍCIO -->
+    <div id="modalExercicio" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <i class="ph ph-calendar-plus text-indigo-600"></i> Criar Novo Exercício (Ano)
+            </h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Ano do Exercício</label>
+                    <input type="number" id="input_ano_exercicio" value="2027" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Título do Quadro</label>
+                    <input type="text" id="input_titulo_exercicio" value="Quadro de Cargos e Estrutura Organizacional 2027" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Copiar Estrutura de Exercício Anterior?</label>
+                    <select id="select_copiar_exercicio" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                        <option value="">Não (Iniciar do Zero)</option>
+                        {% for ex in exercicios %}
+                        <option value="{{ ex.id }}">Copiar do Exercício {{ ex.ano }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="fecharModalExercicio()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold">Cancelar</button>
+                <button onclick="salvarExercicio()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">Salvar Exercício</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: CARGO / UNIDADE -->
+    <div id="modalNode" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <i class="ph ph-sitemap text-indigo-600"></i> Cadastrar / Editar Cargo ou Unidade
+            </h3>
+            <input type="hidden" id="node_edit_id">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Título do Cargo / Unidade <span class="text-rose-500">*</span></label>
+                    <input type="text" id="node_titulo" placeholder="Ex: Diretor de Ensino, Coordenação Pedagógica..." class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Sigla / Cód</label>
+                    <input type="text" id="node_sigla" placeholder="Ex: DIPE, COPED" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo de Item</label>
+                    <select id="node_tipo" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                        <option value="CARGO_CHEFIA">Cargo de Chefia / Direção</option>
+                        <option value="UNIDADE">Unidade / Setor / Departamento</option>
+                        <option value="ASSESSORIA">Assessoria / Órgão de Apoio</option>
+                        <option value="CARGO_OPERACIONAL">Cargo Operacional / Técnico</option>
+                    </select>
+                </div>
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Subordinado a (Cargo Pai / Unidade Superior)</label>
+                    <select id="node_parent_id" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                        <option value="">Nenhum (Nó Raiz Principal)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Vínculo Requerido</label>
+                    <select id="node_tipo_vinculo" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                        <option value="COMISSIONADO">Comissionado</option>
+                        <option value="EFETIVO">Efetivo</option>
+                        <option value="FUNÇÃO GRATIFICADA">Função Gratificada</option>
+                        <option value="QUALQUER">Qualquer Vínculo</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Vagas Previstas</label>
+                    <input type="number" id="node_vagas_totais" value="1" min="1" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="fecharModalNode()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold">Cancelar</button>
+                <button onclick="salvarNode()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">Salvar Cargo/Unidade</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 3: NOMEAR SERVIDOR (PORTARIA NOMEAÇÃO OBRIGATÓRIA) -->
+    <div id="modalNomear" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <i class="ph ph-user-plus text-emerald-600"></i> Nomeação de Servidor (Ato Administrativo)
+            </h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Cargo Selecionado: <span id="lbl_cargo_nomear" class="font-bold text-indigo-600">---</span></p>
+            <input type="hidden" id="nomear_node_id">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="sm:col-span-2">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nome Completo do Servidor <span class="text-rose-500">*</span></label>
+                    <input type="text" id="nom_nome" placeholder="Digite o nome completo do servidor..." class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">CPF</label>
+                    <input type="text" id="nom_cpf" placeholder="000.000.000-00" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Matrícula / Vínculo</label>
+                    <input type="text" id="nom_matricula" placeholder="Ex: MAT-1234" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo de Vínculo</label>
+                    <select id="nom_tipo_vinculo" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                        <option value="COMISSIONADO">Comissionado</option>
+                        <option value="EFETIVO">Efetivo</option>
+                        <option value="CONTRATADO">Contratado</option>
+                        <option value="FUNÇÃO GRATIFICADA">Função Gratificada</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Remuneração Estimada (R$)</label>
+                    <input type="number" id="nom_remuneracao" step="0.01" value="0.00" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                </div>
+                <div class="sm:col-span-2 bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-2">
+                    <label class="block text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase flex items-center gap-1">
+                        <i class="ph ph-file-text"></i> Portaria de Nomeação (OBRIGATÓRIO) <span class="text-rose-500">*</span>
+                    </label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="nom_portaria" placeholder="Ex: Portaria nº 104/2026-SEME" class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold">
+                        <input type="date" id="nom_data_nomeacao" class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold">
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="fecharModalNomear()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold">Cancelar</button>
+                <button onclick="salvarNomeacao()" class="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700">Efetivar Nomeação</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 4: EXONERAR SERVIDOR (PORTARIA EXONERAÇÃO OBRIGATÓRIA) -->
+    <div id="modalExonerar" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4">
+            <h3 class="text-lg font-bold text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                <i class="ph ph-user-minus"></i> Exoneração / Desligamento de Servidor
+            </h3>
+            <p class="text-xs text-gray-500">Servidor a ser exonerado: <span id="lbl_servidor_exonerar" class="font-bold text-gray-900 dark:text-white">---</span></p>
+            <input type="hidden" id="exonerar_servidor_id">
+            <div class="bg-rose-50 dark:bg-rose-950/40 p-3 rounded-xl border border-rose-200 dark:border-rose-800 space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-rose-800 dark:text-rose-300 uppercase mb-1">Portaria de Exoneração <span class="text-rose-600">*</span></label>
+                    <input type="text" id="exo_portaria" placeholder="Ex: Portaria nº 205/2026-SEME" class="w-full p-2.5 bg-white dark:bg-gray-800 border border-rose-300 dark:border-rose-700 rounded-xl text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-rose-800 dark:text-rose-300 uppercase mb-1">Data da Exoneração</label>
+                    <input type="date" id="exo_data" class="w-full p-2.5 bg-white dark:bg-gray-800 border border-rose-300 dark:border-rose-700 rounded-xl text-xs font-bold">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-rose-800 dark:text-rose-300 uppercase mb-1">Motivo do Desligamento</label>
+                    <input type="text" id="exo_motivo" value="Exoneração a Pedido / Ofício" class="w-full p-2.5 bg-white dark:bg-gray-800 border border-rose-300 dark:border-rose-700 rounded-xl text-xs font-semibold">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="fecharModalExonerar()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold">Cancelar</button>
+                <button onclick="salvarExoneracao()" class="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700">Confirmar Exoneração</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 5: SUBSTITUIR SERVIDOR (2 ETAPAS COM 2 PORTARIAS) -->
+    <div id="modalSubstituir" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-xl p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4 max-h-[90vh] overflow-y-auto menu-scroll">
+            <h3 class="text-lg font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+                <i class="ph ph-arrows-left-right text-xl"></i> Substituição de Servidor no Cargo
+            </h3>
+            <p class="text-xs text-gray-500">Substituindo ocupante atual: <span id="lbl_sub_antigo_nome" class="font-bold text-rose-600">---</span></p>
+            <input type="hidden" id="sub_servidor_antigo_id">
+
+            <!-- BLOCO 1: EXONERAÇÃO DO ATUAL -->
+            <div class="bg-rose-50 dark:bg-rose-950/40 p-3.5 rounded-xl border border-rose-200 dark:border-rose-800 space-y-2">
+                <span class="block text-xs font-bold text-rose-800 dark:text-rose-300 uppercase">1. Portaria de Exoneração do Antigo Ocupante <span class="text-rose-600">*</span></span>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" id="sub_exo_portaria" placeholder="Portaria de Exoneração nº..." class="w-full p-2 bg-white dark:bg-gray-800 border border-rose-300 rounded-lg text-xs font-bold">
+                    <input type="date" id="sub_exo_data" class="w-full p-2 bg-white dark:bg-gray-800 border border-rose-300 rounded-lg text-xs font-bold">
+                </div>
+            </div>
+
+            <!-- BLOCO 2: NOMEAÇÃO DO NOVO -->
+            <div class="bg-emerald-50 dark:bg-emerald-950/40 p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-3">
+                <span class="block text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase">2. Dados e Portaria de Nomeação do Novo Servidor <span class="text-rose-500">*</span></span>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div class="sm:col-span-2">
+                        <input type="text" id="sub_nom_nome" placeholder="Nome completo do novo servidor..." class="w-full p-2.5 bg-white dark:bg-gray-800 border border-emerald-300 rounded-lg text-xs font-bold">
+                    </div>
+                    <input type="text" id="sub_nom_cpf" placeholder="CPF" class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 rounded-lg text-xs">
+                    <input type="text" id="sub_nom_matricula" placeholder="Matrícula" class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 rounded-lg text-xs">
+                    <select id="sub_nom_tipo_vinculo" class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 rounded-lg text-xs font-bold">
+                        <option value="COMISSIONADO">Comissionado</option>
+                        <option value="EFETIVO">Efetivo</option>
+                        <option value="FUNÇÃO GRATIFICADA">Função Gratificada</option>
+                    </select>
+                    <input type="number" id="sub_nom_remuneracao" step="0.01" placeholder="Remuneração Est." class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 rounded-lg text-xs">
+                    <div class="sm:col-span-2 grid grid-cols-2 gap-2">
+                        <input type="text" id="sub_nom_portaria" placeholder="Portaria de Nomeação nº..." class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 rounded-lg text-xs font-bold">
+                        <input type="date" id="sub_nom_data" class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 rounded-lg text-xs font-bold">
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="fecharModalSubstituir()" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl text-xs font-bold">Cancelar</button>
+                <button onclick="salvarSubstituicao()" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700">Concluir Substituição</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT JS PRINCIPAL -->
+    <script>
+        const EXERCICIO_ID = {{ selected_exercicio.id }};
+        let globalChart = null;
+        let globalTreeData = null;
+        let chartVinculoObj = null;
+        let chartStatusObj = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            carregarDadosOrganograma();
+        });
+
+        function trocarAba(abaId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-indigo-600', 'text-indigo-600', 'dark:text-indigo-400');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+
+            document.getElementById(abaId).classList.remove('hidden');
+            const btn = document.getElementById('btn-' + abaId);
+            if (btn) {
+                btn.classList.remove('border-transparent', 'text-gray-500');
+                btn.classList.add('border-indigo-600', 'text-indigo-600', 'dark:text-indigo-400');
+            }
+
+            if (abaId === 'aba-kpis' && globalTreeData) {
+                renderizarGraficosKPIs(globalTreeData);
+            }
+        }
+
+        function trocarExercicio(id) {
+            window.location.href = `/organograma?exercicio_id=${id}`;
+        }
+
+        function carregarDadosOrganograma() {
+            fetch(`/api/organograma/tree/${EXERCICIO_ID}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        globalTreeData = data;
+                        atualizarKPIs(data.kpis);
+                        renderizarChartD3(data.nodes);
+                        renderizarTabelaHistoricoRecente(data.historico);
+                        renderizarTabelaQuadroCargos(data.nodes);
+                        renderizarTabelaServidores(data.nodes);
+                        renderizarTimeline(data.historico);
+                        popularSelectParents(data.nodes);
+                    } else {
+                        alert("Erro ao carregar dados do organograma: " + data.message);
+                    }
+                })
+                .catch(err => console.error("Erro na requisição:", err));
+        }
+
+        function atualizarKPIs(kpis) {
+            if (!kpis) return;
+            document.getElementById('kpi-total-cargos').innerText = kpis.total_cargos;
+            document.getElementById('kpi-total-vagas').innerText = kpis.total_vagas;
+            document.getElementById('kpi-total-ocupadas').innerText = kpis.total_ocupadas;
+            document.getElementById('kpi-total-vagas-vagas').innerText = kpis.total_vagas_vagas;
+            document.getElementById('kpi-taxa-ocupacao').innerText = kpis.taxa_ocupacao + '%';
+            document.getElementById('kpi-custo-estimado').innerText = 'R$ ' + kpis.custo_total_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+        }
+
+        function renderizarChartD3(nodes) {
+            if (!nodes || nodes.length === 0) return;
+
+            const container = document.getElementById('chart-container');
+            container.innerHTML = '';
+
+            globalChart = new d3.OrgChart()
+                .container('#chart-container')
+                .data(nodes)
+                .nodeWidth(d => 260)
+                .nodeHeight(d => 160)
+                .childrenMargin(d => 45)
+                .compactMarginBetween(d => 25)
+                .nodeContent(function(d, i, arr, state) {
+                    const node = d.data;
+                    const isVacant = node.vagas_ocupadas === 0;
+                    const serv = (node.servidores && node.servidores.length > 0) ? node.servidores[0] : null;
+
+                    let bgCard = isVacant ? '#fef2f2' : '#ffffff';
+                    let borderCard = isVacant ? '#ef4444' : '#cbd5e1';
+                    let statusBadge = isVacant 
+                        ? `<span style="background:#fee2e2; color:#dc2626; font-size:9px; font-weight:800; padding:2px 8px; border-radius:999px;">VAGO (${node.vagas_livres} VAGA)</span>` 
+                        : `<span style="background:#dcfce7; color:#166534; font-size:9px; font-weight:800; padding:2px 8px; border-radius:999px;">OCUPADO (${node.vagas_ocupadas}/${node.vagas_totais})</span>`;
+
+                    let avatarImg = serv && serv.foto_url 
+                        ? `<img src="${serv.foto_url}" style="width:38px; height:38px; border-radius:50%; object-fit:cover; border:2px solid #6366f1;" />` 
+                        : `<div style="width:38px; height:38px; border-radius:50%; background:#e0e7ff; color:#4338ca; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px;">${serv ? serv.nome.charAt(0) : '?'}</div>`;
+
+                    return `
+                        <div style="background:${bgCard}; border:2px solid ${borderCard}; border-radius:14px; padding:12px; height:100%; box-shadow:0 4px 12px rgba(0,0,0,0.06); display:flex; flex-direction:column; justify-content:space-between; font-family:sans-serif;">
+                            <div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <span style="font-size:9px; font-weight:800; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:6px; text-transform:uppercase;">${node.sigla || 'SETOR'}</span>
+                                    ${statusBadge}
+                                </div>
+                                <div style="font-size:13px; font-weight:800; color:#0f172a; line-height:1.2; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${node.title}">
+                                    ${node.title}
+                                </div>
+                            </div>
+
+                            <div style="background:#f8fafc; border-radius:10px; padding:8px; display:flex; align-items:center; gap:8px;">
+                                ${avatarImg}
+                                <div style="overflow:hidden;">
+                                    <div style="font-size:11px; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                        ${serv ? serv.nome : 'Sem Servidor Alocado'}
+                                    </div>
+                                    <div style="font-size:9px; color:#64748b; font-weight:600;">
+                                        ${serv ? 'Portaria: ' + serv.portaria_nomeacao : 'Clique no Quadro para Nomear'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                })
+                .render();
+        }
+
+        function chartZoomIn() { if (globalChart) globalChart.zoomIn(); }
+        function chartZoomOut() { if (globalChart) globalChart.zoomOut(); }
+        function chartFit() { if (globalChart) globalChart.fit(); }
+        function chartExpandAll() { if (globalChart) globalChart.expandAll(); }
+        function chartCollapseAll() { if (globalChart) globalChart.collapseAll(); }
+
+        function buscarNoOrganograma(val) {
+            if (!globalChart || !val) return;
+            globalChart.clearHighlighting();
+            const value = val.toLowerCase().trim();
+            const matched = globalTreeData.nodes.filter(n => 
+                n.title.toLowerCase().includes(value) || 
+                (n.sigla && n.sigla.toLowerCase().includes(value)) ||
+                (n.servidores && n.servidores.some(s => s.nome.toLowerCase().includes(value)))
+            );
+            if (matched.length > 0) {
+                globalChart.setHighlighted(matched[0].id).render();
+            }
+        }
+
+        function renderizarTabelaHistoricoRecente(historico) {
+            const tbody = document.getElementById('tbody-historico-recente');
+            if (!historico || historico.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-400">Nenhum ato administrativo registrado ainda.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = historico.map(h => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <td class="p-3 text-gray-500">${h.data_hora}</td>
+                    <td class="p-3 font-bold text-indigo-600 dark:text-indigo-400">${h.tipo_evento}</td>
+                    <td class="p-3 text-gray-800 dark:text-gray-200">${h.descricao}</td>
+                    <td class="p-3"><span class="bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded font-bold">${h.portaria}</span></td>
+                    <td class="p-3 text-gray-500">${h.usuario}</td>
+                </tr>
+            `).join('');
+        }
+
+        function renderizarTabelaQuadroCargos(nodes) {
+            const tbody = document.getElementById('tbody-quadro-cargos');
+            if (!nodes || nodes.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="9" class="p-4 text-center text-gray-400">Nenhum cargo/unidade cadastrado.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = nodes.map(n => {
+                let badgeStatus = n.vagas_livres === 0 
+                    ? `<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold text-[10px]">PREENCHIDO</span>`
+                    : `<span class="bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-bold text-[10px]">VAGO (${n.vagas_livres})</span>`;
+
+                return `
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                        <td class="p-3 font-bold text-indigo-600">${n.sigla || '---'}</td>
+                        <td class="p-3 font-bold text-gray-900 dark:text-white">${n.title}</td>
+                        <td class="p-3 text-gray-500 text-[11px]">${n.tipo}</td>
+                        <td class="p-3 text-gray-500 text-[11px]">${n.tipo_vinculo_requerido}</td>
+                        <td class="p-3 text-center font-bold">${n.vagas_totais}</td>
+                        <td class="p-3 text-center font-bold text-emerald-600">${n.vagas_ocupadas}</td>
+                        <td class="p-3 text-center font-bold text-rose-600">${n.vagas_livres}</td>
+                        <td class="p-3 text-center">${badgeStatus}</td>
+                        <td class="p-3 text-right space-x-1 whitespace-nowrap">
+                            <button onclick="abrirModalNomear('${n.id}', '${n.title.replace(/'/g, "\\'")}')" class="px-2 py-1 bg-emerald-600 text-white rounded font-bold text-[11px] hover:bg-emerald-700">+ Nomear</button>
+                            <button onclick="abrirModalNode('${n.id}')" class="px-2 py-1 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 rounded font-bold text-[11px]">Editar</button>
+                            <button onclick="deletarNode('${n.id}')" class="px-2 py-1 bg-rose-100 text-rose-700 rounded font-bold text-[11px]">Excluir</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderizarTabelaServidores(nodes) {
+            const tbody = document.getElementById('tbody-servidores-quadro');
+            let rowsHtml = '';
+            nodes.forEach(n => {
+                if (n.servidores && n.servidores.length > 0) {
+                    n.servidores.forEach(s => {
+                        rowsHtml += `
+                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                <td class="p-3 font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black">${s.nome.charAt(0)}</div>
+                                    ${s.nome}
+                                </td>
+                                <td class="p-3 font-mono text-gray-500">${s.cpf}</td>
+                                <td class="p-3 font-semibold text-gray-800 dark:text-gray-200">${n.title}</td>
+                                <td class="p-3"><span class="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold text-[10px]">${s.tipo_vinculo}</span></td>
+                                <td class="p-3 font-bold text-gray-700 dark:text-gray-300">${s.portaria_nomeacao}</td>
+                                <td class="p-3 text-gray-500">${s.data_nomeacao}</td>
+                                <td class="p-3 font-bold text-emerald-600">R$ ${s.remuneracao.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                <td class="p-3 text-right space-x-1 whitespace-nowrap">
+                                    <button onclick="abrirModalSubstituir('${s.id}', '${s.nome.replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-indigo-600 text-white rounded font-bold text-[11px]">Substituir</button>
+                                    <button onclick="abrirModalExonerar('${s.id}', '${s.nome.replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-rose-600 text-white rounded font-bold text-[11px]">Exonerar</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                }
+            });
+
+            if (!rowsHtml) {
+                tbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-gray-400">Nenhum servidor nomeado no quadro deste exercício.</td></tr>`;
+            } else {
+                tbody.innerHTML = rowsHtml;
+            }
+        }
+
+        function renderizarTimeline(historico) {
+            const container = document.getElementById('timeline-container');
+            if (!historico || historico.length === 0) {
+                container.innerHTML = `<p class="text-xs text-gray-400">Nenhuma movimentação registrada.</p>`;
+                return;
+            }
+
+            container.innerHTML = historico.map(h => `
+                <div class="relative pl-6">
+                    <div class="absolute -left-[9px] top-1 w-4 h-4 rounded-full bg-indigo-600 border-2 border-white dark:border-gray-900"></div>
+                    <div class="bg-gray-50 dark:bg-gray-900/80 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-1">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">${h.tipo_evento}</span>
+                            <span class="text-gray-400">${h.data_hora}</span>
+                        </div>
+                        <p class="text-xs font-medium text-gray-800 dark:text-gray-200">${h.descricao}</p>
+                        <div class="flex justify-between items-center text-[11px] text-gray-500 pt-1 border-t border-gray-200/50 dark:border-gray-700/50">
+                            <span>Portaria: <strong>${h.portaria}</strong></span>
+                            <span>Registrado por: <strong>${h.usuario}</strong></span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderizarGraficosKPIs(data) {
+            if (!data || !data.nodes) return;
+
+            const vinculosCount = {};
+            data.nodes.forEach(n => {
+                const v = n.tipo_vinculo_requerido || 'OUTROS';
+                vinculosCount[v] = (vinculosCount[v] || 0) + 1;
+            });
+
+            const ctx1 = document.getElementById('chartVinculoCanvas').getContext('2d');
+            if (chartVinculoObj) chartVinculoObj.destroy();
+            chartVinculoObj = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(vinculosCount),
+                    datasets: [{ data: Object.values(vinculosCount), backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ec4899', '#6366f1'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+
+            const statusCount = { 'PREENCHIDO': 0, 'VAGO': 0 };
+            data.nodes.forEach(n => {
+                if (n.vagas_livres === 0) statusCount['PREENCHIDO']++;
+                else statusCount['VAGO']++;
+            });
+
+            const ctx2 = document.getElementById('chartStatusCanvas').getContext('2d');
+            if (chartStatusObj) chartStatusObj.destroy();
+            chartStatusObj = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(statusCount),
+                    datasets: [{ label: 'Qtd Cargos', data: Object.values(statusCount), backgroundColor: ['#10b981', '#ef4444'] }]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function popularSelectParents(nodes) {
+            const select = document.getElementById('node_parent_id');
+            select.innerHTML = '<option value="">Nenhum (Nó Raiz Principal)</option>';
+            nodes.forEach(n => {
+                const opt = document.createElement('option');
+                opt.value = n.id;
+                opt.textContent = `${n.sigla ? '[' + n.sigla + '] ' : ''}${n.title}`;
+                select.appendChild(opt);
+            });
+        }
+
+        // FUNÇÕES DE MODAL & API
+
+        function abrirModalExercicio() {
+            document.getElementById('modalExercicio').classList.remove('hidden');
+            document.getElementById('modalExercicio').classList.add('flex');
+        }
+        function fecharModalExercicio() {
+            document.getElementById('modalExercicio').classList.add('hidden');
+            document.getElementById('modalExercicio').classList.remove('flex');
+        }
+        function salvarExercicio() {
+            const ano = document.getElementById('input_ano_exercicio').value;
+            const titulo = document.getElementById('input_titulo_exercicio').value;
+            const copiar = document.getElementById('select_copiar_exercicio').value;
+
+            fetch('/api/organograma/exercicio/salvar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ ano: ano, titulo: titulo, copiar_de_id: copiar })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    fecharModalExercicio();
+                    window.location.href = `/organograma?exercicio_id=${res.exercicio_id}`;
+                } else {
+                    alert(res.message);
+                }
+            });
+        }
+
+        function abrirModalNode(nodeId = null) {
+            document.getElementById('node_edit_id').value = nodeId || '';
+            if (nodeId && globalTreeData) {
+                const n = globalTreeData.nodes.find(item => item.id === String(nodeId));
+                if (n) {
+                    document.getElementById('node_titulo').value = n.title;
+                    document.getElementById('node_sigla').value = n.sigla;
+                    document.getElementById('node_tipo').value = n.tipo;
+                    document.getElementById('node_parent_id').value = n.parentId || '';
+                    document.getElementById('node_tipo_vinculo').value = n.tipo_vinculo_requerido;
+                    document.getElementById('node_vagas_totais').value = n.vagas_totais;
+                }
+            } else {
+                document.getElementById('node_titulo').value = '';
+                document.getElementById('node_sigla').value = '';
+                document.getElementById('node_vagas_totais').value = 1;
+            }
+            document.getElementById('modalNode').classList.remove('hidden');
+            document.getElementById('modalNode').classList.add('flex');
+        }
+        function fecharModalNode() {
+            document.getElementById('modalNode').classList.add('hidden');
+            document.getElementById('modalNode').classList.remove('flex');
+        }
+        function salvarNode() {
+            const id = document.getElementById('node_edit_id').value;
+            const titulo = document.getElementById('node_titulo').value;
+            const sigla = document.getElementById('node_sigla').value;
+            const tipo = document.getElementById('node_tipo').value;
+            const parent_id = document.getElementById('node_parent_id').value;
+            const tipo_vinculo = document.getElementById('node_tipo_vinculo').value;
+            const vagas_totais = document.getElementById('node_vagas_totais').value;
+
+            fetch('/api/organograma/node/salvar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    id: id,
+                    exercicio_id: EXERCICIO_ID,
+                    titulo: titulo,
+                    sigla: sigla,
+                    tipo: tipo,
+                    parent_id: parent_id,
+                    tipo_vinculo_requerido: tipo_vinculo,
+                    vagas_totais: vagas_totais
+                })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    fecharModalNode();
+                    carregarDadosOrganograma();
+                } else {
+                    alert(res.message);
+                }
+            });
+        }
+
+        function deletarNode(nodeId) {
+            if (!confirm("Tem certeza que deseja excluir este cargo/unidade?")) return;
+            fetch('/api/organograma/node/deletar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ node_id: nodeId })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    carregarDadosOrganograma();
+                } else {
+                    alert(res.message);
+                }
+            });
+        }
+
+        function abrirModalNomear(nodeId, cargoTitulo) {
+            document.getElementById('nomear_node_id').value = nodeId;
+            document.getElementById('lbl_cargo_nomear').innerText = cargoTitulo;
+            document.getElementById('nom_nome').value = '';
+            document.getElementById('nom_portaria').value = '';
+            document.getElementById('modalNomear').classList.remove('hidden');
+            document.getElementById('modalNomear').classList.add('flex');
+        }
+        function fecharModalNomear() {
+            document.getElementById('modalNomear').classList.add('hidden');
+            document.getElementById('modalNomear').classList.remove('flex');
+        }
+        function salvarNomeacao() {
+            const node_id = document.getElementById('nomear_node_id').value;
+            const nome_servidor = document.getElementById('nom_nome').value;
+            const cpf = document.getElementById('nom_cpf').value;
+            const matricula_vinculo = document.getElementById('nom_matricula').value;
+            const tipo_vinculo = document.getElementById('nom_tipo_vinculo').value;
+            const portaria_nomeacao = document.getElementById('nom_portaria').value;
+            const data_nomeacao = document.getElementById('nom_data_nomeacao').value;
+            const remuneracao_estimada = document.getElementById('nom_remuneracao').value;
+
+            if (!portaria_nomeacao) {
+                alert("A Portaria de Nomeação é OBRIGATÓRIA!");
+                return;
+            }
+
+            fetch('/api/organograma/servidor/nomear', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    node_id: node_id,
+                    nome_servidor: nome_servidor,
+                    cpf: cpf,
+                    matricula_vinculo: matricula_vinculo,
+                    tipo_vinculo: tipo_vinculo,
+                    portaria_nomeacao: portaria_nomeacao,
+                    data_nomeacao: data_nomeacao,
+                    remuneracao_estimada: remuneracao_estimada
+                })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    fecharModalNomear();
+                    carregarDadosOrganograma();
+                } else {
+                    alert(res.message);
+                }
+            });
+        }
+
+        function abrirModalExonerar(servidorId, servidorNome) {
+            document.getElementById('exonerar_servidor_id').value = servidorId;
+            document.getElementById('lbl_servidor_exonerar').innerText = servidorNome;
+            document.getElementById('exo_portaria').value = '';
+            document.getElementById('modalExonerar').classList.remove('hidden');
+            document.getElementById('modalExonerar').classList.add('flex');
+        }
+        function fecharModalExonerar() {
+            document.getElementById('modalExonerar').classList.add('hidden');
+            document.getElementById('modalExonerar').classList.remove('flex');
+        }
+        function salvarExoneracao() {
+            const servidor_id = document.getElementById('exonerar_servidor_id').value;
+            const portaria_exoneracao = document.getElementById('exo_portaria').value;
+            const data_exoneracao = document.getElementById('exo_data').value;
+            const motivo_exoneracao = document.getElementById('exo_motivo').value;
+
+            if (!portaria_exoneracao) {
+                alert("A Portaria de Exoneração é OBRIGATÓRIA!");
+                return;
+            }
+
+            fetch('/api/organograma/servidor/exonerar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    servidor_id: servidor_id,
+                    portaria_exoneracao: portaria_exoneracao,
+                    data_exoneracao: data_exoneracao,
+                    motivo_exoneracao: motivo_exoneracao
+                })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    fecharModalExonerar();
+                    carregarDadosOrganograma();
+                } else {
+                    alert(res.message);
+                }
+            });
+        }
+
+        function abrirModalSubstituir(servidorId, servidorNome) {
+            document.getElementById('sub_servidor_antigo_id').value = servidorId;
+            document.getElementById('lbl_sub_antigo_nome').innerText = servidorNome;
+            document.getElementById('sub_exo_portaria').value = '';
+            document.getElementById('sub_nom_nome').value = '';
+            document.getElementById('sub_nom_portaria').value = '';
+            document.getElementById('modalSubstituir').classList.remove('hidden');
+            document.getElementById('modalSubstituir').classList.add('flex');
+        }
+        function fecharModalSubstituir() {
+            document.getElementById('modalSubstituir').classList.add('hidden');
+            document.getElementById('modalSubstituir').classList.remove('flex');
+        }
+        function salvarSubstituicao() {
+            const servidor_antigo_id = document.getElementById('sub_servidor_antigo_id').value;
+            const portaria_exoneracao = document.getElementById('sub_exo_portaria').value;
+            const data_exoneracao = document.getElementById('sub_exo_data').value;
+            
+            const nome_novo_servidor = document.getElementById('sub_nom_nome').value;
+            const cpf_novo = document.getElementById('sub_nom_cpf').value;
+            const matricula_novo = document.getElementById('sub_nom_matricula').value;
+            const tipo_vinculo_novo = document.getElementById('sub_nom_tipo_vinculo').value;
+            const portaria_nomeacao = document.getElementById('sub_nom_portaria').value;
+            const data_nomeacao = document.getElementById('sub_nom_data').value;
+            const remuneracao_estimada = document.getElementById('sub_nom_remuneracao').value;
+
+            if (!portaria_exoneracao) {
+                alert("A Portaria de Exoneração do antigo ocupante é OBRIGATÓRIA!");
+                return;
+            }
+            if (!portaria_nomeacao) {
+                alert("A Portaria de Nomeação do novo servidor é OBRIGATÓRIA!");
+                return;
+            }
+
+            fetch('/api/organograma/servidor/substituir', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    servidor_antigo_id: servidor_antigo_id,
+                    portaria_exoneracao: portaria_exoneracao,
+                    data_exoneracao: data_exoneracao,
+                    nome_novo_servidor: nome_novo_servidor,
+                    cpf_novo: cpf_novo,
+                    matricula_novo: matricula_novo,
+                    tipo_vinculo_novo: tipo_vinculo_novo,
+                    portaria_nomeacao: portaria_nomeacao,
+                    data_nomeacao: data_nomeacao,
+                    remuneracao_estimada: remuneracao_estimada
+                })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    fecharModalSubstituir();
+                    carregarDadosOrganograma();
+                } else {
+                    alert(res.message);
+                }
+            });
+        }
+
+        function exportarExcel() {
+            window.location.href = `/organograma/exportar/excel/${EXERCICIO_ID}`;
+        }
+
+        function exportarPDF() {
+            const element = document.getElementById('print-area');
+            const opt = {
+                margin: [6, 6, 6, 6],
+                filename: `organograma_estrutura_${EXERCICIO_ID}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a3', orientation: 'landscape' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+    </script>
+</body>
+</html>
