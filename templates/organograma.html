@@ -107,8 +107,8 @@
                     <i class="ph ph-file-xls text-base"></i> Excel
                 </button>
 
-                <button onclick="exportarPDF()" class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm">
-                    <i class="ph ph-file-pdf text-base"></i> PDF
+                <button onclick="exportarPDF()" class="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm" title="Gerar PDF Oficial no Modelo da Secretaria">
+                    <i class="ph ph-file-pdf text-base"></i> PDF Oficial
                 </button>
             </div>
         </div>
@@ -439,47 +439,58 @@
         </div>
     </div>
 
-    <!-- MODAL 3: NOMEAR SERVIDOR (PORTARIA NOMEAÇÃO OBRIGATÓRIA) -->
+    <!-- MODAL 3: NOMEAR SERVIDOR -->
     <div id="modalNomear" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
         <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-gray-100 dark:border-gray-700 space-y-4">
             <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                <i class="ph ph-user-plus text-emerald-600"></i> Nomeação de Servidor (Ato Administrativo)
+                <i class="ph ph-user-plus text-emerald-600"></i> Nomeação de Servidor no Cargo
             </h3>
             <p class="text-xs text-gray-500 dark:text-gray-400">Cargo Selecionado: <span id="lbl_cargo_nomear" class="font-bold text-indigo-600">---</span></p>
             <input type="hidden" id="nomear_node_id">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div class="sm:col-span-2">
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nome Completo do Servidor <span class="text-rose-500">*</span></label>
-                    <input type="text" id="nom_nome" placeholder="Digite o nome completo do servidor..." class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">CPF</label>
-                    <input type="text" id="nom_cpf" placeholder="000.000.000-00" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Matrícula / Vínculo</label>
-                    <input type="text" id="nom_matricula" placeholder="Ex: MAT-1234" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo de Vínculo</label>
-                    <select id="nom_tipo_vinculo" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
-                        <option value="COMISSIONADO">Comissionado</option>
-                        <option value="EFETIVO">Efetivo</option>
-                        <option value="CONTRATADO">Contratado</option>
-                        <option value="FUNÇÃO GRATIFICADA">Função Gratificada</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Remuneração Estimada (R$)</label>
-                    <input type="number" id="nom_remuneracao" step="0.01" value="0.00" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
-                </div>
-                <div class="sm:col-span-2 bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-2">
-                    <label class="block text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase flex items-center gap-1">
-                        <i class="ph ph-file-text"></i> Portaria de Nomeação (OBRIGATÓRIO) <span class="text-rose-500">*</span>
+            
+            <div class="space-y-3">
+                <div class="relative">
+                    <label class="block text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-1 flex items-center gap-1">
+                        <i class="ph ph-magnifying-glass"></i> Buscar Servidor Cadastrado na Base (Opcional)
                     </label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <input type="text" id="nom_portaria" placeholder="Ex: Portaria nº 104/2026-SEME" class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold">
-                        <input type="date" id="nom_data_nomeacao" class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold">
+                    <input type="text" id="nom_busca_servidor" onkeyup="buscarServidorCadastrado(this.value)" placeholder="Digite o nome ou CPF para autocompletar..." class="w-full p-2.5 bg-indigo-50 dark:bg-gray-900 border border-indigo-200 dark:border-indigo-800 rounded-xl text-xs font-semibold dark:text-white">
+                    <div id="nom_busca_results" class="absolute z-30 left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto hidden"></div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Nome Completo do Servidor <span class="text-rose-500">*</span></label>
+                        <input type="text" id="nom_nome" placeholder="Digite o nome completo do servidor..." class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">CPF</label>
+                        <input type="text" id="nom_cpf" placeholder="000.000.000-00" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Matrícula / Vínculo</label>
+                        <input type="text" id="nom_matricula" placeholder="Ex: MAT-1234" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Tipo de Vínculo</label>
+                        <select id="nom_tipo_vinculo" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                            <option value="COMISSIONADO">Comissionado</option>
+                            <option value="EFETIVO">Efetivo</option>
+                            <option value="CONTRATADO">Contratado</option>
+                            <option value="FUNÇÃO GRATIFICADA">Função Gratificada</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Remuneração Estimada (R$)</label>
+                        <input type="number" id="nom_remuneracao" step="0.01" value="0.00" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                    </div>
+                    <div class="sm:col-span-2 bg-emerald-50 dark:bg-emerald-950/40 p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-2">
+                        <label class="block text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase flex items-center gap-1">
+                            <i class="ph ph-file-text"></i> Portaria / Ato de Nomeação (Opcional)
+                        </label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" id="nom_portaria" placeholder="Ex: Portaria nº 104/2026 (ou deixe S/N)" class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold">
+                            <input type="date" id="nom_data_nomeacao" class="w-full p-2 bg-white dark:bg-gray-800 border border-emerald-300 dark:border-emerald-700 rounded-lg text-xs font-bold">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -640,8 +651,8 @@
             globalChart = new d3.OrgChart()
                 .container('#chart-container')
                 .data(nodes)
-                .nodeWidth(d => 260)
-                .nodeHeight(d => 160)
+                .nodeWidth(d => 270)
+                .nodeHeight(d => 195)
                 .childrenMargin(d => 45)
                 .compactMarginBetween(d => 25)
                 .nodeContent(function(d, i, arr, state) {
@@ -656,31 +667,37 @@
                         : `<span style="background:#dcfce7; color:#166534; font-size:9px; font-weight:800; padding:2px 8px; border-radius:999px;">OCUPADO (${node.vagas_ocupadas}/${node.vagas_totais})</span>`;
 
                     let avatarImg = serv && serv.foto_url 
-                        ? `<img src="${serv.foto_url}" style="width:38px; height:38px; border-radius:50%; object-fit:cover; border:2px solid #6366f1;" />` 
-                        : `<div style="width:38px; height:38px; border-radius:50%; background:#e0e7ff; color:#4338ca; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px;">${serv ? serv.nome.charAt(0) : '?'}</div>`;
+                        ? `<img src="${serv.foto_url}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; border:2px solid #6366f1;" />` 
+                        : `<div style="width:34px; height:34px; border-radius:50%; background:#e0e7ff; color:#4338ca; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:13px;">${serv ? serv.nome.charAt(0) : '?'}</div>`;
 
                     return `
-                        <div style="background:${bgCard}; border:2px solid ${borderCard}; border-radius:14px; padding:12px; height:100%; box-shadow:0 4px 12px rgba(0,0,0,0.06); display:flex; flex-direction:column; justify-content:space-between; font-family:sans-serif;">
+                        <div style="background:${bgCard}; border:2px solid ${borderCard}; border-radius:14px; padding:10px; height:100%; box-shadow:0 4px 12px rgba(0,0,0,0.06); display:flex; flex-direction:column; justify-content:space-between; font-family:sans-serif;">
                             <div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                     <span style="font-size:9px; font-weight:800; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:6px; text-transform:uppercase;">${node.sigla || 'SETOR'}</span>
                                     ${statusBadge}
                                 </div>
-                                <div style="font-size:13px; font-weight:800; color:#0f172a; line-height:1.2; margin-bottom:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${node.title}">
+                                <div style="font-size:12px; font-weight:800; color:#0f172a; line-height:1.2; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${node.title}">
                                     ${node.title}
                                 </div>
                             </div>
 
-                            <div style="background:#f8fafc; border-radius:10px; padding:8px; display:flex; align-items:center; gap:8px;">
+                            <div style="background:#f8fafc; border-radius:8px; padding:6px; display:flex; align-items:center; gap:8px;">
                                 ${avatarImg}
-                                <div style="overflow:hidden;">
+                                <div style="overflow:hidden; flex:1;">
                                     <div style="font-size:11px; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                        ${serv ? serv.nome : 'Sem Servidor Alocado'}
+                                        ${serv ? serv.nome : 'Sem Servidor'}
                                     </div>
-                                    <div style="font-size:9px; color:#64748b; font-weight:600;">
-                                        ${serv ? 'Portaria: ' + serv.portaria_nomeacao : 'Clique no Quadro para Nomear'}
+                                    <div style="font-size:8.5px; color:#64748b; font-weight:600;">
+                                        ${serv ? 'Portaria: ' + serv.portaria_nomeacao : 'Vaga Aberta'}
                                     </div>
                                 </div>
+                            </div>
+
+                            <div style="display:flex; gap:3px; margin-top:4px; padding-top:4px; border-top:1px solid #e2e8f0; justify-content:space-between;">
+                                <button onclick="event.stopPropagation(); abrirModalNode(null, '${node.id}')" title="Adicionar Cargo Subordinado" style="background:#4f46e5; color:#fff; border:none; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:800; cursor:pointer;">+ Subordinado</button>
+                                <button onclick="event.stopPropagation(); abrirModalNomear('${node.id}', '${node.title.replace(/'/g, "\\'")}')" title="Nomear Servidor" style="background:#10b981; color:#fff; border:none; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:800; cursor:pointer;">Nomear</button>
+                                <button onclick="event.stopPropagation(); abrirModalNode('${node.id}')" title="Editar Cargo" style="background:#64748b; color:#fff; border:none; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:800; cursor:pointer;">Editar</button>
                             </div>
                         </div>
                     `;
@@ -894,7 +911,7 @@
             });
         }
 
-        function abrirModalNode(nodeId = null) {
+        function abrirModalNode(nodeId = null, parentId = null) {
             document.getElementById('node_edit_id').value = nodeId || '';
             if (nodeId && globalTreeData) {
                 const n = globalTreeData.nodes.find(item => item.id === String(nodeId));
@@ -909,6 +926,7 @@
             } else {
                 document.getElementById('node_titulo').value = '';
                 document.getElementById('node_sigla').value = '';
+                document.getElementById('node_parent_id').value = parentId ? String(parentId) : '';
                 document.getElementById('node_vagas_totais').value = 1;
             }
             document.getElementById('modalNode').classList.remove('hidden');
@@ -965,11 +983,55 @@
             });
         }
 
+        let timerBuscaServidor = null;
+        function buscarServidorCadastrado(val) {
+            clearTimeout(timerBuscaServidor);
+            const box = document.getElementById('nom_busca_results');
+            if (!val || val.trim().length < 2) {
+                box.classList.add('hidden');
+                return;
+            }
+            timerBuscaServidor = setTimeout(() => {
+                fetch(`/api/organograma/buscar_funcionarios?q=${encodeURIComponent(val)}`)
+                    .then(r => r.json())
+                    .then(res => {
+                        if (res.success && res.funcionarios.length > 0) {
+                            box.innerHTML = res.funcionarios.map(f => `
+                                <div onclick="selecionarServidorEncontrado('${f.nome.replace(/'/g, "\\'")}', '${f.cpf}', '${f.matricula}', '${f.tipo_vinculo}', '${f.remuneracao}')" class="p-2.5 hover:bg-indigo-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 text-xs">
+                                    <div class="font-bold text-gray-900 dark:text-white">${f.nome}</div>
+                                    <div class="text-[10px] text-gray-500">CPF: ${f.cpf || '---'} | Mat: ${f.matricula || '---'} | Vínculo: ${f.tipo_vinculo}</div>
+                                </div>
+                            `).join('');
+                            box.classList.remove('hidden');
+                        } else {
+                            box.innerHTML = `<div class="p-3 text-xs text-gray-400 text-center">Nenhum servidor cadastrado encontrado.</div>`;
+                            box.classList.remove('hidden');
+                        }
+                    });
+            }, 300);
+        }
+
+        function selecionarServidorEncontrado(nome, cpf, matricula, vinculo, remun) {
+            document.getElementById('nom_nome').value = nome;
+            document.getElementById('nom_cpf').value = cpf;
+            document.getElementById('nom_matricula').value = matricula;
+            if (vinculo) document.getElementById('nom_tipo_vinculo').value = vinculo;
+            if (remun) document.getElementById('nom_remuneracao').value = remun;
+            document.getElementById('nom_busca_results').classList.add('hidden');
+            document.getElementById('nom_busca_servidor').value = '';
+        }
+
         function abrirModalNomear(nodeId, cargoTitulo) {
             document.getElementById('nomear_node_id').value = nodeId;
             document.getElementById('lbl_cargo_nomear').innerText = cargoTitulo;
             document.getElementById('nom_nome').value = '';
+            document.getElementById('nom_cpf').value = '';
+            document.getElementById('nom_matricula').value = '';
             document.getElementById('nom_portaria').value = '';
+            document.getElementById('nom_busca_servidor').value = '';
+            const resultsBox = document.getElementById('nom_busca_results');
+            if (resultsBox) resultsBox.classList.add('hidden');
+            
             document.getElementById('modalNomear').classList.remove('hidden');
             document.getElementById('modalNomear').classList.add('flex');
         }
@@ -979,16 +1041,16 @@
         }
         function salvarNomeacao() {
             const node_id = document.getElementById('nomear_node_id').value;
-            const nome_servidor = document.getElementById('nom_nome').value;
-            const cpf = document.getElementById('nom_cpf').value;
-            const matricula_vinculo = document.getElementById('nom_matricula').value;
+            const nome_servidor = document.getElementById('nom_nome').value.trim();
+            const cpf = document.getElementById('nom_cpf').value.trim();
+            const matricula_vinculo = document.getElementById('nom_matricula').value.trim();
             const tipo_vinculo = document.getElementById('nom_tipo_vinculo').value;
-            const portaria_nomeacao = document.getElementById('nom_portaria').value;
+            const portaria_nomeacao = document.getElementById('nom_portaria').value.trim() || 'S/N';
             const data_nomeacao = document.getElementById('nom_data_nomeacao').value;
             const remuneracao_estimada = document.getElementById('nom_remuneracao').value;
 
-            if (!portaria_nomeacao) {
-                alert("A Portaria de Nomeação é OBRIGATÓRIA!");
+            if (!nome_servidor) {
+                alert("O Nome do Servidor é OBRIGATÓRIO!");
                 return;
             }
 
@@ -1121,15 +1183,7 @@
         }
 
         function exportarPDF() {
-            const element = document.getElementById('print-area');
-            const opt = {
-                margin: [6, 6, 6, 6],
-                filename: `organograma_estrutura_${EXERCICIO_ID}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
-                jsPDF: { unit: 'mm', format: 'a3', orientation: 'landscape' }
-            };
-            html2pdf().set(opt).from(element).save();
+            window.open(`/organograma/pdf/${EXERCICIO_ID}`, '_blank');
         }
     </script>
 </body>

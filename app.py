@@ -3615,7 +3615,7 @@ def api_organograma_node_salvar():
         node_id = data.get('id')
         exercicio_id = data.get('exercicio_id')
         parent_id = data.get('parent_id')
-        if parent_id and str(parent_id).strip() != "":
+        if parent_id and str(parent_id).strip() != "" and str(parent_id) != "null":
             parent_id = int(parent_id)
         else:
             parent_id = None
@@ -3624,17 +3624,24 @@ def api_organograma_node_salvar():
         sigla = data.get('sigla', '').strip()
         tipo = data.get('tipo', 'UNIDADE')
         tipo_vinculo = data.get('tipo_vinculo_requerido', 'QUALQUER')
-        vagas_totais = int(data.get('vagas_totais', 1))
+        vagas_totais = int(data.get('vagas_totais', 1) or 1)
         
         if not titulo:
             return {"success": False, "message": "O título do cargo ou unidade é obrigatório."}, 400
             
+        nivel_hierarquico = 1
+        if parent_id:
+            parent_node = OrganogramaNode.query.get(parent_id)
+            if parent_node:
+                nivel_hierarquico = (parent_node.nivel_hierarquico or 1) + 1
+
         if node_id:
             node = OrganogramaNode.query.get_or_404(node_id)
             node.titulo = titulo
             node.sigla = sigla
             node.tipo = tipo
             node.parent_id = parent_id
+            node.nivel_hierarquico = nivel_hierarquico
             node.tipo_vinculo_requerido = tipo_vinculo
             node.vagas_totais = vagas_totais
             desc = f"Cargo/Unidade '{titulo}' atualizado."
@@ -3646,6 +3653,7 @@ def api_organograma_node_salvar():
                 titulo=titulo,
                 sigla=sigla,
                 tipo=tipo,
+                nivel_hierarquico=nivel_hierarquico,
                 tipo_vinculo_requerido=tipo_vinculo,
                 vagas_totais=vagas_totais
             )
@@ -3660,8 +3668,8 @@ def api_organograma_node_salvar():
             node_id=node.id,
             tipo_evento=evento,
             descricao=desc,
-            usuario_id=current_user.id,
-            usuario_nome=current_user.username
+            usuario_id=current_user.id if hasattr(current_user, 'id') else None,
+            usuario_nome=current_user.username if hasattr(current_user, 'username') else "Sistema"
         )
         db.session.add(hist)
         db.session.commit()
@@ -3694,8 +3702,8 @@ def api_organograma_node_deletar():
             exercicio_id=exercicio_id,
             tipo_evento="REMOCAO_NO",
             descricao=f"Cargo/Unidade '{titulo_removido}' removido do organograma.",
-            usuario_id=current_user.id,
-            usuario_nome=current_user.username
+            usuario_id=current_user.id if hasattr(current_user, 'id') else None,
+            usuario_nome=current_user.username if hasattr(current_user, 'username') else "Sistema"
         )
         db.session.add(hist)
         db.session.commit()
@@ -3716,7 +3724,7 @@ def api_organograma_servidor_nomear():
         cpf = data.get('cpf', '').strip()
         matricula_vinculo = data.get('matricula_vinculo', '').strip()
         tipo_vinculo = data.get('tipo_vinculo', 'COMISSIONADO')
-        portaria_nomeacao = data.get('portaria_nomeacao', '').strip()
+        portaria_nomeacao = data.get('portaria_nomeacao', '').strip() or "S/N"
         data_nomeacao_str = data.get('data_nomeacao')
         data_inicio_str = data.get('data_inicio')
         remuneracao_estimada = float(data.get('remuneracao_estimada', 0.0) or 0.0)
@@ -3725,13 +3733,25 @@ def api_organograma_servidor_nomear():
         if not node_id or not nome_servidor:
             return {"success": False, "message": "Nome do servidor e cargo são obrigatórios."}, 400
             
-        if not portaria_nomeacao:
-            return {"success": False, "message": "A Portaria de Nomeação é OBRIGATÓRIA para nomear um servidor no organograma."}, 400
-            
         node = OrganogramaNode.query.get_or_404(node_id)
         
-        dt_nom = datetime.strptime(data_nomeacao_str, '%Y-%m-%d').date() if data_nomeacao_str else datetime.now().date()
-        dt_ini = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else dt_nom
+        dt_nom = None
+        if data_nomeacao_str and str(data_nomeacao_str).strip():
+            try:
+                dt_nom = datetime.strptime(data_nomeacao_str, '%Y-%m-%d').date()
+            except ValueError:
+                dt_nom = datetime.now().date()
+        else:
+            dt_nom = datetime.now().date()
+
+        dt_ini = None
+        if data_inicio_str and str(data_inicio_str).strip():
+            try:
+                dt_ini = datetime.strptime(data_inicio_str, '%Y-%m-%d').date()
+            except ValueError:
+                dt_ini = dt_nom
+        else:
+            dt_ini = dt_nom
         
         servidor = OrganogramaServidor(
             node_id=node.id,
@@ -3749,7 +3769,7 @@ def api_organograma_servidor_nomear():
         db.session.add(servidor)
         db.session.commit()
         
-        desc = f"Servidor(a) {nome_servidor} NOMEADO(A) para o cargo de '{node.titulo}' mediante a Portaria de Nomeação nº {portaria_nomeacao}."
+        desc = f"Servidor(a) {nome_servidor} NOMEADO(A) para o cargo de '{node.titulo}' (Portaria/Ato nº {portaria_nomeacao})."
         hist = OrganogramaHistorico(
             exercicio_id=node.exercicio_id,
             node_id=node.id,
@@ -3757,8 +3777,8 @@ def api_organograma_servidor_nomear():
             tipo_evento="NOMEACAO",
             descricao=desc,
             portaria_referencia=portaria_nomeacao,
-            usuario_id=current_user.id,
-            usuario_nome=current_user.username
+            usuario_id=current_user.id if hasattr(current_user, 'id') else None,
+            usuario_nome=current_user.username if hasattr(current_user, 'username') else "Sistema"
         )
         db.session.add(hist)
         db.session.commit()
@@ -3939,6 +3959,68 @@ def organograma_exportar_excel(exercicio_id):
         mimetype="text/csv",
         headers={"Content-disposition": f"attachment; filename={filename}"}
     )
+
+
+@app.route('/api/organograma/buscar_funcionarios')
+@login_required
+def api_organograma_buscar_funcionarios():
+    q = request.args.get('q', '').strip()
+    query = Funcionario.query
+    if q:
+        query = query.filter(
+            db.or_(
+                Funcionario.nome.ilike(f"%{q}%"),
+                Funcionario.cpf.ilike(f"%{q}%"),
+                Funcionario.num_vinculo.ilike(f"%{q}%")
+            )
+        )
+    funcionarios = query.limit(20).all()
+    results = []
+    for f in funcionarios:
+        results.append({
+            "id": f.id,
+            "nome": f.nome,
+            "cpf": f.cpf or "",
+            "matricula": f.num_vinculo or "",
+            "tipo_vinculo": f.tipo_vinculo or "COMISSIONADO",
+            "remuneracao": str(f.remuneracao or "0.00"),
+            "foto_url": f.foto_path or ""
+        })
+    return {"success": True, "funcionarios": results}
+
+
+@app.route('/organograma/pdf/<int:exercicio_id>')
+@login_required
+def organograma_pdf_view(exercicio_id):
+    exercicio = OrganogramaExercicio.query.get_or_404(exercicio_id)
+    nodes = OrganogramaNode.query.filter_by(exercicio_id=exercicio.id).order_by(OrganogramaNode.nivel_hierarquico, OrganogramaNode.ordem, OrganogramaNode.id).all()
+    
+    nodes_by_id = {}
+    for n in nodes:
+        servidores_ativos = OrganogramaServidor.query.filter_by(node_id=n.id, ativo=True).all()
+        servidor_nome = servidores_ativos[0].nome_servidor if servidores_ativos else "VAGA"
+        is_vaga = len(servidores_ativos) == 0
+        nodes_by_id[n.id] = {
+            "id": n.id,
+            "parent_id": n.parent_id,
+            "titulo": n.titulo,
+            "sigla": n.sigla or "",
+            "nivel": n.nivel_hierarquico or 1,
+            "tipo": n.tipo,
+            "servidor_nome": servidor_nome,
+            "is_vaga": is_vaga,
+            "children": []
+        }
+
+    root_nodes = []
+    for node_id, node_data in nodes_by_id.items():
+        p_id = node_data["parent_id"]
+        if p_id and p_id in nodes_by_id:
+            nodes_by_id[p_id]["children"].append(node_data)
+        else:
+            root_nodes.append(node_data)
+            
+    return render_template('organograma_pdf.html', exercicio=exercicio, root_nodes=root_nodes, nodes=nodes)
 
 
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===

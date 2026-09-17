@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organograma Oficial - {{ exercicio.titulo }}</title>
+    
+    <!-- Tailwind CSS para estruturação rápida -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+        @page {
+            size: A3 landscape;
+            margin: 8mm;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: white !important;
+                padding: 0 !important;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .org-card {
+            width: 210px;
+            box-sizing: border-box;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            margin: 0 auto;
+        }
+
+        .org-card-header {
+            background-color: #d97706; /* Âmbar Dourado */
+            color: #000000;
+            font-weight: 800;
+            font-size: 10.5px;
+            text-transform: uppercase;
+            text-align: center;
+            padding: 5px 6px;
+            border: 1.5px solid #000000;
+            border-radius: 3px 3px 0 0;
+            line-height: 1.25;
+            min-height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .org-card-body {
+            background-color: #ffffff;
+            color: #0f172a;
+            font-weight: 700;
+            font-size: 11.5px;
+            text-align: center;
+            padding: 6px;
+            border: 1.5px solid #000000;
+            border-top: none;
+            border-radius: 0 0 3px 3px;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-break: break-word;
+        }
+
+        .vaga-text {
+            color: #dc2626;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+        }
+
+        .tree-line-v {
+            width: 2px;
+            background-color: #15803d;
+            margin: 0 auto;
+        }
+
+        .tree-arrow-down {
+            color: #15803d;
+            font-size: 14px;
+            font-weight: 900;
+            text-align: center;
+            line-height: 1;
+        }
+
+        .tree-line-h {
+            height: 2px;
+            background-color: #15803d;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8">
+
+    <!-- BARRA DE AÇÕES (NÃO SAI NO PDF) -->
+    <div class="no-print max-w-6xl mx-auto mb-6 bg-white p-4 rounded-2xl shadow-md border border-gray-200 flex justify-between items-center">
+        <div>
+            <h2 class="font-bold text-gray-800 text-base">Organograma Oficial (Formato PDF)</h2>
+            <p class="text-xs text-gray-500">Exibindo estrutura no modelo oficial do Município de Valença do Piauí</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="/organograma?exercicio_id={{ exercicio.id }}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition">
+                ← Voltar
+            </a>
+            <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow transition">
+                🖨️ Imprimir / Salvar PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- ÁREA DE IMPRESSÃO / EXP. PDF -->
+    <div id="pdf-container" class="max-w-[1400px] mx-auto bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+        
+        <!-- CABEÇALHO OFICIAL COM BRASÃO -->
+        <div class="text-center mb-4">
+            <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão Valença do Piauí" class="h-14 mx-auto mb-1 object-contain">
+            <div class="text-xs font-bold text-gray-600 tracking-wide uppercase">Município de Valença do Piauí</div>
+            <div class="w-full h-1 bg-emerald-700 my-2 rounded-full"></div>
+            <h1 class="text-2xl font-black text-emerald-800 tracking-wide uppercase">SECRETARIA MUNICIPAL DE EDUCAÇÃO</h1>
+            <div class="text-[11px] font-bold text-gray-500 uppercase mt-0.5">{{ exercicio.titulo }}</div>
+        </div>
+
+        <!-- RENDERIZAÇÃO DA ÁRVORE HIERÁRQUICA -->
+        {% macro render_node(node) %}
+        <div class="flex flex-col items-center">
+            <!-- CARD DO CARGO -->
+            <div class="org-card">
+                <div class="org-card-header">
+                    {{ node.titulo }}
+                </div>
+                <div class="org-card-body">
+                    {% if node.is_vaga %}
+                        <span class="vaga-text">VAGA</span>
+                    {% else %}
+                        {{ node.servidor_nome }}
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- FILHOS DO NÓ -->
+            {% if node.children and node.children|length > 0 %}
+                <div class="tree-line-v h-4"></div>
+                <div class="tree-arrow-down">↓</div>
+                
+                {% if node.children|length == 1 %}
+                    <div class="tree-line-v h-3"></div>
+                    {{ render_node(node.children[0]) }}
+                {% else %}
+                    <div class="relative flex justify-center w-full mt-1">
+                        <!-- LINHA HORIZONTAL CONECTORA -->
+                        <div class="absolute top-0 h-0.5 bg-emerald-700" style="left: calc(100% / {{ node.children|length }} / 2); right: calc(100% / {{ node.children|length }} / 2);"></div>
+                        
+                        <div class="flex justify-around w-full gap-4 pt-3">
+                            {% for child in node.children %}
+                                <div class="flex flex-col items-center flex-1">
+                                    {{ render_node(child) }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+        {% endmacro %}
+
+        <div class="py-6 overflow-x-auto">
+            {% if root_nodes and root_nodes|length > 0 %}
+                <div class="flex flex-col items-center gap-8">
+                    {% for r in root_nodes %}
+                        {{ render_node(r) }}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-12 text-gray-400 font-bold">
+                    Nenhum cargo ou unidade cadastrado neste exercício.
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- RODAPÉ DE PÁGINA -->
+        <div class="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center text-[10px] text-gray-500 font-semibold">
+            <span>Sistema Gestoor 360 - Secretaria Municipal de Educação</span>
+            <span>Documento gerado em {{ datetime.now().strftime('%d/%m/%Y às %H:%M') }}</span>
+        </div>
+
+    </div>
+
+</body>
+</html>
