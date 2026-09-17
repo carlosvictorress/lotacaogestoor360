@@ -3401,9 +3401,12 @@ def inicializar_estrutura_oficial_seme(exercicio_id):
     if OrganogramaNode.query.filter_by(exercicio_id=exercicio_id).count() > 1:
         return
         
+    OrganogramaHistorico.query.filter_by(exercicio_id=exercicio_id).delete(synchronize_session=False)
+    
     OrganogramaServidor.query.filter(OrganogramaServidor.node_id.in_(
         db.session.query(OrganogramaNode.id).filter_by(exercicio_id=exercicio_id)
     )).delete(synchronize_session=False)
+    
     OrganogramaNode.query.filter_by(exercicio_id=exercicio_id).delete(synchronize_session=False)
     db.session.commit()
 
@@ -3769,6 +3772,7 @@ def api_organograma_node_deletar():
         titulo_removido = node.titulo
         exercicio_id = node.exercicio_id
         
+        OrganogramaHistorico.query.filter_by(node_id=node.id).update({"node_id": None})
         db.session.delete(node)
         db.session.commit()
         
