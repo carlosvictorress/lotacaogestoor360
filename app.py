@@ -3459,6 +3459,7 @@ def organograma_page():
 def api_organograma_tree(exercicio_id):
     exercicio = OrganogramaExercicio.query.get_or_404(exercicio_id)
     nodes = OrganogramaNode.query.filter_by(exercicio_id=exercicio.id).all()
+    valid_ids = {n.id for n in nodes}
     
     nodes_data = []
     total_cargos = 0
@@ -3502,9 +3503,11 @@ def api_organograma_tree(exercicio_id):
             else:
                 status_vaga = "PARCIAL"
                 
+        parent_id_str = str(n.parent_id) if (n.parent_id and n.parent_id in valid_ids) else ""
+
         nodes_data.append({
             "id": str(n.id),
-            "parentId": str(n.parent_id) if n.parent_id else "",
+            "parentId": parent_id_str,
             "title": n.titulo,
             "sigla": n.sigla or "",
             "tipo": n.tipo or "UNIDADE",
@@ -3994,15 +3997,18 @@ def api_organograma_buscar_funcionarios():
 def organograma_pdf_view(exercicio_id):
     exercicio = OrganogramaExercicio.query.get_or_404(exercicio_id)
     nodes = OrganogramaNode.query.filter_by(exercicio_id=exercicio.id).order_by(OrganogramaNode.nivel_hierarquico, OrganogramaNode.ordem, OrganogramaNode.id).all()
+    valid_ids = {n.id for n in nodes}
     
     nodes_by_id = {}
     for n in nodes:
         servidores_ativos = OrganogramaServidor.query.filter_by(node_id=n.id, ativo=True).all()
         servidor_nome = servidores_ativos[0].nome_servidor if servidores_ativos else "VAGA"
         is_vaga = len(servidores_ativos) == 0
+        parent_id = n.parent_id if (n.parent_id and n.parent_id in valid_ids) else None
+        
         nodes_by_id[n.id] = {
             "id": n.id,
-            "parent_id": n.parent_id,
+            "parent_id": parent_id,
             "titulo": n.titulo,
             "sigla": n.sigla or "",
             "nivel": n.nivel_hierarquico or 1,
@@ -4020,7 +4026,8 @@ def organograma_pdf_view(exercicio_id):
         else:
             root_nodes.append(node_data)
             
-    return render_template('organograma_pdf.html', exercicio=exercicio, root_nodes=root_nodes, nodes=nodes)
+    data_hoje = datetime.now().strftime('%d/%m/%Y às %H:%M')
+    return render_template('organograma_pdf.html', exercicio=exercicio, root_nodes=root_nodes, nodes=nodes, data_hoje=data_hoje, datetime=datetime)
 
 
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===
