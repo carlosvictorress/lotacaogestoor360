@@ -101,6 +101,10 @@
                     <i class="ph ph-plus text-base"></i> Nova Unidade / Cargo
                 </button>
 
+                <button onclick="abrirModalNomear()" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/20" title="Nomear Servidor para um Cargo do Quadro">
+                    <i class="ph ph-user-plus text-base"></i> Nomear Servidor
+                </button>
+
                 <button onclick="limparEstruturaExercicio()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm" title="Zerar dados de teste e começar seu cadastro do zero">
                     <i class="ph ph-trash text-base"></i> Zerar Quadro
                 </button>
@@ -449,10 +453,14 @@
             <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <i class="ph ph-user-plus text-emerald-600"></i> Nomeação de Servidor no Cargo
             </h3>
-            <p class="text-xs text-gray-500 dark:text-gray-400">Cargo Selecionado: <span id="lbl_cargo_nomear" class="font-bold text-indigo-600">---</span></p>
-            <input type="hidden" id="nomear_node_id">
-            
             <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Cargo / Unidade de Destino <span class="text-rose-500">*</span></label>
+                    <select id="nomear_select_cargo" class="w-full p-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl text-sm font-semibold dark:text-white">
+                        <option value="">-- Selecione o Cargo / Unidade --</option>
+                    </select>
+                </div>
+
                 <div class="relative">
                     <label class="block text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-1 flex items-center gap-1">
                         <i class="ph ph-magnifying-glass"></i> Buscar Servidor Cadastrado na Base (Opcional)
@@ -623,12 +631,13 @@
                     if (data.success) {
                         globalTreeData = data;
                         atualizarKPIs(data.kpis);
-                        renderizarChartD3(data.nodes);
-                        renderizarTabelaHistoricoRecente(data.historico);
                         renderizarTabelaQuadroCargos(data.nodes);
                         renderizarTabelaServidores(data.nodes);
+                        renderizarTabelaHistoricoRecente(data.historico);
                         renderizarTimeline(data.historico);
                         popularSelectParents(data.nodes);
+                        popularSelectCargosParaNomear(data.nodes);
+                        renderizarChartD3(data.nodes);
                     } else {
                         alert("Erro ao carregar dados do organograma: " + data.message);
                     }
@@ -646,67 +655,106 @@
             document.getElementById('kpi-custo-estimado').innerText = 'R$ ' + kpis.custo_total_estimado.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
         }
 
+        function prepararNodesParaD3(nodes) {
+            if (!nodes || nodes.length === 0) return [];
+            const nodesCopy = JSON.parse(JSON.stringify(nodes));
+            const rootNodes = nodesCopy.filter(n => !n.parentId || String(n.parentId).trim() === '' || n.parentId === null);
+            if (rootNodes.length > 1) {
+                const primaryRootId = rootNodes[0].id;
+                for (let i = 1; i < rootNodes.length; i++) {
+                    rootNodes[i].parentId = String(primaryRootId);
+                }
+            }
+            return nodesCopy;
+        }
+
+        function popularSelectCargosParaNomear(nodes) {
+            const select = document.getElementById('nomear_select_cargo');
+            if (!select) return;
+            const currentVal = select.value;
+            select.innerHTML = '<option value="">-- Selecione o Cargo / Unidade --</option>';
+            if (nodes && nodes.length > 0) {
+                nodes.forEach(n => {
+                    const opt = document.createElement('option');
+                    opt.value = String(n.id);
+                    const vagaInfo = n.vagas_livres > 0 ? `(${n.vagas_livres} vaga(s) livre(s))` : '(Vagas preenchidas)';
+                    opt.textContent = `${n.sigla ? '[' + n.sigla + '] ' : ''}${n.title} ${vagaInfo}`;
+                    select.appendChild(opt);
+                });
+            }
+            if (currentVal) select.value = currentVal;
+        }
+
         function renderizarChartD3(nodes) {
-            if (!nodes || nodes.length === 0) return;
+            if (!nodes || nodes.length === 0) {
+                const container = document.getElementById('chart-container');
+                if (container) container.innerHTML = '<div class="p-8 text-center text-gray-400 font-medium">Nenhum cargo/unidade cadastrado ainda. Clique em "+ Nova Unidade / Cargo" para iniciar.</div>';
+                return;
+            }
 
-            const container = document.getElementById('chart-container');
-            container.innerHTML = '';
+            try {
+                const d3Nodes = prepararNodesParaD3(nodes);
+                const container = document.getElementById('chart-container');
+                if (container) container.innerHTML = '';
 
-            globalChart = new d3.OrgChart()
-                .container('#chart-container')
-                .data(nodes)
-                .nodeWidth(d => 270)
-                .nodeHeight(d => 195)
-                .childrenMargin(d => 45)
-                .compactMarginBetween(d => 25)
-                .nodeContent(function(d, i, arr, state) {
-                    const node = d.data;
-                    const isVacant = node.vagas_ocupadas === 0;
-                    const serv = (node.servidores && node.servidores.length > 0) ? node.servidores[0] : null;
+                globalChart = new d3.OrgChart()
+                    .container('#chart-container')
+                    .data(d3Nodes)
+                    .nodeWidth(d => 270)
+                    .nodeHeight(d => 195)
+                    .childrenMargin(d => 45)
+                    .compactMarginBetween(d => 25)
+                    .nodeContent(function(d, i, arr, state) {
+                        const node = d.data;
+                        const isVacant = node.vagas_ocupadas === 0;
+                        const serv = (node.servidores && node.servidores.length > 0) ? node.servidores[0] : null;
 
-                    let bgCard = isVacant ? '#fef2f2' : '#ffffff';
-                    let borderCard = isVacant ? '#ef4444' : '#cbd5e1';
-                    let statusBadge = isVacant 
-                        ? `<span style="background:#fee2e2; color:#dc2626; font-size:9px; font-weight:800; padding:2px 8px; border-radius:999px;">VAGO (${node.vagas_livres} VAGA)</span>` 
-                        : `<span style="background:#dcfce7; color:#166534; font-size:9px; font-weight:800; padding:2px 8px; border-radius:999px;">OCUPADO (${node.vagas_ocupadas}/${node.vagas_totais})</span>`;
+                        let bgCard = isVacant ? '#fef2f2' : '#ffffff';
+                        let borderCard = isVacant ? '#ef4444' : '#cbd5e1';
+                        let statusBadge = isVacant 
+                            ? `<span style="background:#fee2e2; color:#dc2626; font-size:9px; font-weight:800; padding:2px 8px; border-radius:999px;">VAGO (${node.vagas_livres} VAGA)</span>` 
+                            : `<span style="background:#dcfce7; color:#166534; font-size:9px; font-weight:800; padding:2px 8px; border-radius:999px;">OCUPADO (${node.vagas_ocupadas}/${node.vagas_totais})</span>`;
 
-                    let avatarImg = serv && serv.foto_url 
-                        ? `<img src="${serv.foto_url}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; border:2px solid #6366f1;" />` 
-                        : `<div style="width:34px; height:34px; border-radius:50%; background:#e0e7ff; color:#4338ca; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:13px;">${serv ? serv.nome.charAt(0) : '?'}</div>`;
+                        let avatarImg = serv && serv.foto_url 
+                            ? `<img src="${serv.foto_url}" style="width:34px; height:34px; border-radius:50%; object-fit:cover; border:2px solid #6366f1;" />` 
+                            : `<div style="width:34px; height:34px; border-radius:50%; background:#e0e7ff; color:#4338ca; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:13px;">${serv ? serv.nome.charAt(0) : '?'}</div>`;
 
-                    return `
-                        <div style="background:${bgCard}; border:2px solid ${borderCard}; border-radius:14px; padding:10px; height:100%; box-shadow:0 4px 12px rgba(0,0,0,0.06); display:flex; flex-direction:column; justify-content:space-between; font-family:sans-serif;">
-                            <div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                                    <span style="font-size:9px; font-weight:800; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:6px; text-transform:uppercase;">${node.sigla || 'SETOR'}</span>
-                                    ${statusBadge}
-                                </div>
-                                <div style="font-size:12px; font-weight:800; color:#0f172a; line-height:1.2; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${node.title}">
-                                    ${node.title}
-                                </div>
-                            </div>
-
-                            <div style="background:#f8fafc; border-radius:8px; padding:6px; display:flex; align-items:center; gap:8px;">
-                                ${avatarImg}
-                                <div style="overflow:hidden; flex:1;">
-                                    <div style="font-size:11px; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                        ${serv ? serv.nome : 'Sem Servidor'}
+                        return `
+                            <div style="background:${bgCard}; border:2px solid ${borderCard}; border-radius:14px; padding:10px; height:100%; box-shadow:0 4px 12px rgba(0,0,0,0.06); display:flex; flex-direction:column; justify-content:space-between; font-family:sans-serif;">
+                                <div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                                        <span style="font-size:9px; font-weight:800; color:#64748b; background:#f1f5f9; padding:2px 6px; border-radius:6px; text-transform:uppercase;">${node.sigla || 'SETOR'}</span>
+                                        ${statusBadge}
                                     </div>
-                                    <div style="font-size:8.5px; color:#64748b; font-weight:600;">
-                                        ${serv ? 'Portaria: ' + serv.portaria_nomeacao : 'Vaga Aberta'}
+                                    <div style="font-size:12px; font-weight:800; color:#0f172a; line-height:1.2; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${node.title}">
+                                        ${node.title}
                                     </div>
                                 </div>
-                            </div>
 
-                            <div style="display:flex; gap:3px; margin-top:4px; padding-top:4px; border-top:1px solid #e2e8f0; justify-content:space-between;">
-                                <button onclick="event.stopPropagation(); abrirModalNode(null, '${node.id}')" title="Adicionar Cargo Subordinado" style="background:#4f46e5; color:#fff; border:none; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:800; cursor:pointer;">+ Subordinado</button>
-                                <button onclick="event.stopPropagation(); abrirModalNomear('${node.id}', '${node.title.replace(/'/g, "\\'")}')" title="Nomear Servidor" style="background:#10b981; color:#fff; border:none; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:800; cursor:pointer;">Nomear</button>
-                                <button onclick="event.stopPropagation(); abrirModalNode('${node.id}')" title="Editar Cargo" style="background:#64748b; color:#fff; border:none; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:800; cursor:pointer;">Editar</button>
+                                <div style="background:#f8fafc; border-radius:8px; padding:6px; display:flex; align-items:center; gap:8px;">
+                                    ${avatarImg}
+                                    <div style="overflow:hidden; flex:1;">
+                                        <div style="font-size:11px; font-weight:700; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                            ${serv ? serv.nome : 'Sem Servidor'}
+                                        </div>
+                                        <div style="font-size:8.5px; color:#64748b; font-weight:600;">
+                                            ${serv ? 'Portaria: ' + serv.portaria_nomeacao : 'Vaga Aberta'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div style="display:flex; gap:3px; margin-top:4px; padding-top:4px; border-top:1px solid #e2e8f0; justify-content:space-between;">
+                                    <button onclick="event.stopPropagation(); abrirModalNode(null, '${node.id}')" title="Adicionar Cargo Subordinado" style="background:#4f46e5; color:#fff; border:none; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:800; cursor:pointer;">+ Subordinado</button>
+                                    <button onclick="event.stopPropagation(); abrirModalNomear('${node.id}', '${node.title.replace(/'/g, "\\'")}')" title="Nomear Servidor" style="background:#10b981; color:#fff; border:none; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:800; cursor:pointer;">Nomear</button>
+                                    <button onclick="event.stopPropagation(); abrirModalNode('${node.id}')" title="Editar Cargo" style="background:#64748b; color:#fff; border:none; padding:3px 6px; border-radius:6px; font-size:9px; font-weight:800; cursor:pointer;">Editar</button>
+                                </div>
                             </div>
-                        </div>
-                    `;
-                })
-                .render();
+                        `;
+                    })
+                    .render();
+            } catch(err) {
+                console.error("Erro ao renderizar D3 OrgChart:", err);
+            }
         }
 
         function chartZoomIn() { if (globalChart) globalChart.zoomIn(); }
@@ -1025,9 +1073,16 @@
             document.getElementById('nom_busca_servidor').value = '';
         }
 
-        function abrirModalNomear(nodeId, cargoTitulo) {
-            document.getElementById('nomear_node_id').value = nodeId;
-            document.getElementById('lbl_cargo_nomear').innerText = cargoTitulo;
+        function abrirModalNomear(nodeId = null, cargoTitulo = null) {
+            popularSelectCargosParaNomear(globalTreeData ? globalTreeData.nodes : []);
+
+            const selectCargo = document.getElementById('nomear_select_cargo');
+            if (nodeId && selectCargo) {
+                selectCargo.value = String(nodeId);
+            } else if (selectCargo) {
+                selectCargo.value = '';
+            }
+
             document.getElementById('nom_nome').value = '';
             document.getElementById('nom_cpf').value = '';
             document.getElementById('nom_matricula').value = '';
@@ -1035,7 +1090,7 @@
             document.getElementById('nom_busca_servidor').value = '';
             const resultsBox = document.getElementById('nom_busca_results');
             if (resultsBox) resultsBox.classList.add('hidden');
-            
+
             document.getElementById('modalNomear').classList.remove('hidden');
             document.getElementById('modalNomear').classList.add('flex');
         }
@@ -1044,7 +1099,8 @@
             document.getElementById('modalNomear').classList.remove('flex');
         }
         function salvarNomeacao() {
-            const node_id = document.getElementById('nomear_node_id').value;
+            const selectCargo = document.getElementById('nomear_select_cargo');
+            const node_id = selectCargo ? selectCargo.value : '';
             const nome_servidor = document.getElementById('nom_nome').value.trim();
             const cpf = document.getElementById('nom_cpf').value.trim();
             const matricula_vinculo = document.getElementById('nom_matricula').value.trim();
@@ -1052,6 +1108,11 @@
             const portaria_nomeacao = document.getElementById('nom_portaria').value.trim() || 'S/N';
             const data_nomeacao = document.getElementById('nom_data_nomeacao').value;
             const remuneracao_estimada = document.getElementById('nom_remuneracao').value;
+
+            if (!node_id) {
+                alert("Por favor, selecione o Cargo/Unidade de destino!");
+                return;
+            }
 
             if (!nome_servidor) {
                 alert("O Nome do Servidor é OBRIGATÓRIO!");
