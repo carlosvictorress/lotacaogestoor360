@@ -293,6 +293,80 @@ class ContratoGerado(db.Model):
     quem_editou = db.relationship("User", foreign_keys=[quem_editou_id])
 
 
+# --- MODELOS DO MÓDULO INDEPENDENTE DE ORGANOGRAMA ---
+
+class OrganogramaExercicio(db.Model):
+    __tablename__ = "organograma_exercicio"
+    id = db.Column(db.Integer, primary_key=True)
+    ano = db.Column(db.Integer, nullable=False, default=lambda: datetime.now().year)
+    titulo = db.Column(db.String(150), nullable=False)
+    secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=True)
+    secretaria = db.relationship("Secretaria", backref="organogramas")
+    ativo = db.Column(db.Boolean, default=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    criado_por = db.relationship("User")
+    nodes = db.relationship("OrganogramaNode", backref="exercicio", lazy=True, cascade="all, delete-orphan")
+    historico = db.relationship("OrganogramaHistorico", backref="exercicio", lazy=True, cascade="all, delete-orphan")
+
+
+class OrganogramaNode(db.Model):
+    __tablename__ = "organograma_node"
+    id = db.Column(db.Integer, primary_key=True)
+    exercicio_id = db.Column(db.Integer, db.ForeignKey("organograma_exercicio.id"), nullable=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey("organograma_node.id"), nullable=True)
+    tipo = db.Column(db.String(50), default="UNIDADE") # UNIDADE, CARGO_CHEFIA, CARGO_OPERACIONAL, ASSESSORIA
+    titulo = db.Column(db.String(150), nullable=False)
+    sigla = db.Column(db.String(50), nullable=True)
+    nivel_hierarquico = db.Column(db.Integer, default=1)
+    tipo_vinculo_requerido = db.Column(db.String(50), default="QUALQUER") # COMISSIONADO, EFETIVO, FUNÇÃO GRATIFICADA, QUALQUER
+    vagas_totais = db.Column(db.Integer, default=1)
+    ordem = db.Column(db.Integer, default=0)
+    
+    # Auto-relacionamento hierárquico (Pai -> Filhos)
+    children = db.relationship("OrganogramaNode", backref=db.backref("parent", remote_side=[id]), cascade="all, delete-orphan")
+    servidores = db.relationship("OrganogramaServidor", backref="node", lazy=True, cascade="all, delete-orphan")
+
+
+class OrganogramaServidor(db.Model):
+    __tablename__ = "organograma_servidor"
+    id = db.Column(db.Integer, primary_key=True)
+    node_id = db.Column(db.Integer, db.ForeignKey("organograma_node.id"), nullable=False)
+    nome_servidor = db.Column(db.String(150), nullable=False)
+    cpf = db.Column(db.String(14), nullable=True)
+    matricula_vinculo = db.Column(db.String(50), nullable=True)
+    tipo_vinculo = db.Column(db.String(50), default="COMISSIONADO") # COMISSIONADO, EFETIVO, CONTRATADO, FUNÇÃO GRATIFICADA
+    foto_url = db.Column(db.Text, nullable=True)
+    
+    # Atos Administrativos Obrigatórios
+    portaria_nomeacao = db.Column(db.String(100), nullable=True)
+    data_nomeacao = db.Column(db.Date, nullable=True)
+    data_inicio = db.Column(db.Date, nullable=True)
+    
+    portaria_exoneracao = db.Column(db.String(100), nullable=True)
+    data_exoneracao = db.Column(db.Date, nullable=True)
+    motivo_exoneracao = db.Column(db.String(200), nullable=True)
+    
+    remuneracao_estimada = db.Column(db.Float, default=0.0)
+    ativo = db.Column(db.Boolean, default=True)
+    data_registro = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class OrganogramaHistorico(db.Model):
+    __tablename__ = "organograma_historico"
+    id = db.Column(db.Integer, primary_key=True)
+    exercicio_id = db.Column(db.Integer, db.ForeignKey("organograma_exercicio.id"), nullable=False)
+    node_id = db.Column(db.Integer, db.ForeignKey("organograma_node.id"), nullable=True)
+    servidor_id = db.Column(db.Integer, db.ForeignKey("organograma_servidor.id"), nullable=True)
+    tipo_evento = db.Column(db.String(50), nullable=False) # CRIACAO_EXERCICIO, ADICAO_NO, NOMEACAO, EXONERACAO, SUBSTITUICAO, EDICAO_NO, REMOCAO_NO
+    descricao = db.Column(db.Text, nullable=False)
+    portaria_referencia = db.Column(db.String(100), nullable=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    usuario_nome = db.Column(db.String(100), nullable=True)
+    data_hora = db.Column(db.DateTime, default=datetime.utcnow)
+    dados_json = db.Column(db.Text, nullable=True)
+
+
 def gerar_proximo_numero_contrato(ano=None):
     if not ano:
         ano = datetime.now().year
@@ -3321,9 +3395,556 @@ def unidades_ponto():
     return render_template("unidades_ponto.html", locais=locais)
 
 
+# ==============================================================================
+# MÓDULO INDEPENDENTE DE ORGANOGRAMA & QUADRO DE CARGOS DA SECRETARIA
+# ==============================================================================
+
+@app.route('/organograma')
+@login_required
+def organograma_page():
+    # Garante que existe pelo menos um exercício cadastrado
+    exercicios = OrganogramaExercicio.query.order_by(OrganogramaExercicio.ano.desc(), OrganogramaExercicio.id.desc()).all()
+    
+    if not exercicios:
+        ano_atual = datetime.now().year
+        novo_ex = OrganogramaExercicio(
+            ano=ano_atual,
+            titulo=f"Quadro de Cargos e Estrutura Organizacional - {ano_atual}",
+            ativo=True,
+            criado_por_id=current_user.id if hasattr(current_user, 'id') else None
+        )
+        db.session.add(novo_ex)
+        db.session.commit()
+        
+        no_raiz = OrganogramaNode(
+            exercicio_id=novo_ex.id,
+            parent_id=None,
+            tipo="CARGO_CHEFIA",
+            titulo="Secretário(a) Municipal",
+            sigla="GABINETE/SEME",
+            nivel_hierarquico=1,
+            tipo_vinculo_requerido="COMISSIONADO",
+            vagas_totais=1
+        )
+        db.session.add(no_raiz)
+        db.session.commit()
+        
+        hist = OrganogramaHistorico(
+            exercicio_id=novo_ex.id,
+            node_id=no_raiz.id,
+            tipo_evento="CRIACAO_EXERCICIO",
+            descricao=f"Exercício {ano_atual} inicializado automaticamente com o cargo de Secretário(a) Municipal.",
+            usuario_id=current_user.id if hasattr(current_user, 'id') else None,
+            usuario_nome=current_user.username if hasattr(current_user, 'username') else "Sistema"
+        )
+        db.session.add(hist)
+        db.session.commit()
+        
+        exercicios = [novo_ex]
+        
+    exercicio_id = request.args.get('exercicio_id', type=int)
+    selected_exercicio = None
+    if exercicio_id:
+        selected_exercicio = OrganogramaExercicio.query.get(exercicio_id)
+    if not selected_exercicio:
+        selected_exercicio = exercicios[0]
+
+    return render_template('organograma.html', 
+                           exercicios=exercicios, 
+                           selected_exercicio=selected_exercicio)
+
+
+@app.route('/api/organograma/tree/<int:exercicio_id>')
+@login_required
+def api_organograma_tree(exercicio_id):
+    exercicio = OrganogramaExercicio.query.get_or_404(exercicio_id)
+    nodes = OrganogramaNode.query.filter_by(exercicio_id=exercicio.id).all()
+    
+    nodes_data = []
+    total_cargos = 0
+    total_vagas = 0
+    total_ocupadas = 0
+    total_vagas_vagas = 0
+    custo_total_estimado = 0.0
+    
+    for n in nodes:
+        total_cargos += 1
+        total_vagas += (n.vagas_totais or 1)
+        
+        servidores_ativos = OrganogramaServidor.query.filter_by(node_id=n.id, ativo=True).all()
+        qtd_ocupadas = len(servidores_ativos)
+        total_ocupadas += qtd_ocupadas
+        
+        vagas_livres = max(0, (n.vagas_totais or 1) - qtd_ocupadas)
+        total_vagas_vagas += vagas_livres
+        
+        servidores_list = []
+        for s in servidores_ativos:
+            remun = s.remuneracao_estimada or 0.0
+            custo_total_estimado += remun
+            servidores_list.append({
+                "id": s.id,
+                "nome": s.nome_servidor,
+                "cpf": s.cpf or "---",
+                "matricula": s.matricula_vinculo or "---",
+                "tipo_vinculo": s.tipo_vinculo or "COMISSIONADO",
+                "portaria_nomeacao": s.portaria_nomeacao or "---",
+                "data_nomeacao": s.data_nomeacao.strftime('%d/%m/%Y') if s.data_nomeacao else "---",
+                "data_inicio": s.data_inicio.strftime('%d/%m/%Y') if s.data_inicio else "---",
+                "remuneracao": remun,
+                "foto_url": s.foto_url or ""
+            })
+            
+        status_vaga = "DESOCUPADO"
+        if qtd_ocupadas > 0:
+            if qtd_ocupadas >= (n.vagas_totais or 1):
+                status_vaga = "PREENCHIDO"
+            else:
+                status_vaga = "PARCIAL"
+                
+        nodes_data.append({
+            "id": str(n.id),
+            "parentId": str(n.parent_id) if n.parent_id else "",
+            "title": n.titulo,
+            "sigla": n.sigla or "",
+            "tipo": n.tipo or "UNIDADE",
+            "nivel": n.nivel_hierarquico or 1,
+            "tipo_vinculo_requerido": n.tipo_vinculo_requerido or "QUALQUER",
+            "vagas_totais": n.vagas_totais or 1,
+            "vagas_ocupadas": qtd_ocupadas,
+            "vagas_livres": vagas_livres,
+            "status_vaga": status_vaga,
+            "servidores": servidores_list
+        })
+        
+    taxa_ocupacao = round((total_ocupadas / total_vagas * 100), 1) if total_vagas > 0 else 0
+    kpis = {
+        "total_cargos": total_cargos,
+        "total_vagas": total_vagas,
+        "total_ocupadas": total_ocupadas,
+        "total_vagas_vagas": total_vagas_vagas,
+        "taxa_ocupacao": taxa_ocupacao,
+        "custo_total_estimado": custo_total_estimado
+    }
+    
+    historico_db = OrganogramaHistorico.query.filter_by(exercicio_id=exercicio.id).order_by(OrganogramaHistorico.data_hora.desc()).limit(20).all()
+    historico_list = [{
+        "id": h.id,
+        "tipo_evento": h.tipo_evento,
+        "descricao": h.descricao,
+        "portaria": h.portaria_referencia or "---",
+        "usuario": h.usuario_nome or "Sistema",
+        "data_hora": h.data_hora.strftime('%d/%m/%Y às %H:%M') if h.data_hora else "---"
+    } for h in historico_db]
+    
+    return {
+        "success": True,
+        "exercicio": {"id": exercicio.id, "ano": exercicio.ano, "titulo": exercicio.titulo},
+        "nodes": nodes_data,
+        "kpis": kpis,
+        "historico": historico_list
+    }
+
+
+@app.route('/api/organograma/exercicio/salvar', methods=['POST'])
+@login_required
+def api_organograma_exercicio_salvar():
+    try:
+        data = request.json or {}
+        ano = int(data.get('ano', datetime.now().year))
+        titulo = data.get('titulo', f'Quadro de Cargos - Exercício {ano}').strip()
+        copiar_de_id = data.get('copiar_de_id')
+        
+        novo_ex = OrganogramaExercicio(
+            ano=ano,
+            titulo=titulo,
+            ativo=True,
+            criado_por_id=current_user.id
+        )
+        db.session.add(novo_ex)
+        db.session.commit()
+        
+        if copiar_de_id:
+            ex_antigo = OrganogramaExercicio.query.get(copiar_de_id)
+            if ex_antigo:
+                id_map = {}
+                old_nodes = OrganogramaNode.query.filter_by(exercicio_id=ex_antigo.id).all()
+                for old_n in old_nodes:
+                    new_n = OrganogramaNode(
+                        exercicio_id=novo_ex.id,
+                        tipo=old_n.tipo,
+                        titulo=old_n.titulo,
+                        sigla=old_n.sigla,
+                        nivel_hierarquico=old_n.nivel_hierarquico,
+                        tipo_vinculo_requerido=old_n.tipo_vinculo_requerido,
+                        vagas_totais=old_n.vagas_totais,
+                        ordem=old_n.ordem
+                    )
+                    db.session.add(new_n)
+                    db.session.flush()
+                    id_map[old_n.id] = new_n.id
+                
+                for old_n in old_nodes:
+                    if old_n.parent_id and old_n.id in id_map and old_n.parent_id in id_map:
+                        new_node_id = id_map[old_n.id]
+                        new_node = OrganogramaNode.query.get(new_node_id)
+                        new_node.parent_id = id_map[old_n.parent_id]
+                db.session.commit()
+
+        hist = OrganogramaHistorico(
+            exercicio_id=novo_ex.id,
+            tipo_evento="CRIACAO_EXERCICIO",
+            descricao=f"Novo Exercício '{titulo}' criado por {current_user.username}.",
+            usuario_id=current_user.id,
+            usuario_nome=current_user.username
+        )
+        db.session.add(hist)
+        db.session.commit()
+        
+        return {"success": True, "exercicio_id": novo_ex.id}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
+
+
+@app.route('/api/organograma/node/salvar', methods=['POST'])
+@login_required
+def api_organograma_node_salvar():
+    try:
+        data = request.json or {}
+        node_id = data.get('id')
+        exercicio_id = data.get('exercicio_id')
+        parent_id = data.get('parent_id')
+        if parent_id and str(parent_id).strip() != "":
+            parent_id = int(parent_id)
+        else:
+            parent_id = None
+            
+        titulo = data.get('titulo', '').strip()
+        sigla = data.get('sigla', '').strip()
+        tipo = data.get('tipo', 'UNIDADE')
+        tipo_vinculo = data.get('tipo_vinculo_requerido', 'QUALQUER')
+        vagas_totais = int(data.get('vagas_totais', 1))
+        
+        if not titulo:
+            return {"success": False, "message": "O título do cargo ou unidade é obrigatório."}, 400
+            
+        if node_id:
+            node = OrganogramaNode.query.get_or_404(node_id)
+            node.titulo = titulo
+            node.sigla = sigla
+            node.tipo = tipo
+            node.parent_id = parent_id
+            node.tipo_vinculo_requerido = tipo_vinculo
+            node.vagas_totais = vagas_totais
+            desc = f"Cargo/Unidade '{titulo}' atualizado."
+            evento = "EDICAO_NO"
+        else:
+            node = OrganogramaNode(
+                exercicio_id=exercicio_id,
+                parent_id=parent_id,
+                titulo=titulo,
+                sigla=sigla,
+                tipo=tipo,
+                tipo_vinculo_requerido=tipo_vinculo,
+                vagas_totais=vagas_totais
+            )
+            db.session.add(node)
+            desc = f"Novo Cargo/Unidade '{titulo}' adicionado à estrutura."
+            evento = "ADICAO_NO"
+            
+        db.session.commit()
+        
+        hist = OrganogramaHistorico(
+            exercicio_id=node.exercicio_id,
+            node_id=node.id,
+            tipo_evento=evento,
+            descricao=desc,
+            usuario_id=current_user.id,
+            usuario_nome=current_user.username
+        )
+        db.session.add(hist)
+        db.session.commit()
+        
+        return {"success": True}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
+
+
+@app.route('/api/organograma/node/deletar', methods=['POST'])
+@login_required
+def api_organograma_node_deletar():
+    try:
+        data = request.json or {}
+        node_id = data.get('node_id')
+        node = OrganogramaNode.query.get_or_404(node_id)
+        
+        filhos = OrganogramaNode.query.filter_by(parent_id=node.id).count()
+        if filhos > 0:
+            return {"success": False, "message": "Não é possível excluir um item que possui sub-unidades vinculadas. Remova os subordinados primeiro."}, 400
+            
+        titulo_removido = node.titulo
+        exercicio_id = node.exercicio_id
+        
+        db.session.delete(node)
+        db.session.commit()
+        
+        hist = OrganogramaHistorico(
+            exercicio_id=exercicio_id,
+            tipo_evento="REMOCAO_NO",
+            descricao=f"Cargo/Unidade '{titulo_removido}' removido do organograma.",
+            usuario_id=current_user.id,
+            usuario_nome=current_user.username
+        )
+        db.session.add(hist)
+        db.session.commit()
+        
+        return {"success": True}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
+
+
+@app.route('/api/organograma/servidor/nomear', methods=['POST'])
+@login_required
+def api_organograma_servidor_nomear():
+    try:
+        data = request.json or {}
+        node_id = data.get('node_id')
+        nome_servidor = data.get('nome_servidor', '').strip()
+        cpf = data.get('cpf', '').strip()
+        matricula_vinculo = data.get('matricula_vinculo', '').strip()
+        tipo_vinculo = data.get('tipo_vinculo', 'COMISSIONADO')
+        portaria_nomeacao = data.get('portaria_nomeacao', '').strip()
+        data_nomeacao_str = data.get('data_nomeacao')
+        data_inicio_str = data.get('data_inicio')
+        remuneracao_estimada = float(data.get('remuneracao_estimada', 0.0) or 0.0)
+        foto_url = data.get('foto_url', '').strip()
+        
+        if not node_id or not nome_servidor:
+            return {"success": False, "message": "Nome do servidor e cargo são obrigatórios."}, 400
+            
+        if not portaria_nomeacao:
+            return {"success": False, "message": "A Portaria de Nomeação é OBRIGATÓRIA para nomear um servidor no organograma."}, 400
+            
+        node = OrganogramaNode.query.get_or_404(node_id)
+        
+        dt_nom = datetime.strptime(data_nomeacao_str, '%Y-%m-%d').date() if data_nomeacao_str else datetime.now().date()
+        dt_ini = datetime.strptime(data_inicio_str, '%Y-%m-%d').date() if data_inicio_str else dt_nom
+        
+        servidor = OrganogramaServidor(
+            node_id=node.id,
+            nome_servidor=nome_servidor,
+            cpf=cpf,
+            matricula_vinculo=matricula_vinculo,
+            tipo_vinculo=tipo_vinculo,
+            portaria_nomeacao=portaria_nomeacao,
+            data_nomeacao=dt_nom,
+            data_inicio=dt_ini,
+            remuneracao_estimada=remuneracao_estimada,
+            foto_url=foto_url,
+            ativo=True
+        )
+        db.session.add(servidor)
+        db.session.commit()
+        
+        desc = f"Servidor(a) {nome_servidor} NOMEADO(A) para o cargo de '{node.titulo}' mediante a Portaria de Nomeação nº {portaria_nomeacao}."
+        hist = OrganogramaHistorico(
+            exercicio_id=node.exercicio_id,
+            node_id=node.id,
+            servidor_id=servidor.id,
+            tipo_evento="NOMEACAO",
+            descricao=desc,
+            portaria_referencia=portaria_nomeacao,
+            usuario_id=current_user.id,
+            usuario_nome=current_user.username
+        )
+        db.session.add(hist)
+        db.session.commit()
+        
+        return {"success": True}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
+
+
+@app.route('/api/organograma/servidor/exonerar', methods=['POST'])
+@login_required
+def api_organograma_servidor_exonerar():
+    try:
+        data = request.json or {}
+        servidor_id = data.get('servidor_id')
+        portaria_exoneracao = data.get('portaria_exoneracao', '').strip()
+        data_exoneracao_str = data.get('data_exoneracao')
+        motivo_exoneracao = data.get('motivo_exoneracao', 'Exoneração a Pedido / Ofício').strip()
+        
+        if not servidor_id:
+            return {"success": False, "message": "ID do servidor é obrigatório."}, 400
+            
+        if not portaria_exoneracao:
+            return {"success": False, "message": "A Portaria de Exoneração é OBRIGATÓRIA para desligar/exonerar um servidor do quadro."}, 400
+            
+        servidor = OrganogramaServidor.query.get_or_404(servidor_id)
+        node = OrganogramaNode.query.get(servidor.node_id)
+        
+        dt_exo = datetime.strptime(data_exoneracao_str, '%Y-%m-%d').date() if data_exoneracao_str else datetime.now().date()
+        
+        servidor.ativo = False
+        servidor.portaria_exoneracao = portaria_exoneracao
+        servidor.data_exoneracao = dt_exo
+        servidor.motivo_exoneracao = motivo_exoneracao
+        db.session.commit()
+        
+        desc = f"Servidor(a) {servidor.nome_servidor} EXONERADO(A) do cargo de '{node.titulo if node else '---'}' mediante a Portaria de Exoneração nº {portaria_exoneracao}. Motivo: {motivo_exoneracao}."
+        hist = OrganogramaHistorico(
+            exercicio_id=node.exercicio_id if node else 1,
+            node_id=node.id if node else None,
+            servidor_id=servidor.id,
+            tipo_evento="EXONERACAO",
+            descricao=desc,
+            portaria_referencia=portaria_exoneracao,
+            usuario_id=current_user.id,
+            usuario_nome=current_user.username
+        )
+        db.session.add(hist)
+        db.session.commit()
+        
+        return {"success": True}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
+
+
+@app.route('/api/organograma/servidor/substituir', methods=['POST'])
+@login_required
+def api_organograma_servidor_substituir():
+    try:
+        data = request.json or {}
+        servidor_antigo_id = data.get('servidor_antigo_id')
+        portaria_exoneracao = data.get('portaria_exoneracao', '').strip()
+        data_exoneracao_str = data.get('data_exoneracao')
+        motivo_exoneracao = data.get('motivo_exoneracao', 'Substituição no Cargo').strip()
+        
+        nome_novo_servidor = data.get('nome_novo_servidor', '').strip()
+        cpf_novo = data.get('cpf_novo', '').strip()
+        matricula_novo = data.get('matricula_novo', '').strip()
+        tipo_vinculo_novo = data.get('tipo_vinculo_novo', 'COMISSIONADO')
+        portaria_nomeacao = data.get('portaria_nomeacao', '').strip()
+        data_nomeacao_str = data.get('data_nomeacao')
+        remuneracao_estimada = float(data.get('remuneracao_estimada', 0.0) or 0.0)
+        foto_url_novo = data.get('foto_url_novo', '').strip()
+        
+        if not servidor_antigo_id or not nome_novo_servidor:
+            return {"success": False, "message": "Preencha os dados do servidor antigo e do novo servidor."}, 400
+            
+        if not portaria_exoneracao:
+            return {"success": False, "message": "A Portaria de Exoneração do antigo ocupante é OBRIGATÓRIA."}, 400
+            
+        if not portaria_nomeacao:
+            return {"success": False, "message": "A Portaria de Nomeação do novo servidor é OBRIGATÓRIA."}, 400
+            
+        servidor_antigo = OrganogramaServidor.query.get_or_404(servidor_antigo_id)
+        node = OrganogramaNode.query.get_or_404(servidor_antigo.node_id)
+        dt_exo = datetime.strptime(data_exoneracao_str, '%Y-%m-%d').date() if data_exoneracao_str else datetime.now().date()
+        
+        servidor_antigo.ativo = False
+        servidor_antigo.portaria_exoneracao = portaria_exoneracao
+        servidor_antigo.data_exoneracao = dt_exo
+        servidor_antigo.motivo_exoneracao = motivo_exoneracao
+        
+        dt_nom = datetime.strptime(data_nomeacao_str, '%Y-%m-%d').date() if data_nomeacao_str else datetime.now().date()
+        
+        novo_servidor = OrganogramaServidor(
+            node_id=node.id,
+            nome_servidor=nome_novo_servidor,
+            cpf=cpf_novo,
+            matricula_vinculo=matricula_novo,
+            tipo_vinculo=tipo_vinculo_novo,
+            portaria_nomeacao=portaria_nomeacao,
+            data_nomeacao=dt_nom,
+            data_inicio=dt_nom,
+            remuneracao_estimada=remuneracao_estimada,
+            foto_url=foto_url_novo,
+            ativo=True
+        )
+        db.session.add(novo_servidor)
+        db.session.commit()
+        
+        desc = f"SUBSTITUIÇÃO DE CARGO em '{node.titulo}': Servidor(a) {servidor_antigo.nome_servidor} EXONERADO(A) (Portaria nº {portaria_exoneracao}) e Servidor(a) {nome_novo_servidor} NOMEADO(A) (Portaria nº {portaria_nomeacao})."
+        hist = OrganogramaHistorico(
+            exercicio_id=node.exercicio_id,
+            node_id=node.id,
+            servidor_id=novo_servidor.id,
+            tipo_evento="SUBSTITUICAO",
+            descricao=desc,
+            portaria_referencia=f"Exo: {portaria_exoneracao} / Nom: {portaria_nomeacao}",
+            usuario_id=current_user.id,
+            usuario_nome=current_user.username
+        )
+        db.session.add(hist)
+        db.session.commit()
+        
+        return {"success": True}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
+
+
+@app.route('/organograma/exportar/excel/<int:exercicio_id>')
+@login_required
+def organograma_exportar_excel(exercicio_id):
+    exercicio = OrganogramaExercicio.query.get_or_404(exercicio_id)
+    nodes = OrganogramaNode.query.filter_by(exercicio_id=exercicio.id).all()
+    
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=';')
+    
+    writer.writerow(['EXERCÍCIO', 'SIGLA', 'UNIDADE / CARGO', 'TIPO', 'TIPO VÍNCULO REQUERIDO', 'VAGAS PREVISTAS', 'SERVIDORES NOMEADOS', 'PORTARIA NOMEAÇÃO', 'DATA NOMEAÇÃO', 'STATUS'])
+    
+    for n in nodes:
+        servidores_ativos = OrganogramaServidor.query.filter_by(node_id=n.id, ativo=True).all()
+        if servidores_ativos:
+            for s in servidores_ativos:
+                writer.writerow([
+                    exercicio.ano,
+                    n.sigla or '',
+                    n.titulo,
+                    n.tipo,
+                    n.tipo_vinculo_requerido,
+                    n.vagas_totais,
+                    s.nome_servidor,
+                    s.portaria_nomeacao or '',
+                    s.data_nomeacao.strftime('%d/%m/%Y') if s.data_nomeacao else '',
+                    'OCUPADO'
+                ])
+        else:
+            writer.writerow([
+                exercicio.ano,
+                n.sigla or '',
+                n.titulo,
+                n.tipo,
+                n.tipo_vinculo_requerido,
+                n.vagas_totais,
+                'VAGO / DESOCUPADO',
+                '---',
+                '---',
+                'VAGO'
+            ])
+            
+    output.seek(0)
+    filename = f"quadro_cargos_organograma_{exercicio.ano}.csv"
+    return Response(
+        output.getvalue().encode('utf-8-sig'),
+        mimetype="text/csv",
+        headers={"Content-disposition": f"attachment; filename={filename}"}
+    )
+
+
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===
 # --- 1. EXECUTA TANTO LOCALMENTE QUANTO NO RAILWAY (GUNICORN) ---
 with app.app_context():
+    db.create_all()
     atualizar_schema()
     create_admin()
 
