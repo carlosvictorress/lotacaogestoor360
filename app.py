@@ -3397,12 +3397,106 @@ def unidades_ponto():
 
 # ==============================================================================
 # MÓDULO INDEPENDENTE DE ORGANOGRAMA & QUADRO DE CARGOS DA SECRETARIA
-# ==============================================================================
+def inicializar_estrutura_oficial_seme(exercicio_id):
+    if OrganogramaNode.query.filter_by(exercicio_id=exercicio_id).count() > 1:
+        return
+        
+    OrganogramaServidor.query.filter(OrganogramaServidor.node_id.in_(
+        db.session.query(OrganogramaNode.id).filter_by(exercicio_id=exercicio_id)
+    )).delete(synchronize_session=False)
+    OrganogramaNode.query.filter_by(exercicio_id=exercicio_id).delete(synchronize_session=False)
+    db.session.commit()
+
+    def add_item(titulo, sigla, parent_id=None, nivel=1, tipo="CARGO_CHEFIA", vinculo="COMISSIONADO", servidor_nome=None, portaria="Portaria nº 010/2026"):
+        node = OrganogramaNode(
+            exercicio_id=exercicio_id,
+            parent_id=parent_id,
+            titulo=titulo,
+            sigla=sigla,
+            nivel_hierarquico=nivel,
+            tipo=tipo,
+            tipo_vinculo_requerido=vinculo,
+            vagas_totais=1
+        )
+        db.session.add(node)
+        db.session.flush()
+        
+        if servidor_nome and servidor_nome.upper() != "VAGA":
+            serv = OrganogramaServidor(
+                node_id=node.id,
+                nome_servidor=servidor_nome,
+                tipo_vinculo=vinculo,
+                portaria_nomeacao=portaria,
+                ativo=True
+            )
+            db.session.add(serv)
+        return node.id
+
+    # 1. SECRETÁRIA
+    n_sec = add_item("Secretária Municipal", "SECRETÁRIA", None, 1, "CARGO_CHEFIA", "COMISSIONADO", "Antônia Iara Costa")
+
+    # 2. DIRETORIAS E ASSESSORIAS (Nível 2)
+    n_ass_esp = add_item("Assessora Especial", "ASS-ESP", n_sec, 2, "ASSESSORIA", "COMISSIONADO", "Leidiane")
+    n_dir_cont = add_item("Diretora de Contabilidade", "DIR-CONT", n_sec, 2, "CARGO_CHEFIA", "COMISSIONADO", "Irene Maria da Conceição")
+    n_dir_edu = add_item("Diretora de Educação", "DIR-EDU", n_sec, 2, "CARGO_CHEFIA", "COMISSIONADO", "Elizabete Moura da Silva Soares")
+    n_ci = add_item("Chefe de Setor de Controle Interno", "SEC-CI", n_sec, 2, "UNIDADE", "COMISSIONADO", "Eliane de Melo Veloso")
+    n_adv = add_item("Advogada", "JURIDICO", n_sec, 2, "ASSESSORIA", "COMISSIONADO", "Alvina Noronha")
+
+    # 3. SETORES E SUPERVISÕES (Nível 3)
+    n_rh = add_item("Chefe de Setor de RH", "SEC-RH", n_ass_esp, 3, "UNIDADE", "COMISSIONADO", "Bárbara Victoria Alves Rocha")
+    n_orc = add_item("Chefe de Setor de Controle Orçamentário", "SEC-ORC", n_dir_cont, 3, "UNIDADE", "COMISSIONADO", "Arisla Rodrigues Neres")
+    n_sup_ped1 = add_item("Supervisora de Ensino Pedagógico", "SUP-PED1", n_dir_edu, 3, "UNIDADE", "COMISSIONADO", "Rachel Soares da Silva")
+    n_sup_ped2 = add_item("Supervisora de Ensino Pedagógico", "SUP-PED2", n_dir_edu, 3, "UNIDADE", "COMISSIONADO", "Adriana Vieira dos Reis Sobrinho")
+    n_ass_jur = add_item("Assessora", "ASSESSORA", n_adv, 3, "ASSESSORIA", "COMISSIONADO", "Larissa Ferreira Nunes Matos")
+
+    # 4. COORDENAÇÕES (Nível 4)
+    n_efi = add_item("Coordenador de Ensino Fundamental Anos Iniciais", "COORD-EFI", n_sup_ped1, 4, "CARGO_CHEFIA", "COMISSIONADO", "André Nildo Leite Rodrigues")
+    n_ei = add_item("Coordenadora de Ensino Infantil", "COORD-EI", n_sup_ped1, 4, "CARGO_CHEFIA", "COMISSIONADO", "Ana Maria Lopes de Sousa")
+    n_eff = add_item("Coordenador(a) de Ensino Infantil Anos Finais", "COORD-EFF", n_sup_ped2, 4, "CARGO_CHEFIA", "COMISSIONADO", None) # VAGA
+    n_eja = add_item("Coordenadora de Educação de Jovens e Adultos", "COORD-EJA", n_sup_ped2, 4, "CARGO_CHEFIA", "COMISSIONADO", "Veânia Kelini de Sousa")
+    n_form1 = add_item("Formadora da Educação Infantil - PPAIC", "FORM-PPAIC1", n_ass_jur, 4, "CARGO_OPERACIONAL", "COMISSIONADO", "Maria dos Anjos Campelo")
+
+    # 5. PROGRAMAS E PROJETOS (Nível 5)
+    n_unicef = add_item("Coordenadora de Projetos e Selo UNICEF", "COORD-UNICEF", n_efi, 5, "CARGO_CHEFIA", "COMISSIONADO", "Renata Ferreira")
+    n_form2 = add_item("Formadora do Ciclo de Alfabetização - PPAIC", "FORM-PPAIC2", n_ei, 5, "CARGO_OPERACIONAL", "COMISSIONADO", "Jessovane Osmarina de Barros Silva")
+    n_prog = add_item("Coordenadora de Programas e Apoio Escolar", "COORD-PROG", n_eff, 5, "CARGO_CHEFIA", "COMISSIONADO", "Leticia Nunes Alves")
+    n_gpei = add_item("Operadora do GPEI (Censo Escolar)", "OP-GPEI", n_ci, 5, "CARGO_OPERACIONAL", "EFETIVO", "Samia Patricia Lima Verde")
+    n_mer = add_item("Supervisora Merenda Escolar", "SUP-MERENDA", n_form1, 5, "UNIDADE", "COMISSIONADO", "Jessika Bábara Coelho Isidório")
+
+    # 6. APOIO / LOGÍSTICA (Nível 6)
+    add_item("Coordenador do Transporte Escolar", "COORD-TRANSP", n_prog, 6, "CARGO_CHEFIA", "COMISSIONADO", "Carlos Victor")
+    add_item("Coordenador do Sistema BIOEDUC", "COORD-BIO", n_prog, 6, "CARGO_CHEFIA", "COMISSIONADO", "Jailton")
+    add_item("Coordenador do Setor de Patrimônio", "COORD-PATR", n_prog, 6, "CARGO_CHEFIA", "COMISSIONADO", "Marcos Emanuel")
+
+    # ESTRUTURA ADMINISTRATIVA & OPERACIONAL (PÁGINA 2 DO DOCUMENTO)
+    n_prot = add_item("Setor de Protocolos", "PROTOCOLO", n_sec, 2, "UNIDADE", "EFETIVO", "Islan Alves")
+    n_ve = add_item("Chefe do Setor de Vida Escolar", "CHEFE-VE", n_sec, 2, "UNIDADE", "COMISSIONADO", "Diomar Martins de Menezes")
+    n_ass_ve = add_item("Assessora do Chefe do Setor de Vida Escolar", "ASS-VE", n_ve, 3, "ASSESSORIA", "COMISSIONADO", "Maria do Rosário de Sousa Ferreira")
+    n_sup_ve = add_item("Supervisora de Vida Escolar", "SUP-VE", n_ve, 3, "UNIDADE", "COMISSIONADO", "Auricélia")
+    n_sec_esc = add_item("Secretaria de Unidade Escolar", "SEC-UNID", n_ve, 3, "UNIDADE", "EFETIVO", "Elisa")
+    n_manut = add_item("Chefe do Setor de Manutenção e Limpeza", "CHEFE-MANUT", n_sec, 2, "UNIDADE", "COMISSIONADO", "Antônia Alves da Silva")
+    n_ass_manut = add_item("Assessora do Chefe de Manutenção e Limpeza", "ASS-MANUT", n_manut, 3, "ASSESSORIA", "COMISSIONADO", "Joana Darc de Lima")
+    add_item("Assessora do Chefe de Manutenção e Limpeza", "ASS-MANUT2", n_manut, 3, "ASSESSORIA", "COMISSIONADO", "Doralice Pereira")
+
+    add_item("Recepcionista", "RECEPCAO", n_ass_ve, 4, "CARGO_OPERACIONAL", "CONTRATADO", "Samara")
+    add_item("Auxiliar Administrativo - Merenda Escola", "AUX-MERENDA", n_ass_ve, 4, "CARGO_OPERACIONAL", "CONTRATADO", "Francisco Ítalo")
+    add_item("Auxiliar Administrativo", "AUX-ADM", n_ve, 4, "CARGO_OPERACIONAL", "CONTRATADO", "Ramom Lucas")
+    add_item("Auxiliar de Almoxarifado", "ALMOXARIFE", n_manut, 4, "CARGO_OPERACIONAL", "EFETIVO", "Laercio")
+
+    add_item("Motorista", "MOTORISTA1", n_manut, 4, "CARGO_OPERACIONAL", "EFETIVO", "Francisco da Cruz de Oliveira Gonçalves")
+    add_item("Motorista", "MOTORISTA2", n_manut, 4, "CARGO_OPERACIONAL", "EFETIVO", "Flaviano Luis do Nascimento")
+    add_item("Motorista", "MOTORISTA3", n_manut, 4, "CARGO_OPERACIONAL", "EFETIVO", "Gleyson")
+
+    add_item("Vigia", "VIGIA1", n_manut, 5, "CARGO_OPERACIONAL", "EFETIVO", "Iromar")
+    add_item("Vigia", "VIGIA2", n_manut, 5, "CARGO_OPERACIONAL", "EFETIVO", "Wilson")
+    add_item("Vigia", "VIGIA3", n_manut, 5, "CARGO_OPERACIONAL", "EFETIVO", "Edgar Feitosa (Jhon)")
+
+    db.session.commit()
+
 
 @app.route('/organograma')
 @login_required
 def organograma_page():
-    # Garante que existe pelo menos um exercício cadastrado
     exercicios = OrganogramaExercicio.query.order_by(OrganogramaExercicio.ano.desc(), OrganogramaExercicio.id.desc()).all()
     
     if not exercicios:
@@ -3415,31 +3509,6 @@ def organograma_page():
         )
         db.session.add(novo_ex)
         db.session.commit()
-        
-        no_raiz = OrganogramaNode(
-            exercicio_id=novo_ex.id,
-            parent_id=None,
-            tipo="CARGO_CHEFIA",
-            titulo="Secretário(a) Municipal",
-            sigla="GABINETE/SEME",
-            nivel_hierarquico=1,
-            tipo_vinculo_requerido="COMISSIONADO",
-            vagas_totais=1
-        )
-        db.session.add(no_raiz)
-        db.session.commit()
-        
-        hist = OrganogramaHistorico(
-            exercicio_id=novo_ex.id,
-            node_id=no_raiz.id,
-            tipo_evento="CRIACAO_EXERCICIO",
-            descricao=f"Exercício {ano_atual} inicializado automaticamente com o cargo de Secretário(a) Municipal.",
-            usuario_id=current_user.id if hasattr(current_user, 'id') else None,
-            usuario_nome=current_user.username if hasattr(current_user, 'username') else "Sistema"
-        )
-        db.session.add(hist)
-        db.session.commit()
-        
         exercicios = [novo_ex]
         
     exercicio_id = request.args.get('exercicio_id', type=int)
@@ -3448,6 +3517,8 @@ def organograma_page():
         selected_exercicio = OrganogramaExercicio.query.get(exercicio_id)
     if not selected_exercicio:
         selected_exercicio = exercicios[0]
+
+    inicializar_estrutura_oficial_seme(selected_exercicio.id)
 
     return render_template('organograma.html', 
                            exercicios=exercicios, 
@@ -3996,15 +4067,59 @@ def api_organograma_buscar_funcionarios():
 @login_required
 def organograma_pdf_view(exercicio_id):
     exercicio = OrganogramaExercicio.query.get_or_404(exercicio_id)
+    inicializar_estrutura_oficial_seme(exercicio.id)
     nodes = OrganogramaNode.query.filter_by(exercicio_id=exercicio.id).order_by(OrganogramaNode.nivel_hierarquico, OrganogramaNode.ordem, OrganogramaNode.id).all()
     valid_ids = {n.id for n in nodes}
     
     nodes_by_id = {}
+    nodes_quadro = []
+    servidores_list = []
+    
+    total_cargos = 0
+    total_vagas = 0
+    total_ocupadas = 0
+    total_vagas_vagas = 0
+    custo_total_estimado = 0.0
+
     for n in nodes:
+        total_cargos += 1
+        v_tot = n.vagas_totais or 1
+        total_vagas += v_tot
+        
         servidores_ativos = OrganogramaServidor.query.filter_by(node_id=n.id, ativo=True).all()
+        qtd_ocupadas = len(servidores_ativos)
+        total_ocupadas += qtd_ocupadas
+        vagas_livres = max(0, v_tot - qtd_ocupadas)
+        total_vagas_vagas += vagas_livres
+        
         servidor_nome = servidores_ativos[0].nome_servidor if servidores_ativos else "VAGA"
         is_vaga = len(servidores_ativos) == 0
         parent_id = n.parent_id if (n.parent_id and n.parent_id in valid_ids) else None
+        
+        for s in servidores_ativos:
+            remun = s.remuneracao_estimada or 0.0
+            custo_total_estimado += remun
+            servidores_list.append({
+                "id": s.id,
+                "nome": s.nome_servidor,
+                "cpf": s.cpf or "---",
+                "cargo_titulo": n.titulo,
+                "tipo_vinculo": s.tipo_vinculo or "COMISSIONADO",
+                "portaria_nomeacao": s.portaria_nomeacao or "---",
+                "data_nomeacao": s.data_nomeacao.strftime('%d/%m/%Y') if s.data_nomeacao else "---",
+                "remuneracao": remun
+            })
+            
+        nodes_quadro.append({
+            "sigla": n.sigla or "---",
+            "titulo": n.titulo,
+            "tipo": n.tipo or "UNIDADE",
+            "tipo_vinculo_requerido": n.tipo_vinculo_requerido or "QUALQUER",
+            "vagas_totais": v_tot,
+            "vagas_ocupadas": qtd_ocupadas,
+            "vagas_livres": vagas_livres,
+            "status": "PREENCHIDO" if vagas_livres == 0 else "VAGO"
+        })
         
         nodes_by_id[n.id] = {
             "id": n.id,
@@ -4025,9 +4140,38 @@ def organograma_pdf_view(exercicio_id):
             nodes_by_id[p_id]["children"].append(node_data)
         else:
             root_nodes.append(node_data)
-            
+
+    taxa_ocupacao = round((total_ocupadas / total_vagas * 100), 1) if total_vagas > 0 else 0
+    kpis = {
+        "total_cargos": total_cargos,
+        "total_vagas": total_vagas,
+        "total_ocupadas": total_ocupadas,
+        "total_vagas_vagas": total_vagas_vagas,
+        "taxa_ocupacao": taxa_ocupacao,
+        "custo_total_estimado": custo_total_estimado
+    }
+    
+    historico_db = OrganogramaHistorico.query.filter_by(exercicio_id=exercicio.id).order_by(OrganogramaHistorico.data_hora.desc()).limit(30).all()
+    historico_list = [{
+        "data_hora": h.data_hora.strftime('%d/%m/%Y às %H:%M') if h.data_hora else "---",
+        "tipo_evento": h.tipo_evento,
+        "descricao": h.descricao,
+        "portaria": h.portaria_referencia or "---",
+        "usuario": h.usuario_nome or "Sistema"
+    } for h in historico_db]
+
     data_hoje = datetime.now().strftime('%d/%m/%Y às %H:%M')
-    return render_template('organograma_pdf.html', exercicio=exercicio, root_nodes=root_nodes, nodes=nodes, data_hoje=data_hoje, datetime=datetime)
+    return render_template(
+        'organograma_pdf.html',
+        exercicio=exercicio,
+        root_nodes=root_nodes,
+        nodes_quadro=nodes_quadro,
+        servidores_list=servidores_list,
+        historico_list=historico_list,
+        kpis=kpis,
+        data_hoje=data_hoje,
+        datetime=datetime
+    )
 
 
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===

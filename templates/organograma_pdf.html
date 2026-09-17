@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Organograma Oficial - {{ exercicio.titulo }}</title>
+    <title>Relatório Oficial do Organograma & Quadro de Cargos - {{ exercicio.titulo }}</title>
     
-    <!-- Tailwind CSS para estruturação rápida -->
+    <!-- Tailwind CSS para estilização elegante -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     
     <style>
         @page {
@@ -23,14 +22,14 @@
                 background: white !important;
                 padding: 0 !important;
             }
-            .page-break {
+            .section-page-break {
                 page-break-before: always;
             }
         }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f1f5f9;
+            background-color: #f8fafc;
             color: #0f172a;
         }
 
@@ -45,14 +44,14 @@
             background-color: #d97706; /* Âmbar Dourado */
             color: #000000;
             font-weight: 800;
-            font-size: 10.5px;
+            font-size: 10px;
             text-transform: uppercase;
             text-align: center;
-            padding: 5px 6px;
+            padding: 4px 5px;
             border: 1.5px solid #000000;
             border-radius: 3px 3px 0 0;
             line-height: 1.25;
-            min-height: 36px;
+            min-height: 34px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -62,13 +61,13 @@
             background-color: #ffffff;
             color: #0f172a;
             font-weight: 700;
-            font-size: 11.5px;
+            font-size: 11px;
             text-align: center;
-            padding: 6px;
+            padding: 5px;
             border: 1.5px solid #000000;
             border-top: none;
             border-radius: 0 0 3px 3px;
-            min-height: 32px;
+            min-height: 30px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -89,109 +88,299 @@
 
         .tree-arrow-down {
             color: #15803d;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 900;
             text-align: center;
             line-height: 1;
         }
 
-        .tree-line-h {
-            height: 2px;
-            background-color: #15803d;
+        .pdf-table {
             width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+        }
+
+        .pdf-table th {
+            background-color: #f1f5f9;
+            color: #334155;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 6px 10px;
+            border: 1px solid #cbd5e1;
+            font-size: 10px;
+        }
+
+        .pdf-table td {
+            padding: 6px 10px;
+            border: 1px solid #e2e8f0;
         }
     </style>
 </head>
 <body class="p-4 sm:p-8">
 
-    <!-- BARRA DE AÇÕES (NÃO SAI NO PDF) -->
-    <div class="no-print max-w-6xl mx-auto mb-6 bg-white p-4 rounded-2xl shadow-md border border-gray-200 flex justify-between items-center">
+    <!-- BARRA SUPERIOR DE AÇÕES -->
+    <div class="no-print max-w-7xl mx-auto mb-6 bg-white p-4 rounded-2xl shadow-md border border-gray-200 flex justify-between items-center">
         <div>
-            <h2 class="font-bold text-gray-800 text-base">Organograma Oficial (Formato PDF)</h2>
-            <p class="text-xs text-gray-500">Exibindo estrutura no modelo oficial do Município de Valença do Piauí</p>
+            <h2 class="font-bold text-gray-800 text-base flex items-center gap-2">
+                📄 Relatório Completo do Organograma & Quadro de Cargos
+            </h2>
+            <p class="text-xs text-gray-500">Inclui todas as 5 seções: Gráfico Visual, Quadro de Cargos, Servidores, Portarias e Indicadores</p>
         </div>
         <div class="flex gap-2">
             <a href="/organograma?exercicio_id={{ exercicio.id }}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition">
-                ← Voltar
+                ← Voltar ao Sistema
             </a>
-            <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow transition">
+            <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow transition flex items-center gap-1.5">
                 🖨️ Imprimir / Salvar PDF
             </button>
         </div>
     </div>
 
-    <!-- ÁREA DE IMPRESSÃO / EXP. PDF -->
-    <div id="pdf-container" class="max-w-[1400px] mx-auto bg-white p-8 rounded-xl shadow-lg border border-gray-200">
+    <!-- CONTAINER PRINCIPAL DO DOCUMENTO -->
+    <div id="pdf-container" class="max-w-[1400px] mx-auto bg-white p-8 rounded-xl shadow-lg border border-gray-200 space-y-8">
         
-        <!-- CABEÇALHO OFICIAL COM BRASÃO -->
-        <div class="text-center mb-4">
-            <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão Valença do Piauí" class="h-14 mx-auto mb-1 object-contain">
+        <!-- CABEÇALHO OFICIAL DO MUNICÍPIO -->
+        <div class="text-center mb-6 border-b pb-6 border-gray-200">
+            <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão Valença do Piauí" class="h-16 mx-auto mb-1.5 object-contain">
             <div class="text-xs font-bold text-gray-600 tracking-wide uppercase">Município de Valença do Piauí</div>
             <div class="w-full h-1 bg-emerald-700 my-2 rounded-full"></div>
             <h1 class="text-2xl font-black text-emerald-800 tracking-wide uppercase">SECRETARIA MUNICIPAL DE EDUCAÇÃO</h1>
-            <div class="text-[11px] font-bold text-gray-500 uppercase mt-0.5">{{ exercicio.titulo }}</div>
+            <div class="text-xs font-bold text-gray-500 uppercase mt-0.5">{{ exercicio.titulo }}</div>
         </div>
 
-        <!-- RENDERIZAÇÃO DA ÁRVORE HIERÁRQUICA -->
-        {% macro render_node(node) %}
-        <div class="flex flex-col items-center">
-            <!-- CARD DO CARGO -->
-            <div class="org-card">
-                <div class="org-card-header">
-                    {{ node.titulo }}
-                </div>
-                <div class="org-card-body">
-                    {% if node.is_vaga %}
-                        <span class="vaga-text">VAGA</span>
-                    {% else %}
-                        {{ node.servidor_nome }}
-                    {% endif %}
-                </div>
+        <!-- SEÇÃO 1: ORGANOGRAMA INTERATIVO (ÁRVORE HIERÁRQUICA VISUAL) -->
+        <div class="space-y-4">
+            <div class="bg-emerald-50 p-3 rounded-lg border-l-4 border-emerald-700 flex justify-between items-center">
+                <h2 class="text-sm font-black uppercase text-emerald-900 tracking-wide">
+                    1. Organograma Interativo (Estrutura Organizacional Visual)
+                </h2>
+                <span class="text-xs font-bold text-emerald-700">Hierarquia da Secretaria</span>
             </div>
 
-            <!-- FILHOS DO NÓ -->
-            {% if node.children and node.children|length > 0 %}
-                <div class="tree-line-v h-4"></div>
-                <div class="tree-arrow-down">↓</div>
-                
-                {% if node.children|length == 1 %}
+            {% macro render_node(node) %}
+            <div class="flex flex-col items-center">
+                <div class="org-card">
+                    <div class="org-card-header">
+                        {{ node.titulo }}
+                    </div>
+                    <div class="org-card-body">
+                        {% if node.is_vaga %}
+                            <span class="vaga-text">VAGA</span>
+                        {% else %}
+                            {{ node.servidor_nome }}
+                        {% endif %}
+                    </div>
+                </div>
+
+                {% if node.children and node.children|length > 0 %}
                     <div class="tree-line-v h-3"></div>
-                    {{ render_node(node.children[0]) }}
-                {% else %}
-                    <div class="relative flex justify-center w-full mt-1">
-                        <!-- LINHA HORIZONTAL CONECTORA -->
-                        <div class="absolute top-0 h-0.5 bg-emerald-700" style="left: calc(100% / {{ node.children|length }} / 2); right: calc(100% / {{ node.children|length }} / 2);"></div>
-                        
-                        <div class="flex justify-around w-full gap-4 pt-3">
-                            {% for child in node.children %}
-                                <div class="flex flex-col items-center flex-1">
-                                    {{ render_node(child) }}
-                                </div>
-                            {% endfor %}
+                    <div class="tree-arrow-down">↓</div>
+                    
+                    {% if node.children|length == 1 %}
+                        <div class="tree-line-v h-2"></div>
+                        {{ render_node(node.children[0]) }}
+                    {% else %}
+                        <div class="relative flex justify-center w-full mt-0.5">
+                            <div class="absolute top-0 h-0.5 bg-emerald-700" style="left: calc(100% / {{ node.children|length }} / 2); right: calc(100% / {{ node.children|length }} / 2);"></div>
+                            <div class="flex justify-around w-full gap-3 pt-2">
+                                {% for child in node.children %}
+                                    <div class="flex flex-col items-center flex-1">
+                                        {{ render_node(child) }}
+                                    </div>
+                                {% endfor %}
+                            </div>
                         </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+            {% endmacro %}
+
+            <div class="py-4 overflow-x-auto">
+                {% if root_nodes and root_nodes|length > 0 %}
+                    <div class="flex flex-col items-center gap-6">
+                        {% for r in root_nodes %}
+                            {{ render_node(r) }}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-8 text-gray-400 font-bold">
+                        Nenhum cargo cadastrado neste exercício.
                     </div>
                 {% endif %}
-            {% endif %}
+            </div>
         </div>
-        {% endmacro %}
 
-        <div class="py-6 overflow-x-auto">
-            {% if root_nodes and root_nodes|length > 0 %}
-                <div class="flex flex-col items-center gap-8">
-                    {% for r in root_nodes %}
-                        {{ render_node(r) }}
+        <div class="section-page-break"></div>
+
+        <!-- SEÇÃO 2: QUADRO DE CARGOS -->
+        <div class="space-y-4 pt-4">
+            <div class="bg-indigo-50 p-3 rounded-lg border-l-4 border-indigo-700 flex justify-between items-center">
+                <h2 class="text-sm font-black uppercase text-indigo-900 tracking-wide">
+                    2. Quadro de Cargos & Vagas Previstas
+                </h2>
+                <span class="text-xs font-bold text-indigo-700">Total: {{ kpis.total_cargos }} Cargos Cadastrados</span>
+            </div>
+
+            <table class="pdf-table">
+                <thead>
+                    <tr>
+                        <th class="text-left">Sigla</th>
+                        <th class="text-left">Título da Unidade / Cargo</th>
+                        <th class="text-left">Tipo</th>
+                        <th class="text-left">Vínculo Requerido</th>
+                        <th class="text-center">Previstas</th>
+                        <th class="text-center">Ocupadas</th>
+                        <th class="text-center">Livres</th>
+                        <th class="text-center">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for q in nodes_quadro %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="font-bold text-indigo-700">{{ q.sigla }}</td>
+                        <td class="font-bold text-gray-900">{{ q.titulo }}</td>
+                        <td class="text-gray-600">{{ q.tipo }}</td>
+                        <td class="text-gray-600">{{ q.tipo_vinculo_requerido }}</td>
+                        <td class="text-center font-bold">{{ q.vagas_totais }}</td>
+                        <td class="text-center font-bold text-emerald-700">{{ q.vagas_ocupadas }}</td>
+                        <td class="text-center font-bold text-rose-600">{{ q.vagas_livres }}</td>
+                        <td class="text-center font-bold">
+                            {% if q.status == 'PREENCHIDO' %}
+                                <span class="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full">PREENCHIDO</span>
+                            {% else %}
+                                <span class="bg-rose-100 text-rose-800 text-[9px] px-2 py-0.5 rounded-full">VAGO</span>
+                            {% endif %}
+                        </td>
+                    </tr>
                     {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section-page-break"></div>
+
+        <!-- SEÇÃO 3: SERVIDORES DO QUADRO -->
+        <div class="space-y-4 pt-4">
+            <div class="bg-emerald-50 p-3 rounded-lg border-l-4 border-emerald-700 flex justify-between items-center">
+                <h2 class="text-sm font-black uppercase text-emerald-900 tracking-wide">
+                    3. Relação de Servidores Nomeados no Quadro
+                </h2>
+                <span class="text-xs font-bold text-emerald-700">Total: {{ kpis.total_ocupadas }} Servidores Nomeados</span>
+            </div>
+
+            <table class="pdf-table">
+                <thead>
+                    <tr>
+                        <th class="text-left">Nome do Servidor</th>
+                        <th class="text-left">CPF</th>
+                        <th class="text-left">Cargo / Lotação</th>
+                        <th class="text-left">Vínculo</th>
+                        <th class="text-left">Portaria Nomeação</th>
+                        <th class="text-left">Data Nomeação</th>
+                        <th class="text-right">Remuneração Est.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if servidores_list and servidores_list|length > 0 %}
+                        {% for s in servidores_list %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="font-bold text-gray-900">{{ s.nome }}</td>
+                            <td class="font-mono text-gray-500">{{ s.cpf }}</td>
+                            <td class="font-semibold text-gray-800">{{ s.cargo_titulo }}</td>
+                            <td class="font-bold text-indigo-700">{{ s.tipo_vinculo }}</td>
+                            <td class="font-bold text-gray-700">{{ s.portaria_nomeacao }}</td>
+                            <td class="text-gray-500">{{ s.data_nomeacao }}</td>
+                            <td class="text-right font-bold text-emerald-700">R$ {{ "%.2f"|format(s.remuneracao) }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4 text-gray-400 font-medium">Nenhum servidor nomeado neste exercício.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SEÇÃO 4: LINHA DO TEMPO & PORTARIAS -->
+        <div class="space-y-4 pt-4">
+            <div class="bg-amber-50 p-3 rounded-lg border-l-4 border-amber-700 flex justify-between items-center">
+                <h2 class="text-sm font-black uppercase text-amber-900 tracking-wide">
+                    4. Linha do Tempo & Histórico Auditável de Portarias
+                </h2>
+                <span class="text-xs font-bold text-amber-700">Atos Administrativos</span>
+            </div>
+
+            <table class="pdf-table">
+                <thead>
+                    <tr>
+                        <th class="text-left">Data / Hora</th>
+                        <th class="text-left">Tipo de Evento</th>
+                        <th class="text-left">Descrição da Movimentação</th>
+                        <th class="text-left">Portaria Ref.</th>
+                        <th class="text-left">Usuário Resp.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if historico_list and historico_list|length > 0 %}
+                        {% for h in historico_list %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="text-gray-500 whitespace-nowrap">{{ h.data_hora }}</td>
+                            <td class="font-bold text-indigo-700">{{ h.tipo_evento }}</td>
+                            <td class="text-gray-800">{{ h.descricao }}</td>
+                            <td class="font-bold text-gray-900">{{ h.portaria }}</td>
+                            <td class="text-gray-500">{{ h.usuario }}</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-gray-400">Nenhum ato registrado.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- SEÇÃO 5: INDICADORES & ESTIMATIVAS -->
+        <div class="space-y-4 pt-4">
+            <div class="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-700 flex justify-between items-center">
+                <h2 class="text-sm font-black uppercase text-blue-900 tracking-wide">
+                    5. Indicadores & Estimativas da Folha
+                </h2>
+                <span class="text-xs font-bold text-blue-700">Resumo dos KPIs</span>
+            </div>
+
+            <div class="grid grid-cols-6 gap-3 text-center">
+                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                    <div class="text-[10px] font-bold text-gray-500 uppercase">Total Cargos</div>
+                    <div class="text-xl font-black text-gray-900 mt-1">{{ kpis.total_cargos }}</div>
                 </div>
-            {% else %}
-                <div class="text-center py-12 text-gray-400 font-bold">
-                    Nenhum cargo ou unidade cadastrado neste exercício.
+                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                    <div class="text-[10px] font-bold text-gray-500 uppercase">Vagas Previstas</div>
+                    <div class="text-xl font-black text-blue-700 mt-1">{{ kpis.total_vagas }}</div>
                 </div>
-            {% endif %}
+                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                    <div class="text-[10px] font-bold text-gray-500 uppercase">Servidores Nomeados</div>
+                    <div class="text-xl font-black text-emerald-700 mt-1">{{ kpis.total_ocupadas }}</div>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                    <div class="text-[10px] font-bold text-gray-500 uppercase">Vagas Vagas</div>
+                    <div class="text-xl font-black text-rose-600 mt-1">{{ kpis.total_vagas_vagas }}</div>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                    <div class="text-[10px] font-bold text-gray-500 uppercase">Taxa Ocupação</div>
+                    <div class="text-xl font-black text-indigo-700 mt-1">{{ kpis.taxa_ocupacao }}%</div>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
+                    <div class="text-[10px] font-bold text-gray-500 uppercase">Custo Est. Folha</div>
+                    <div class="text-base font-black text-amber-700 mt-1">R$ {{ "%.2f"|format(kpis.custo_total_estimado) }}</div>
+                </div>
+            </div>
         </div>
 
         <!-- RODAPÉ DE PÁGINA -->
         <div class="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center text-[10px] text-gray-500 font-semibold">
-            <span>Sistema Gestoor 360 - Secretaria Municipal de Educação</span>
+            <span>Gestoor 360 - Prefeitura Municipal de Valença do Piauí / SEME</span>
             <span>Documento gerado em {{ data_hoje }}</span>
         </div>
 
