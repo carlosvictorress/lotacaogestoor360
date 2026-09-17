@@ -3597,6 +3597,54 @@ def api_organograma_exercicio_salvar():
         return {"success": False, "message": str(e)}, 500
 
 
+@app.route('/api/organograma/exercicio/limpar', methods=['POST'])
+@login_required
+def api_organograma_exercicio_limpar():
+    try:
+        data = request.json or {}
+        exercicio_id = data.get('exercicio_id')
+        if not exercicio_id:
+            return {"success": False, "message": "ID do exercício é obrigatório."}, 400
+
+        OrganogramaHistorico.query.filter_by(exercicio_id=exercicio_id).delete(synchronize_session=False)
+        
+        OrganogramaServidor.query.filter(OrganogramaServidor.node_id.in_(
+            db.session.query(OrganogramaNode.id).filter_by(exercicio_id=exercicio_id)
+        )).delete(synchronize_session=False)
+        
+        OrganogramaNode.query.filter_by(exercicio_id=exercicio_id).delete(synchronize_session=False)
+        db.session.commit()
+
+        no_raiz = OrganogramaNode(
+            exercicio_id=exercicio_id,
+            parent_id=None,
+            tipo="CARGO_CHEFIA",
+            titulo="Secretário(a) Municipal",
+            sigla="GABINETE/SEME",
+            nivel_hierarquico=1,
+            tipo_vinculo_requerido="COMISSIONADO",
+            vagas_totais=1
+        )
+        db.session.add(no_raiz)
+        db.session.commit()
+
+        hist = OrganogramaHistorico(
+            exercicio_id=exercicio_id,
+            node_id=no_raiz.id,
+            tipo_evento="EDICAO_NO",
+            descricao="Estrutura do exercício limpa pelo usuário. Nó raiz inicial criado.",
+            usuario_id=current_user.id if hasattr(current_user, 'id') else None,
+            usuario_nome=current_user.username if hasattr(current_user, 'username') else "Sistema"
+        )
+        db.session.add(hist)
+        db.session.commit()
+
+        return {"success": True}
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
+
+
 @app.route('/api/organograma/node/salvar', methods=['POST'])
 @login_required
 def api_organograma_node_salvar():
