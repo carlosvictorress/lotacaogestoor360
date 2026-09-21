@@ -5,13 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Relatório Oficial do Organograma & Quadro de Cargos - {{ exercicio.titulo }}</title>
     
-    <!-- Tailwind CSS para estilização elegante -->
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <style>
         @page {
             size: A3 landscape;
-            margin: 8mm;
+            margin: 10mm;
         }
 
         @media print {
@@ -25,49 +30,72 @@
             .section-page-break {
                 page-break-before: always;
             }
+            .pdf-watermark-fixed {
+                position: fixed !important;
+            }
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f1f5f9;
             color: #0f172a;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
 
+        /* WATERMARK (MARCA D'ÁGUA) */
+        .pdf-watermark-fixed {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-20deg);
+            opacity: 0.035;
+            width: 580px;
+            pointer-events: none;
+            z-index: 0;
+            user-select: none;
+        }
+
+        /* CARDS DO ORGANOGRAMA */
         .org-card {
-            width: 210px;
+            width: 230px;
             box-sizing: border-box;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+            background: #ffffff;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
             margin: 0 auto;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            position: relative;
+            z-index: 1;
         }
 
         .org-card-header {
-            background-color: #d97706; /* Âmbar Dourado */
-            color: #000000;
+            background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+            color: #ffffff;
             font-weight: 800;
             font-size: 10px;
             text-transform: uppercase;
+            letter-spacing: 0.5px;
             text-align: center;
-            padding: 4px 5px;
-            border: 1.5px solid #000000;
-            border-radius: 3px 3px 0 0;
-            line-height: 1.25;
-            min-height: 34px;
+            padding: 6px 8px;
+            min-height: 38px;
             display: flex;
             align-items: center;
             justify-content: center;
+            line-height: 1.3;
+            border-bottom: 2px solid #059669;
         }
 
         .org-card-body {
             background-color: #ffffff;
-            color: #0f172a;
+            color: #1e293b;
             font-weight: 700;
             font-size: 11px;
             text-align: center;
-            padding: 5px;
-            border: 1.5px solid #000000;
-            border-top: none;
-            border-radius: 0 0 3px 3px;
-            min-height: 30px;
+            padding: 8px 6px;
+            min-height: 34px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -76,19 +104,34 @@
 
         .vaga-text {
             color: #dc2626;
-            font-weight: 900;
-            letter-spacing: 0.5px;
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+            padding: 2px 10px;
+            border-radius: 9999px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+        }
+
+        .servidor-text {
+            color: #065f46;
+            background-color: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
         }
 
         .tree-line-v {
             width: 2px;
-            background-color: #15803d;
+            background-color: #059669;
             margin: 0 auto;
         }
 
         .tree-arrow-down {
-            color: #15803d;
-            font-size: 13px;
+            color: #059669;
+            font-size: 12px;
             font-weight: 900;
             text-align: center;
             line-height: 1;
@@ -96,78 +139,127 @@
 
         .pdf-table {
             width: 100%;
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             font-size: 11px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
         }
 
         .pdf-table th {
-            background-color: #f1f5f9;
+            background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
             color: #334155;
             font-weight: 800;
             text-transform: uppercase;
-            padding: 6px 10px;
-            border: 1px solid #cbd5e1;
-            font-size: 10px;
+            letter-spacing: 0.5px;
+            padding: 8px 12px;
+            border-bottom: 2px solid #cbd5e1;
+            border-right: 1px solid #e2e8f0;
+            font-size: 9.5px;
+        }
+
+        .pdf-table th:last-child {
+            border-right: none;
         }
 
         .pdf-table td {
-            padding: 6px 10px;
-            border: 1px solid #e2e8f0;
+            padding: 8px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            border-right: 1px solid #f1f5f9;
+        }
+
+        .pdf-table td:last-child {
+            border-right: none;
+        }
+
+        .pdf-table tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .pdf-table tr:last-child td {
+            border-bottom: none;
         }
     </style>
 </head>
-<body class="p-4 sm:p-8">
+<body class="p-4 sm:p-8 relative">
+
+    <!-- MARCA D'ÁGUA FIXA NO FUNDO DE IMPRESSÃO -->
+    <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Marca D'água" class="pdf-watermark-fixed">
 
     <!-- BARRA SUPERIOR DE AÇÕES -->
-    <div class="no-print max-w-7xl mx-auto mb-6 bg-white p-4 rounded-2xl shadow-md border border-gray-200 flex justify-between items-center">
-        <div>
-            <h2 class="font-bold text-gray-800 text-base flex items-center gap-2">
-                📄 Relatório Completo do Organograma & Quadro de Cargos
-            </h2>
-            <p class="text-xs text-gray-500">Inclui todas as 5 seções: Gráfico Visual, Quadro de Cargos, Servidores, Portarias e Indicadores</p>
+    <div class="no-print max-w-[1400px] mx-auto mb-6 bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex justify-between items-center relative z-20">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-black text-lg border border-emerald-200">
+                📋
+            </div>
+            <div>
+                <h2 class="font-bold text-gray-900 text-sm sm:text-base tracking-tight">
+                    Relatório Oficial de Organograma & Quadro de Cargos
+                </h2>
+                <p class="text-xs text-gray-500">Documento pronto para exportação em PDF e impressão oficial</p>
+            </div>
         </div>
-        <div class="flex gap-2">
-            <a href="/organograma?exercicio_id={{ exercicio.id }}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition">
+        <div class="flex items-center gap-2.5">
+            <a href="/organograma?exercicio_id={{ exercicio.id }}" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5">
                 ← Voltar ao Sistema
             </a>
-            <button onclick="window.print()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl shadow transition flex items-center gap-1.5">
-                🖨️ Imprimir / Salvar PDF
+            <button onclick="window.print()" class="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
+                🖨️ Imprimir / Salvar em PDF
             </button>
         </div>
     </div>
 
     <!-- CONTAINER PRINCIPAL DO DOCUMENTO -->
-    <div id="pdf-container" class="max-w-[1400px] mx-auto bg-white p-8 rounded-xl shadow-lg border border-gray-200 space-y-8">
+    <div id="pdf-container" class="max-w-[1400px] mx-auto bg-white p-8 sm:p-10 rounded-2xl shadow-xl border border-gray-200/80 space-y-8 relative z-10">
         
         <!-- CABEÇALHO OFICIAL DO MUNICÍPIO -->
-        <div class="text-center mb-6 border-b pb-6 border-gray-200">
-            <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão Valença do Piauí" class="h-16 mx-auto mb-1.5 object-contain">
-            <div class="text-xs font-bold text-gray-600 tracking-wide uppercase">Município de Valença do Piauí</div>
-            <div class="w-full h-1 bg-emerald-700 my-2 rounded-full"></div>
-            <h1 class="text-2xl font-black text-emerald-800 tracking-wide uppercase">SECRETARIA MUNICIPAL DE EDUCAÇÃO</h1>
-            <div class="text-xs font-bold text-gray-500 uppercase mt-0.5">{{ exercicio.titulo }}</div>
+        <div class="border-b-2 border-emerald-700 pb-6 relative">
+            <div class="flex justify-between items-start">
+                <div class="flex items-center gap-5">
+                    <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão Valença do Piauí" class="h-20 object-contain drop-shadow-sm">
+                    <div>
+                        <div class="text-[11px] font-black text-gray-500 uppercase tracking-widest">ESTADO DO PIAUÍ</div>
+                        <div class="text-xs font-black text-gray-700 uppercase tracking-wider">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</div>
+                        <h1 class="text-2xl font-black text-emerald-900 tracking-tight uppercase mt-0.5">SECRETARIA MUNICIPAL DE EDUCAÇÃO</h1>
+                        <div class="text-xs font-bold text-emerald-700 uppercase tracking-wide mt-0.5">{{ exercicio.titulo }}</div>
+                    </div>
+                </div>
+
+                <!-- BLOCO DE PROTOCOLO E AUTENTICIDADE -->
+                <div class="text-right bg-slate-50 p-3 rounded-xl border border-slate-200 text-[10px] space-y-1 font-semibold text-slate-600">
+                    <div class="text-emerald-800 font-extrabold uppercase text-[11px]">Documento Oficial</div>
+                    <div>Exercício: <strong class="text-slate-900">{{ exercicio.ano }}</strong></div>
+                    <div>Emissão: <strong class="text-slate-900">{{ data_hoje }}</strong></div>
+                    <div>Cód. Validação: <strong class="font-mono text-emerald-700">VAL-{{ exercicio.id }}-2026</strong></div>
+                </div>
+            </div>
+            
+            <div class="w-full h-1 bg-gradient-to-r from-emerald-800 via-emerald-600 to-amber-500 mt-4 rounded-full"></div>
         </div>
 
         <!-- SEÇÃO 1: ORGANOGRAMA INTERATIVO (ÁRVORE HIERÁRQUICA VISUAL) -->
         <div class="space-y-4">
-            <div class="bg-emerald-50 p-3 rounded-lg border-l-4 border-emerald-700 flex justify-between items-center">
-                <h2 class="text-sm font-black uppercase text-emerald-900 tracking-wide">
-                    1. Organograma Interativo (Estrutura Organizacional Visual)
+            <div class="bg-gradient-to-r from-emerald-900 to-emerald-700 p-3.5 rounded-xl text-white flex justify-between items-center shadow-sm">
+                <h2 class="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                    <span>🌳</span> 1. Organograma da Estrutura Organizacional Visual
                 </h2>
-                <span class="text-xs font-bold text-emerald-700">Hierarquia da Secretaria</span>
+                <span class="text-[11px] font-bold bg-emerald-800/80 px-3 py-1 rounded-full text-emerald-100 border border-emerald-600">
+                    Estrutura de Cargos e Subordinação
+                </span>
             </div>
 
             {% macro render_node(node) %}
             <div class="flex flex-col items-center">
                 <div class="org-card">
-                    <div class="org-card-header">
+                    <div class="org-card-header" title="{{ node.titulo }}">
                         {{ node.titulo }}
                     </div>
                     <div class="org-card-body">
                         {% if node.is_vaga %}
                             <span class="vaga-text">VAGA</span>
                         {% else %}
-                            {{ node.servidor_nome }}
+                            <span class="servidor-text">{{ node.servidor_nome }}</span>
                         {% endif %}
                     </div>
                 </div>
@@ -181,8 +273,8 @@
                         {{ render_node(node.children[0]) }}
                     {% else %}
                         <div class="relative flex justify-center w-full mt-0.5">
-                            <div class="absolute top-0 h-0.5 bg-emerald-700" style="left: calc(100% / {{ node.children|length }} / 2); right: calc(100% / {{ node.children|length }} / 2);"></div>
-                            <div class="flex justify-around w-full gap-3 pt-2">
+                            <div class="absolute top-0 h-0.5 bg-emerald-600" style="left: calc(100% / {{ node.children|length }} / 2); right: calc(100% / {{ node.children|length }} / 2);"></div>
+                            <div class="flex justify-around w-full gap-4 pt-2">
                                 {% for child in node.children %}
                                     <div class="flex flex-col items-center flex-1">
                                         {{ render_node(child) }}
@@ -195,15 +287,15 @@
             </div>
             {% endmacro %}
 
-            <div class="py-4 overflow-x-auto">
+            <div class="py-6 overflow-x-auto bg-slate-50/50 rounded-2xl border border-slate-200/60 p-4">
                 {% if root_nodes and root_nodes|length > 0 %}
-                    <div class="flex flex-col items-center gap-6">
+                    <div class="flex flex-col items-center gap-8">
                         {% for r in root_nodes %}
                             {{ render_node(r) }}
                         {% endfor %}
                     </div>
                 {% else %}
-                    <div class="text-center py-8 text-gray-400 font-bold">
+                    <div class="text-center py-10 text-gray-400 font-bold text-xs">
                         Nenhum cargo cadastrado neste exercício.
                     </div>
                 {% endif %}
@@ -214,11 +306,13 @@
 
         <!-- SEÇÃO 2: QUADRO DE CARGOS -->
         <div class="space-y-4 pt-4">
-            <div class="bg-indigo-50 p-3 rounded-lg border-l-4 border-indigo-700 flex justify-between items-center">
-                <h2 class="text-sm font-black uppercase text-indigo-900 tracking-wide">
-                    2. Quadro de Cargos & Vagas Previstas
+            <div class="bg-gradient-to-r from-slate-900 to-indigo-900 p-3.5 rounded-xl text-white flex justify-between items-center shadow-sm">
+                <h2 class="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                    <span>📊</span> 2. Quadro de Cargos & Vagas Previstas
                 </h2>
-                <span class="text-xs font-bold text-indigo-700">Total: {{ kpis.total_cargos }} Cargos Cadastrados</span>
+                <span class="text-[11px] font-bold bg-indigo-800/80 px-3 py-1 rounded-full text-indigo-100 border border-indigo-700">
+                    Total: {{ kpis.total_cargos }} Cargos Cadastrados
+                </span>
             </div>
 
             <table class="pdf-table">
@@ -236,19 +330,19 @@
                 </thead>
                 <tbody>
                     {% for q in nodes_quadro %}
-                    <tr class="hover:bg-gray-50">
-                        <td class="font-bold text-indigo-700">{{ q.sigla }}</td>
-                        <td class="font-bold text-gray-900">{{ q.titulo }}</td>
-                        <td class="text-gray-600">{{ q.tipo }}</td>
-                        <td class="text-gray-600">{{ q.tipo_vinculo_requerido }}</td>
-                        <td class="text-center font-bold">{{ q.vagas_totais }}</td>
-                        <td class="text-center font-bold text-emerald-700">{{ q.vagas_ocupadas }}</td>
-                        <td class="text-center font-bold text-rose-600">{{ q.vagas_livres }}</td>
+                    <tr>
+                        <td class="font-extrabold text-emerald-800">{{ q.sigla or '---' }}</td>
+                        <td class="font-extrabold text-slate-900">{{ q.titulo }}</td>
+                        <td class="text-slate-600 font-medium">{{ q.tipo }}</td>
+                        <td class="text-slate-600 font-medium">{{ q.tipo_vinculo_requerido }}</td>
+                        <td class="text-center font-black text-slate-900">{{ q.vagas_totais }}</td>
+                        <td class="text-center font-black text-emerald-700">{{ q.vagas_ocupadas }}</td>
+                        <td class="text-center font-black text-rose-600">{{ q.vagas_livres }}</td>
                         <td class="text-center font-bold">
                             {% if q.status == 'PREENCHIDO' %}
-                                <span class="bg-emerald-100 text-emerald-800 text-[9px] px-2 py-0.5 rounded-full">PREENCHIDO</span>
+                                <span class="bg-emerald-100 text-emerald-800 text-[9px] px-2.5 py-0.5 rounded-full font-black border border-emerald-200">PREENCHIDO</span>
                             {% else %}
-                                <span class="bg-rose-100 text-rose-800 text-[9px] px-2 py-0.5 rounded-full">VAGO</span>
+                                <span class="bg-rose-100 text-rose-800 text-[9px] px-2.5 py-0.5 rounded-full font-black border border-rose-200">VAGO ({{ q.vagas_livres }})</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -261,11 +355,13 @@
 
         <!-- SEÇÃO 3: SERVIDORES DO QUADRO -->
         <div class="space-y-4 pt-4">
-            <div class="bg-emerald-50 p-3 rounded-lg border-l-4 border-emerald-700 flex justify-between items-center">
-                <h2 class="text-sm font-black uppercase text-emerald-900 tracking-wide">
-                    3. Relação de Servidores Nomeados no Quadro
+            <div class="bg-gradient-to-r from-emerald-900 to-emerald-700 p-3.5 rounded-xl text-white flex justify-between items-center shadow-sm">
+                <h2 class="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                    <span>👥</span> 3. Relação de Servidores Nomeados no Quadro
                 </h2>
-                <span class="text-xs font-bold text-emerald-700">Total: {{ kpis.total_ocupadas }} Servidores Nomeados</span>
+                <span class="text-[11px] font-bold bg-emerald-800/80 px-3 py-1 rounded-full text-emerald-100 border border-emerald-600">
+                    Total: {{ kpis.total_ocupadas }} Ocupantes Ativos
+                </span>
             </div>
 
             <table class="pdf-table">
@@ -283,19 +379,19 @@
                 <tbody>
                     {% if servidores_list and servidores_list|length > 0 %}
                         {% for s in servidores_list %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="font-bold text-gray-900">{{ s.nome }}</td>
-                            <td class="font-mono text-gray-500">{{ s.cpf }}</td>
-                            <td class="font-semibold text-gray-800">{{ s.cargo_titulo }}</td>
-                            <td class="font-bold text-indigo-700">{{ s.tipo_vinculo }}</td>
-                            <td class="font-bold text-gray-700">{{ s.portaria_nomeacao }}</td>
-                            <td class="text-gray-500">{{ s.data_nomeacao }}</td>
-                            <td class="text-right font-bold text-emerald-700">R$ {{ "%.2f"|format(s.remuneracao) }}</td>
+                        <tr>
+                            <td class="font-extrabold text-slate-900">{{ s.nome }}</td>
+                            <td class="font-mono text-slate-500 font-semibold">{{ s.cpf or '---' }}</td>
+                            <td class="font-bold text-slate-800">{{ s.cargo_titulo }}</td>
+                            <td class="font-bold text-indigo-700"><span class="bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200 text-[10px]">{{ s.tipo_vinculo }}</span></td>
+                            <td class="font-extrabold text-slate-800">{{ s.portaria_nomeacao }}</td>
+                            <td class="text-slate-600 font-medium">{{ s.data_nomeacao or '---' }}</td>
+                            <td class="text-right font-black text-emerald-700">R$ {{ "%.2f"|format(s.remuneracao) }}</td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="7" class="text-center py-4 text-gray-400 font-medium">Nenhum servidor nomeado neste exercício.</td>
+                            <td colspan="7" class="text-center py-6 text-gray-400 font-semibold">Nenhum servidor nomeado neste exercício.</td>
                         </tr>
                     {% endif %}
                 </tbody>
@@ -304,11 +400,13 @@
 
         <!-- SEÇÃO 4: LINHA DO TEMPO & PORTARIAS -->
         <div class="space-y-4 pt-4">
-            <div class="bg-amber-50 p-3 rounded-lg border-l-4 border-amber-700 flex justify-between items-center">
-                <h2 class="text-sm font-black uppercase text-amber-900 tracking-wide">
-                    4. Linha do Tempo & Histórico Auditável de Portarias
+            <div class="bg-gradient-to-r from-amber-800 to-amber-600 p-3.5 rounded-xl text-white flex justify-between items-center shadow-sm">
+                <h2 class="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                    <span>📜</span> 4. Linha do Tempo & Histórico Auditável de Portarias
                 </h2>
-                <span class="text-xs font-bold text-amber-700">Atos Administrativos</span>
+                <span class="text-[11px] font-bold bg-amber-900/80 px-3 py-1 rounded-full text-amber-100 border border-amber-700">
+                    Atos Administrativos Registrados
+                </span>
             </div>
 
             <table class="pdf-table">
@@ -324,64 +422,82 @@
                 <tbody>
                     {% if historico_list and historico_list|length > 0 %}
                         {% for h in historico_list %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="text-gray-500 whitespace-nowrap">{{ h.data_hora }}</td>
-                            <td class="font-bold text-indigo-700">{{ h.tipo_evento }}</td>
-                            <td class="text-gray-800">{{ h.descricao }}</td>
-                            <td class="font-bold text-gray-900">{{ h.portaria }}</td>
-                            <td class="text-gray-500">{{ h.usuario }}</td>
+                        <tr>
+                            <td class="text-slate-500 whitespace-nowrap font-medium">{{ h.data_hora }}</td>
+                            <td class="font-extrabold text-indigo-700">{{ h.tipo_evento }}</td>
+                            <td class="text-slate-800 font-medium">{{ h.descricao }}</td>
+                            <td class="font-extrabold text-slate-900"><span class="bg-slate-100 px-2 py-0.5 rounded border border-slate-200">{{ h.portaria }}</span></td>
+                            <td class="text-slate-500 font-semibold">{{ h.usuario }}</td>
                         </tr>
                         {% endfor %}
                     {% else %}
                         <tr>
-                            <td colspan="5" class="text-center py-4 text-gray-400">Nenhum ato registrado.</td>
+                            <td colspan="5" class="text-center py-6 text-gray-400 font-semibold">Nenhum ato registrado.</td>
                         </tr>
                     {% endif %}
                 </tbody>
             </table>
         </div>
 
-        <!-- SEÇÃO 5: INDICADORES & ESTIMATIVAS -->
+        <!-- SEÇÃO 5: INDICADORES & ESTIMATIVAS DA FOLHA -->
         <div class="space-y-4 pt-4">
-            <div class="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-700 flex justify-between items-center">
-                <h2 class="text-sm font-black uppercase text-blue-900 tracking-wide">
-                    5. Indicadores & Estimativas da Folha
+            <div class="bg-gradient-to-r from-blue-900 to-slate-800 p-3.5 rounded-xl text-white flex justify-between items-center shadow-sm">
+                <h2 class="text-xs font-black uppercase tracking-wider flex items-center gap-2">
+                    <span>📈</span> 5. Indicadores Sintéticos & Estimativas da Folha
                 </h2>
-                <span class="text-xs font-bold text-blue-700">Resumo dos KPIs</span>
+                <span class="text-[11px] font-bold bg-blue-800/80 px-3 py-1 rounded-full text-blue-100 border border-blue-700">
+                    Resumo Gerencial dos KPIs
+                </span>
             </div>
 
             <div class="grid grid-cols-6 gap-3 text-center">
-                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Total Cargos</div>
-                    <div class="text-xl font-black text-gray-900 mt-1">{{ kpis.total_cargos }}</div>
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 border-t-4 border-t-slate-700">
+                    <div class="text-[10px] font-black text-slate-500 uppercase">Total Cargos</div>
+                    <div class="text-xl font-black text-slate-900 mt-1">{{ kpis.total_cargos }}</div>
                 </div>
-                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Vagas Previstas</div>
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 border-t-4 border-t-blue-600">
+                    <div class="text-[10px] font-black text-slate-500 uppercase">Vagas Previstas</div>
                     <div class="text-xl font-black text-blue-700 mt-1">{{ kpis.total_vagas }}</div>
                 </div>
-                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Servidores Nomeados</div>
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 border-t-4 border-t-emerald-600">
+                    <div class="text-[10px] font-black text-slate-500 uppercase">Servidores Nomeados</div>
                     <div class="text-xl font-black text-emerald-700 mt-1">{{ kpis.total_ocupadas }}</div>
                 </div>
-                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Vagas Vagas</div>
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 border-t-4 border-t-rose-600">
+                    <div class="text-[10px] font-black text-slate-500 uppercase">Vagas Vagas</div>
                     <div class="text-xl font-black text-rose-600 mt-1">{{ kpis.total_vagas_vagas }}</div>
                 </div>
-                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Taxa Ocupação</div>
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 border-t-4 border-t-indigo-600">
+                    <div class="text-[10px] font-black text-slate-500 uppercase">Taxa Ocupação</div>
                     <div class="text-xl font-black text-indigo-700 mt-1">{{ kpis.taxa_ocupacao }}%</div>
                 </div>
-                <div class="bg-gray-50 p-3 rounded-xl border border-gray-200">
-                    <div class="text-[10px] font-bold text-gray-500 uppercase">Custo Est. Folha</div>
+                <div class="bg-slate-50 p-3.5 rounded-xl border border-slate-200 border-t-4 border-t-amber-600">
+                    <div class="text-[10px] font-black text-slate-500 uppercase">Custo Est. Folha</div>
                     <div class="text-base font-black text-amber-700 mt-1">R$ {{ "%.2f"|format(kpis.custo_total_estimado) }}</div>
                 </div>
             </div>
         </div>
 
-        <!-- RODAPÉ DE PÁGINA -->
-        <div class="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center text-[10px] text-gray-500 font-semibold">
-            <span>Gestoor 360 - Prefeitura Municipal de Valença do Piauí / SEME</span>
-            <span>Documento gerado em {{ data_hoje }}</span>
+        <!-- CAMPO DE VALIDAÇÃO E ASSINATURAS OFICIAIS DA SECRETARIA -->
+        <div class="mt-12 pt-8 border-t-2 border-slate-200 space-y-8">
+            <div class="grid grid-cols-2 gap-12 text-center text-xs">
+                <div class="space-y-2">
+                    <div class="border-b border-slate-400 w-3/4 mx-auto"></div>
+                    <div class="font-extrabold text-slate-900 uppercase">Secretaria Municipal de Educação</div>
+                    <div class="text-[10px] text-slate-500 font-semibold">Validação e Homologação da Estrutura</div>
+                </div>
+                <div class="space-y-2">
+                    <div class="border-b border-slate-400 w-3/4 mx-auto"></div>
+                    <div class="font-extrabold text-slate-900 uppercase">Setor de Gestão de Pessoas / RH</div>
+                    <div class="text-[10px] text-slate-500 font-semibold">Conferência dos Atos e Lotações</div>
+                </div>
+            </div>
+
+            <!-- RODAPÉ DE PÁGINA -->
+            <div class="pt-4 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                <span>Gestoor 360 • Prefeitura Municipal de Valença do Piauí / SEME</span>
+                <span>Documento Autenticado Digitalmente • {{ data_hoje }}</span>
+            </div>
         </div>
 
     </div>
