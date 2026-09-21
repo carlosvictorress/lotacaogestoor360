@@ -1022,6 +1022,11 @@ def admin_dashboard():
     funcoes = Funcao.query.order_by(Funcao.nome).all()
     locais_trabalho = LocalTrabalho.query.order_by(LocalTrabalho.nome).all()
 
+    try:
+        atestados_pendentes_count = JustificativaFalta.query.filter_by(status='Pendente').count()
+    except Exception:
+        atestados_pendentes_count = 0
+
     return render_template(
         "admin.html",
         secretarias=secretarias,
@@ -1036,6 +1041,7 @@ def admin_dashboard():
         stats_validacao=stats_validacao,
         locais_stats=locais_stats,
         logs=logs,
+        atestados_pendentes_count=atestados_pendentes_count,
         filtros={
             "sec": filtro_secretaria,
             "vinculo": filtro_vinculo,
