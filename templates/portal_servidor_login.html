@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal do Servidor - Login | SEME</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="h-full flex flex-col justify-center py-12 sm:px-6 lg:px-8 bg-slate-50">
+
+    <div class="sm:mx-auto sm:w-full sm:max-w-md text-center px-4">
+        <!-- BRASÃO / LOGO -->
+        <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão Prefeitura" class="h-20 mx-auto mb-3 object-contain drop-shadow-sm">
+        
+        <h2 class="text-2xl font-black tracking-tight text-slate-900 uppercase">
+            Portal do Servidor
+        </h2>
+        <p class="mt-1 text-xs font-bold text-emerald-800 uppercase tracking-wide">
+            Secretaria Municipal de Educação
+        </p>
+        <p class="text-xs text-slate-500 mt-0.5 font-medium">
+            Envio e Acompanhamento de Atestados & Justificativas de Faltas
+        </p>
+    </div>
+
+    <div class="mt-6 sm:mx-auto sm:w-full sm:max-w-md px-4">
+        <div class="bg-white py-8 px-6 shadow-xl rounded-2xl border border-slate-200/80 space-y-6">
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="p-3.5 rounded-xl text-xs font-bold flex items-center gap-2 {% if category == 'error' or category == 'danger' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-emerald-50 text-emerald-800 border border-emerald-200{% endif %}">
+                            <i class="ph {% if category == 'error' or category == 'danger' %}ph-warning-circle text-lg text-rose-600{% else %}ph-check-circle text-lg text-emerald-600{% endif %}"></i>
+                            <span>{{ message }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            <form action="{{ url_for('portal_servidor_login') }}" method="POST" class="space-y-4">
+                
+                <!-- CAMPO CPF -->
+                <div>
+                    <label for="cpf" class="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        CPF do Servidor <span class="text-rose-500">*</span>
+                    </label>
+                    <div class="relative rounded-xl shadow-sm">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                            <i class="ph ph-identification-card text-lg text-slate-400"></i>
+                        </div>
+                        <input type="text" id="cpf" name="cpf" required placeholder="000.000.000-00" maxlength="14"
+                            class="block w-full rounded-xl border border-slate-300 pl-10 pr-3 py-2.5 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20">
+                    </div>
+                </div>
+
+                <!-- CAMPO DATA DE NASCIMENTO -->
+                <div>
+                    <label for="data_nasc" class="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Data de Nascimento (Senha) <span class="text-rose-500">*</span>
+                    </label>
+                    <div class="relative rounded-xl shadow-sm">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                            <i class="ph ph-calendar text-lg text-slate-400"></i>
+                        </div>
+                        <input type="text" id="data_nasc" name="data_nasc" required placeholder="DD/MM/AAAA" maxlength="10"
+                            class="block w-full rounded-xl border border-slate-300 pl-10 pr-3 py-2.5 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20">
+                    </div>
+                    <p class="mt-1 text-[11px] text-slate-400 font-medium">Informe sua data de nascimento como cadastrada na folha (ex: 15/08/1985).</p>
+                </div>
+
+                <!-- BOTÃO DE LOGIN -->
+                <button type="submit" class="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-md text-xs font-extrabold text-white bg-emerald-700 hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-600 transition-all uppercase tracking-wider">
+                    <i class="ph ph-sign-in text-lg"></i>
+                    Acessar Portal do Servidor
+                </button>
+            </form>
+
+            <div class="pt-4 border-t border-slate-100 text-center">
+                <a href="{{ url_for('login') }}" class="text-xs font-semibold text-slate-500 hover:text-emerald-700 transition flex items-center justify-center gap-1">
+                    <i class="ph ph-shield-check"></i> Área do Administrador / RH
+                </a>
+            </div>
+
+        </div>
+        
+        <div class="mt-6 text-center text-[11px] text-slate-400 font-bold">
+            Gestoor 360 • Prefeitura Municipal de Valença do Piauí
+        </div>
+    </div>
+
+    <!-- MÁSCARA AUTOMÁTICA DE INPUT -->
+    <script>
+        document.getElementById('cpf').addEventListener('input', function(e) {
+            let v = e.target.value.replace(/\D/g, '');
+            if (v.length > 11) v = v.substring(0, 11);
+            v = v.replace(/(\d{3})(\d)/, '$1.$2');
+            v = v.replace(/(\d{3})(\d)/, '$1.$2');
+            v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+            e.target.value = v;
+        });
+
+        document.getElementById('data_nasc').addEventListener('input', function(e) {
+            let v = e.target.value.replace(/\D/g, '');
+            if (v.length > 8) v = v.substring(0, 8);
+            v = v.replace(/(\d{2})(\d)/, '$1/$2');
+            v = v.replace(/(\d{2})(\d)/, '$1/$2');
+            e.target.value = v;
+        });
+    </script>
+</body>
+</html>

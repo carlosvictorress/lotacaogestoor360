@@ -367,6 +367,39 @@ class OrganogramaHistorico(db.Model):
     dados_json = db.Column(db.Text, nullable=True)
 
 
+class JustificativaFalta(db.Model):
+    __tablename__ = "justificativas_falta"
+
+    id = db.Column(db.Integer, primary_key=True)
+    protocolo = db.Column(db.String(50), unique=True, nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey("funcionario.id"), nullable=False)
+    secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=False)
+
+    data_solicitacao = db.Column(db.DateTime, default=datetime.utcnow)
+    data_inicio_afastamento = db.Column(db.Date, nullable=True)
+    dias_solicitados = db.Column(db.Integer, default=1)
+
+    motivo_ausencia = db.Column(db.Text, nullable=False)
+    caminho_anexo = db.Column(db.String(255), nullable=True)
+    anexo_base64 = db.Column(db.Text, nullable=True)
+    extensao_anexo = db.Column(db.String(10), nullable=True)
+
+    crm_medico_ocr = db.Column(db.String(50), nullable=True)
+    cid_ocr = db.Column(db.String(20), nullable=True)
+    dias_atestado_ocr = db.Column(db.Integer, nullable=True)
+
+    status = db.Column(db.String(20), default="PENDENTE") # PENDENTE, APROVADO, REJEITADO
+    dias_liberados_municipio = db.Column(db.Integer, default=0)
+    motivo_rejeicao = db.Column(db.Text, nullable=True)
+    observacao_rh = db.Column(db.Text, nullable=True)
+
+    analisado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    data_analise = db.Column(db.DateTime, nullable=True)
+
+    funcionario = db.relationship("Funcionario", backref=db.backref("justificativas", lazy=True))
+    analisado_por_user = db.relationship("User", backref=db.backref("justificativas_analisadas", lazy=True))
+
+
 def gerar_proximo_numero_contrato(ano=None):
     if not ano:
         ano = datetime.now().year
@@ -4136,6 +4169,358 @@ def organograma_pdf_view(exercicio_id):
         data_hoje=data_hoje,
         datetime=datetime
     )
+
+
+# =========================================================================
+# MÓDULO: PORTAL DO SERVIDOR - ATESTADOS MÉDICOS & JUSTIFICATIVAS DE FALTAS
+# =========================================================================
+
+def extrair_dados_ocr_atestado(file_bytes, filename):
+    resultado = {"crm": None, "cid": None, "dias": None}
+    if not file_bytes:
+        return resultado
+
+    texto_extraido = ""
+    ext = (filename or "").split(".")[-1].lower()
+
+    if ext == "pdf":
+        try:
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                for page in pdf.pages:
+                    txt = page.extract_text()
+                    if txt:
+                        texto_extraido += txt + "\n"
+        except Exception as e:
+            print("Erro ao ler PDF no OCR:", e)
+
+    if texto_extraido:
+        # Busca CRM: CRM/PI 12345, CRM 12345, CRM-PI 12345
+        match_crm = re.search(r'(?:CRM|crm)[\s/:\.\-]*([A-Z]{2})?[\s/:\.\-]*(\d{3,7})', texto_extraido)
+        if match_crm:
+            uf = match_crm.group(1) or ""
+            num = match_crm.group(2)
+            resultado["crm"] = f"CRM{'/' + uf.upper() if uf else ''} {num}"
+
+        # Busca CID: Z00, Z00.0, J11, B34.9
+        match_cid = re.search(r'\b([A-Z]\d{2}(?:\.\d{1,2})?)\b', texto_extraido)
+        if match_cid:
+            resultado["cid"] = match_cid.group(1)
+
+        # Busca Dias: 15 dias, 3 (três) dias
+        match_dias = re.search(r'(\d+)\s*(?:dias|dia)', texto_extraido, re.IGNORECASE)
+        if match_dias:
+            try:
+                resultado["dias"] = int(match_dias.group(1))
+            except Exception:
+                pass
+
+    return resultado
+
+
+@app.route("/portal/servidor/login", methods=["GET", "POST"])
+def portal_servidor_login():
+    if session.get("servidor_id"):
+        return redirect(url_for("portal_servidor_dashboard"))
+
+    if request.method == "POST":
+        cpf_raw = request.form.get("cpf", "").strip()
+        data_nasc_raw = request.form.get("data_nasc", "").strip()
+
+        cpf_clean = re.sub(r"\D", "", cpf_raw)
+        if not cpf_clean:
+            flash("Informe um CPF válido para login.", "danger")
+            return redirect(url_for("portal_servidor_login"))
+
+        # Busca funcionario por CPF
+        funcionarios = Funcionario.query.all()
+        funcionario = None
+        for f in funcionarios:
+            if f.cpf and re.sub(r"\D", "", f.cpf) == cpf_clean:
+                funcionario = f
+                break
+
+        if not funcionario:
+            flash("CPF não encontrado no cadastro do município. Procure o RH da Secretaria.", "danger")
+            return redirect(url_for("portal_servidor_login"))
+
+        # Validação da Data de Nascimento (Senha)
+        if not funcionario.data_nasc:
+            flash("Data de nascimento não cadastrada para este servidor. Contate o RH.", "danger")
+            return redirect(url_for("portal_servidor_login"))
+
+        dt_nasc_valida = False
+        data_nasc_clean = re.sub(r"\D", "", data_nasc_raw)
+
+        # Formatos aceitos: DD/MM/AAAA ou YYYY-MM-DD
+        dt_func_str1 = funcionario.data_nasc.strftime("%d/%m/%Y")
+        dt_func_str2 = funcionario.data_nasc.strftime("%Y-%m-%d")
+        dt_func_clean = funcionario.data_nasc.strftime("%d%m%Y")
+
+        if data_nasc_raw in (dt_func_str1, dt_func_str2) or data_nasc_clean == dt_func_clean:
+            dt_nasc_valida = True
+
+        if not dt_nasc_valida:
+            flash("Data de nascimento (senha) incorreta. Tente no formato DD/MM/AAAA.", "danger")
+            return redirect(url_for("portal_servidor_login"))
+
+        # Login com sucesso na sessão do servidor
+        session["servidor_id"] = funcionario.id
+        session["servidor_nome"] = funcionario.nome
+        session["servidor_cpf"] = funcionario.cpf
+        flash(f"Bem-vindo(a), {funcionario.nome}!", "success")
+        return redirect(url_for("portal_servidor_dashboard"))
+
+    return render_template("portal_servidor_login.html")
+
+
+@app.route("/portal/servidor/dashboard")
+def portal_servidor_dashboard():
+    servidor_id = session.get("servidor_id")
+    if not servidor_id:
+        return redirect(url_for("portal_servidor_login"))
+
+    funcionario = Funcionario.query.get(servidor_id)
+    if not funcionario:
+        session.pop("servidor_id", None)
+        return redirect(url_for("portal_servidor_login"))
+
+    justificativas = JustificativaFalta.query.filter_by(funcionario_id=funcionario.id).order_by(JustificativaFalta.data_solicitacao.desc()).all()
+    return render_template("portal_servidor_dashboard.html", funcionario=funcionario, justificativas=justificativas)
+
+
+@app.route("/portal/servidor/justificativa/nova")
+def portal_servidor_justificativa_nova():
+    if not session.get("servidor_id"):
+        return redirect(url_for("portal_servidor_login"))
+    return render_template("portal_servidor_justificativa.html")
+
+
+@app.route("/portal/servidor/justificativa/salvar", methods=["POST"])
+def portal_servidor_justificativa_salvar():
+    servidor_id = session.get("servidor_id")
+    if not servidor_id:
+        return redirect(url_for("portal_servidor_login"))
+
+    funcionario = Funcionario.query.get(servidor_id)
+    if not funcionario:
+        return redirect(url_for("portal_servidor_login"))
+
+    motivo = request.form.get("motivo_ausencia", "").strip()
+    dt_inicio_str = request.form.get("data_inicio_afastamento", "").strip()
+    dias_str = request.form.get("dias_solicitados", "1").strip()
+
+    if not motivo:
+        flash("O motivo da ausência é obrigatório.", "danger")
+        return redirect(url_for("portal_servidor_justificativa_nova"))
+
+    dt_inicio = None
+    if dt_inicio_str:
+        try:
+            dt_inicio = datetime.strptime(dt_inicio_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+
+    try:
+        dias_req = int(dias_str)
+    except ValueError:
+        dias_req = 1
+
+    file = request.files.get("anexo")
+    anexo_b64 = None
+    ext = None
+    ocr_res = {"crm": None, "cid": None, "dias": None}
+
+    if file and file.filename:
+        file_bytes = file.read()
+        if file_bytes:
+            anexo_b64 = base64.b64encode(file_bytes).decode("utf-8")
+            ext = file.filename.split(".")[-1].lower() if "." in file.filename else "jpg"
+            ocr_res = extrair_dados_ocr_atestado(file_bytes, file.filename)
+
+    # Gera Protocolo Único
+    ano_atual = datetime.now().year
+    protocolo = f"JUST-{ano_atual}-{str(uuid.uuid4().hex[:6]).upper()}"
+
+    just = JustificativaFalta(
+        protocolo=protocolo,
+        funcionario_id=funcionario.id,
+        secretaria_id=funcionario.secretaria_id,
+        motivo_ausencia=motivo,
+        data_inicio_afastamento=dt_inicio,
+        dias_solicitados=dias_req,
+        anexo_base64=anexo_b64,
+        extensao_anexo=ext,
+        crm_medico_ocr=ocr_res.get("crm"),
+        cid_ocr=ocr_res.get("cid"),
+        dias_atestado_ocr=ocr_res.get("dias"),
+        status="PENDENTE"
+    )
+
+    db.session.add(just)
+    db.session.commit()
+
+    flash(f"Justificativa enviada com sucesso! Seu número de protocolo é {protocolo}.", "success")
+    return redirect(url_for("portal_servidor_dashboard"))
+
+
+@app.route("/portal/servidor/atestado/download/<int:id>")
+def portal_servidor_download_atestado(id):
+    just = JustificativaFalta.query.get_or_404(id)
+
+    # Autorização: servidor dono da solicitação ou usuário admin/rh autenticado
+    is_owner = session.get("servidor_id") == just.funcionario_id
+    is_rh = current_user.is_authenticated
+
+    if not (is_owner or is_rh):
+        flash("Acesso não autorizado.", "danger")
+        return redirect(url_for("portal_servidor_login"))
+
+    if not just.anexo_base64:
+        flash("Anexo não disponível.", "danger")
+        return redirect(url_for("portal_servidor_dashboard"))
+
+    try:
+        file_data = base64.b64decode(just.anexo_base64)
+        mimetype = "application/pdf" if just.extensao_anexo == "pdf" else f"image/{just.extensao_anexo or 'jpeg'}"
+        return Response(file_data, mimetype=mimetype)
+    except Exception as e:
+        print("Erro ao decodificar anexo base64:", e)
+        flash("Erro ao abrir anexo.", "danger")
+        return redirect(url_for("portal_servidor_dashboard"))
+
+
+@app.route("/portal/servidor/logout")
+def portal_servidor_logout():
+    session.pop("servidor_id", None)
+    session.pop("servidor_nome", None)
+    session.pop("servidor_cpf", None)
+    flash("Sessão encerrada com sucesso.", "success")
+    return redirect(url_for("portal_servidor_login"))
+
+
+# === ROTAS DE ADMIN/RH PARA GESTÃO DE ATESTADOS ===
+
+@app.route("/admin/atestados")
+@login_required
+def admin_atestados():
+    status_filter = request.args.get("status", "TODOS").upper()
+    search = request.args.get("search", "").strip()
+
+    query = JustificativaFalta.query
+
+    # Filtra por secretaria se o usuário não for super admin
+    if not (current_user.is_admin or getattr(current_user, "role", "") == "admin"):
+        if current_user.secretaria_id:
+            query = query.filter_by(secretaria_id=current_user.secretaria_id)
+
+    if status_filter in ("PENDENTE", "APROVADO", "REJEITADO"):
+        query = query.filter_by(status=status_filter)
+
+    if search:
+        search_like = f"%{search}%"
+        query = query.join(Funcionario).filter(
+            (Funcionario.nome.ilike(search_like)) |
+            (Funcionario.cpf.ilike(search_like)) |
+            (JustificativaFalta.protocolo.ilike(search_like))
+        )
+
+    justificativas = query.order_by(JustificativaFalta.data_solicitacao.desc()).all()
+
+    # Estatísticas KPI
+    base_query = JustificativaFalta.query
+    if not (current_user.is_admin or getattr(current_user, "role", "") == "admin"):
+        if current_user.secretaria_id:
+            base_query = base_query.filter_by(secretaria_id=current_user.secretaria_id)
+
+    total_qtd = base_query.count()
+    pendentes_qtd = base_query.filter_by(status="PENDENTE").count()
+    aprovados_qtd = base_query.filter_by(status="APROVADO").count()
+    rejeitados_qtd = base_query.filter_by(status="REJEITADO").count()
+
+    return render_template(
+        "admin_atestados.html",
+        justificativas=justificativas,
+        total_qtd=total_qtd,
+        pendentes_qtd=pendentes_qtd,
+        aprovados_qtd=aprovados_qtd,
+        rejeitados_qtd=rejeitados_qtd,
+        current_status=status_filter,
+        search_query=search
+    )
+
+
+@app.route("/api/atestados/aprovar", methods=["POST"])
+@login_required
+def api_atestados_aprovar():
+    data = request.get_json() or {}
+    just_id = data.get("id")
+    dias_liberados = data.get("dias_liberados", 1)
+    obs = data.get("observacao", "").strip()
+
+    if not just_id:
+        return jsonify({"success": False, "message": "ID do atestado não fornecido."})
+
+    just = JustificativaFalta.query.get(just_id)
+    if not just:
+        return jsonify({"success": False, "message": "Solicitação não encontrada."})
+
+    try:
+        dias_val = int(dias_liberados)
+    except ValueError:
+        dias_val = just.dias_solicitados
+
+    just.status = "APROVADO"
+    just.dias_liberados_municipio = dias_val
+    just.observacao_rh = obs
+    just.analisado_por_id = current_user.id
+    just.data_analise = datetime.utcnow()
+
+    # Log de auditoria
+    log = LogAuditoria(
+        usuario_id=current_user.id,
+        acao=f"Aprovou Atestado/Justificativa (Protocolo {just.protocolo})",
+        alvo=f"Servidor: {just.funcionario.nome} | Dias Liberados: {dias_val}",
+        secretaria_id=just.secretaria_id
+    )
+    db.session.add(log)
+    db.session.commit()
+
+    return jsonify({"success": True, "message": "Solicitação Aprovada com Sucesso!"})
+
+
+@app.route("/api/atestados/reprovar", methods=["POST"])
+@login_required
+def api_atestados_reprovar():
+    data = request.get_json() or {}
+    just_id = data.get("id")
+    motivo = data.get("motivo_rejeicao", "").strip()
+
+    if not just_id:
+        return jsonify({"success": False, "message": "ID do atestado não fornecido."})
+
+    if not motivo:
+        return jsonify({"success": False, "message": "O motivo do indeferimento é OBRIGATÓRIO!"})
+
+    just = JustificativaFalta.query.get(just_id)
+    if not just:
+        return jsonify({"success": False, "message": "Solicitação não encontrada."})
+
+    just.status = "REJEITADO"
+    just.motivo_rejeicao = motivo
+    just.analisado_por_id = current_user.id
+    just.data_analise = datetime.utcnow()
+
+    # Log de auditoria
+    log = LogAuditoria(
+        usuario_id=current_user.id,
+        acao=f"Indeferiu Atestado/Justificativa (Protocolo {just.protocolo})",
+        alvo=f"Servidor: {just.funcionario.nome} | Motivo: {motivo}",
+        secretaria_id=just.secretaria_id
+    )
+    db.session.add(log)
+    db.session.commit()
+
+    return jsonify({"success": True, "message": "Solicitação Indeferida com Sucesso!"})
 
 
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===

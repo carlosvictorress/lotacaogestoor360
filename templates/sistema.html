@@ -233,6 +233,7 @@
                 {% if role == 'admin' or is_admin %}
                 <a href="{{ url_for('pagina_contratos') }}" class="text-xs font-medium text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-lg transition border border-purple-100 flex items-center gap-1" title="Contratos Gerados"><i class="ph ph-files text-sm"></i> Contratos Gerados</a>
                 {% endif %}
+                <a href="{{ url_for('admin_atestados') }}" class="text-xs font-medium text-emerald-700 hover:bg-emerald-50 px-3 py-2 rounded-lg transition border border-emerald-200 flex items-center gap-1" title="Gestão de Atestados"><i class="ph ph-first-aid text-sm"></i> Atestados</a>
                 {% if role == 'admin' or is_admin or role == 'rh_supervisor' %}<a href="{{ url_for('admin_dashboard') }}" class="text-xs font-medium text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition border border-blue-100">Painel Admin</a>{% endif %}
                 <button onclick="confirmAction('{{ url_for('logout') }}', 'Sair do Sistema', 'Tem certeza que deseja encerrar sua sessão?')" class="text-xs font-medium text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition border border-red-100">Sair</button>
             </div>

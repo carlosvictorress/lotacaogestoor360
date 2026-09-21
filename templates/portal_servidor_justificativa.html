@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nova Justificativa / Atestado | SEME</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="min-h-full flex flex-col bg-slate-50 text-slate-800">
+
+    <!-- BARRA SUPERIOR -->
+    <header class="bg-emerald-900 text-white shadow-md sticky top-0 z-30">
+        <div class="max-w-3xl mx-auto px-4 py-3.5 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <a href="{{ url_for('portal_servidor_dashboard') }}" class="p-1.5 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-emerald-100 transition">
+                    <i class="ph ph-arrow-left text-xl"></i>
+                </a>
+                <h1 class="text-sm font-bold">Enviar Nova Justificativa / Atestado</h1>
+            </div>
+            
+            <a href="{{ url_for('portal_servidor_logout') }}" title="Sair" class="text-xs text-emerald-200 hover:text-white font-bold">
+                Sair
+            </a>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="max-w-3xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+
+        <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200/80 space-y-6">
+            
+            <div>
+                <h2 class="text-lg font-black text-slate-900 flex items-center gap-2">
+                    <i class="ph ph-first-aid text-emerald-700 text-2xl"></i>
+                    Formulário de Justificativa de Ausência
+                </h2>
+                <p class="text-xs text-slate-500 font-medium mt-0.5">
+                    Preencha os dados abaixo e anexe a foto ou documento em PDF do seu atestado médico.
+                </p>
+            </div>
+
+            <form action="{{ url_for('portal_servidor_justificativa_salvar') }}" method="POST" enctype="multipart/form-data" onsubmit="exibirLoadingSpinner()" class="space-y-5">
+                
+                <!-- DATA DE INÍCIO & DIAS -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="data_inicio_afastamento" class="block text-xs font-bold text-slate-700 uppercase mb-1">
+                            Data de Início da Falta / Afastamento <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="date" id="data_inicio_afastamento" name="data_inicio_afastamento" required
+                            class="block w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20">
+                    </div>
+
+                    <div>
+                        <label for="dias_solicitados" class="block text-xs font-bold text-slate-700 uppercase mb-1">
+                            Qtd. de Dias de Afastamento <span class="text-rose-500">*</span>
+                        </label>
+                        <input type="number" id="dias_solicitados" name="dias_solicitados" min="1" value="1" required
+                            class="block w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20">
+                    </div>
+                </div>
+
+                <!-- DESCRICAO / MOTIVO DA FALTA -->
+                <div>
+                    <label for="motivo_ausencia" class="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Descreva o Motivo da Falta / Ausência <span class="text-rose-500">*</span>
+                    </label>
+                    <textarea id="motivo_ausencia" name="motivo_ausencia" rows="3" required placeholder="Explicar detalhadamente o motivo da ausência ao trabalho..."
+                        class="block w-full rounded-xl border border-slate-300 p-3 text-sm font-medium text-slate-900 placeholder-slate-400 focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20"></textarea>
+                </div>
+
+                <!-- UPLOAD DO DOCUMENTO / FOTO -->
+                <div class="space-y-2">
+                    <label class="block text-xs font-bold text-slate-700 uppercase">
+                        Anexar Foto do Atestado Médico ou Arquivo (PDF / JPG / PNG)
+                    </label>
+                    
+                    <div class="border-2 border-dashed border-slate-300 hover:border-emerald-600 rounded-2xl p-6 text-center cursor-pointer bg-slate-50 transition" onclick="document.getElementById('anexo').click()">
+                        <input type="file" id="anexo" name="anexo" accept="image/*,application/pdf" capture="environment" class="hidden" onchange="mostrarPreviewArquivo(this)">
+                        
+                        <div id="upload_prompt" class="space-y-2">
+                            <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center mx-auto text-2xl font-bold">
+                                📸
+                            </div>
+                            <div class="text-xs font-bold text-slate-700">
+                                Clique para Tirar Foto ou Escolher Arquivo
+                            </div>
+                            <p class="text-[11px] text-slate-400 font-medium">Aceita imagens (JPG, PNG) ou documento PDF</p>
+                        </div>
+
+                        <div id="upload_preview" class="hidden space-y-2">
+                            <img id="preview_img" class="max-h-48 mx-auto rounded-xl shadow border border-slate-200 hidden">
+                            <p id="preview_filename" class="text-xs font-bold text-emerald-800"></p>
+                            <span class="text-[11px] font-bold text-slate-500 underline">Clique para alterar a foto/arquivo</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOTAO ENVIAR -->
+                <div class="pt-2 flex justify-end gap-3">
+                    <a href="{{ url_for('portal_servidor_dashboard') }}" class="px-5 py-3 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition">
+                        Cancelar
+                    </a>
+                    
+                    <button type="submit" id="btn_submit" class="px-6 py-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-extrabold shadow-md transition flex items-center gap-2 uppercase tracking-wider">
+                        <i class="ph ph-paper-plane-right text-lg"></i>
+                        Enviar Justificativa
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+
+    </main>
+
+    <script>
+        // Data de hoje padrão para o input
+        document.getElementById('data_inicio_afastamento').valueAsDate = new Date();
+
+        function mostrarPreviewArquivo(input) {
+            const prompt = document.getElementById('upload_prompt');
+            const preview = document.getElementById('upload_preview');
+            const img = document.getElementById('preview_img');
+            const filename = document.getElementById('preview_filename');
+
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                filename.innerText = "Arquivo selecionado: " + file.name;
+                
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        img.src = e.target.result;
+                        img.classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    img.classList.add('hidden');
+                }
+
+                prompt.classList.add('hidden');
+                preview.classList.remove('hidden');
+            }
+        }
+
+        function exibirLoadingSpinner() {
+            const btn = document.getElementById('btn_submit');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin text-lg"></i> Enviando e Processando...`;
+        }
+    </script>
+</body>
+</html>

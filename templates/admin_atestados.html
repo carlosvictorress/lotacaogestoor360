@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Atestados & Justificativas - Admin RH | SEME</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="h-full flex flex-col bg-slate-50 text-slate-800">
+
+    <!-- CABEÇALHO DA PÁGINA -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <a href="{{ url_for('sistema') }}" class="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition" title="Voltar ao Painel">
+                    <i class="ph ph-arrow-left text-xl"></i>
+                </a>
+                <div>
+                    <h1 class="text-xl font-black tracking-tight text-slate-900 flex items-center gap-2">
+                        <i class="ph ph-first-aid text-emerald-700 text-2xl"></i>
+                        Gestão de Atestados & Justificativas de Faltas
+                    </h1>
+                    <p class="text-xs text-slate-500 font-medium">
+                        Painel Administrativo do RH - Secretaria Municipal de Educação
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('portal_servidor_login') }}" target="_blank" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-slate-200">
+                    <i class="ph ph-device-mobile text-base text-emerald-700"></i> Portal do Servidor
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full space-y-6">
+
+        <!-- CARDS KPIS -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center">
+                <div>
+                    <span class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Total Solicitações</span>
+                    <div class="text-2xl font-black text-slate-900 mt-1">{{ total_qtd }}</div>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center font-bold">
+                    📋
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center border-l-4 border-l-amber-500">
+                <div>
+                    <span class="text-[10px] font-black uppercase text-amber-700 tracking-wider">Pendentes (Em Análise)</span>
+                    <div class="text-2xl font-black text-amber-600 mt-1">{{ pendentes_qtd }}</div>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+                    ⏳
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center border-l-4 border-l-emerald-600">
+                <div>
+                    <span class="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Aprovados</span>
+                    <div class="text-2xl font-black text-emerald-600 mt-1">{{ aprovados_qtd }}</div>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                    ✅
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex justify-between items-center border-l-4 border-l-rose-600">
+                <div>
+                    <span class="text-[10px] font-black uppercase text-rose-700 tracking-wider">Indeferidos</span>
+                    <div class="text-2xl font-black text-rose-600 mt-1">{{ rejeitados_qtd }}</div>
+                </div>
+                <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                    ❌
+                </div>
+            </div>
+        </div>
+
+        <!-- BARRA DE FILTROS & BUSCA -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap justify-between items-center gap-3">
+            
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('admin_atestados', status='TODOS') }}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if current_status == 'TODOS' %}bg-slate-900 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+                    Todos ({{ total_qtd }})
+                </a>
+                <a href="{{ url_for('admin_atestados', status='PENDENTE') }}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if current_status == 'PENDENTE' %}bg-amber-600 text-white{% else %}bg-amber-50 text-amber-700 hover:bg-amber-100{% endif %}">
+                    Pendentes ({{ pendentes_qtd }})
+                </a>
+                <a href="{{ url_for('admin_atestados', status='APROVADO') }}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if current_status == 'APROVADO' %}bg-emerald-700 text-white{% else %}bg-emerald-50 text-emerald-800 hover:bg-emerald-100{% endif %}">
+                    Aprovados ({{ aprovados_qtd }})
+                </a>
+                <a href="{{ url_for('admin_atestados', status='REJEITADO') }}" class="px-3 py-1.5 rounded-xl text-xs font-bold transition {% if current_status == 'REJEITADO' %}bg-rose-600 text-white{% else %}bg-rose-50 text-rose-700 hover:bg-rose-100{% endif %}">
+                    Indeferidos ({{ rejeitados_qtd }})
+                </a>
+            </div>
+
+            <form action="{{ url_for('admin_atestados') }}" method="GET" class="flex gap-2 flex-1 max-w-xs">
+                <input type="hidden" name="status" value="{{ current_status }}">
+                <div class="relative w-full">
+                    <i class="ph ph-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" name="search" value="{{ search_query }}" placeholder="Buscar por servidor, CPF ou protocolo..." 
+                        class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600">
+                </div>
+            </form>
+        </div>
+
+        <!-- TABELA DE SOLICITAÇÕES -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-50 uppercase text-[10px] font-black text-slate-500 tracking-wider border-b border-slate-200">
+                        <tr>
+                            <th class="p-3.5">Protocolo / Data</th>
+                            <th class="p-3.5">Servidor</th>
+                            <th class="p-3.5">Motivo / Afastamento</th>
+                            <th class="p-3.5">Documento / OCR</th>
+                            <th class="p-3.5 text-center">Status</th>
+                            <th class="p-3.5 text-right">Ações do RH</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-medium">
+                        {% if justificativas and justificativas|length > 0 %}
+                            {% for j in justificativas %}
+                                <tr class="hover:bg-slate-50/80 transition">
+                                    <td class="p-3.5 space-y-1">
+                                        <span class="bg-slate-100 font-mono font-black text-[11px] px-2 py-0.5 rounded text-slate-800 border border-slate-200 block w-fit">
+                                            {{ j.protocolo }}
+                                        </span>
+                                        <span class="text-[10px] text-slate-400 block font-semibold">
+                                            {{ j.data_solicitacao.strftime('%d/%m/%Y às %H:%M') }}
+                                        </span>
+                                    </td>
+
+                                    <td class="p-3.5 space-y-0.5">
+                                        <div class="font-bold text-slate-900 text-sm">{{ j.funcionario.nome }}</div>
+                                        <div class="text-[10px] text-slate-500 font-mono">CPF: {{ j.funcionario.cpf }}</div>
+                                    </td>
+
+                                    <td class="p-3.5 max-w-xs space-y-1">
+                                        <p class="text-slate-800 font-semibold truncate" title="{{ j.motivo_ausencia }}">{{ j.motivo_ausencia }}</p>
+                                        <div class="text-[10px] text-slate-500">
+                                            Início: <strong class="text-slate-900">{{ j.data_inicio_afastamento.strftime('%d/%m/%Y') if j.data_inicio_afastamento else '---' }}</strong> 
+                                            ({{ j.dias_solicitados }} dia(s))
+                                        </div>
+                                    </td>
+
+                                    <td class="p-3.5 space-y-1">
+                                        {% if j.caminho_anexo or j.anexo_base64 %}
+                                            <a href="{{ url_for('portal_servidor_download_atestado', id=j.id) }}" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200 transition">
+                                                <i class="ph ph-file-text"></i> Abrir Anexo
+                                            </a>
+                                        {% else %}
+                                            <span class="text-slate-400 text-[10px]">Sem anexo</span>
+                                        {% endif %}
+
+                                        {% if j.crm_medico_ocr or j.cid_ocr %}
+                                            <div class="text-[10px] text-slate-600 font-semibold">
+                                                {% if j.crm_medico_ocr %}<span class="block">CRM: <strong>{{ j.crm_medico_ocr }}</strong></span>{% endif %}
+                                                {% if j.cid_ocr %}<span class="block">CID: <strong>{{ j.cid_ocr }}</strong></span>{% endif %}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+
+                                    <td class="p-3.5 text-center whitespace-nowrap">
+                                        {% if j.status == 'PENDENTE' %}
+                                            <span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full font-black text-[10px] border border-amber-200">PENDENTE</span>
+                                        {% elif j.status == 'APROVADO' %}
+                                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full font-black text-[10px] border border-emerald-200">APROVADO ({{ j.dias_liberados_municipio }}d)</span>
+                                        {% elif j.status == 'REJEITADO' %}
+                                            <span class="bg-rose-100 text-rose-800 px-2.5 py-1 rounded-full font-black text-[10px] border border-rose-200">INDEFERIDO</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td class="p-3.5 text-right space-x-1 whitespace-nowrap">
+                                        {% if j.status == 'PENDENTE' %}
+                                            <button onclick="abrirModalAprovar({{ j.id }}, '{{ j.funcionario.nome|replace("'", "\\'") }}', {{ j.dias_solicitados }})" class="px-2.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-[11px] font-extrabold shadow-sm transition">
+                                                🟢 Aprovar
+                                            </button>
+                                            <button onclick="abrirModalReprovar({{ j.id }}, '{{ j.funcionario.nome|replace("'", "\\'") }}')" class="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[11px] font-extrabold shadow-sm transition">
+                                                🔴 Indeferir
+                                            </button>
+                                        {% else %}
+                                            <button onclick="abrirModalAprovar({{ j.id }}, '{{ j.funcionario.nome|replace("'", "\\'") }}', {{ j.dias_liberados_municipio }})" class="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold border border-slate-300">
+                                                Alterar Parecer
+                                            </button>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="p-8 text-center text-slate-400 font-bold">
+                                    Nenhum atestado / justificativa encontrada.
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL APROVAR -->
+    <div id="modalAprovar" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-100 space-y-4">
+            <h3 class="text-base font-bold text-emerald-800 flex items-center gap-2">
+                <i class="ph ph-check-circle text-2xl text-emerald-600"></i> Aprovação de Atestado / Falta
+            </h3>
+            <p class="text-xs text-slate-600">Servidor: <strong id="lbl_aprovar_servidor" class="text-slate-900 font-extrabold">---</strong></p>
+            <input type="hidden" id="aprovar_id">
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Qtd. de Dias Liberados pelo Município <span class="text-rose-500">*</span></label>
+                    <input type="number" id="aprovar_dias" value="1" min="1" class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold text-slate-900">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Observações do RH (Opcional)</label>
+                    <textarea id="aprovar_obs" rows="2" placeholder="Observações adicionais sobre o abono..." class="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium text-slate-900"></textarea>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="fecharModalAprovar()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Cancelar</button>
+                <button onclick="salvarAprovacao()" class="px-4 py-2 bg-emerald-700 text-white rounded-xl text-xs font-extrabold hover:bg-emerald-800">Confirmar Aprovação</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL REPROVAR / INDEFERIR -->
+    <div id="modalReprovar" class="fixed inset-0 bg-slate-900/60 hidden items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-100 space-y-4">
+            <h3 class="text-base font-bold text-rose-700 flex items-center gap-2">
+                <i class="ph ph-x-circle text-2xl text-rose-600"></i> Indeferimento de Atestado / Falta
+            </h3>
+            <p class="text-xs text-slate-600">Servidor: <strong id="lbl_reprovar_servidor" class="text-slate-900 font-extrabold">---</strong></p>
+            <input type="hidden" id="reprovar_id">
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Motivo do Indeferimento <span class="text-rose-500">*</span></label>
+                    <textarea id="reprovar_motivo" rows="3" required placeholder="Digite detalhadamente por que a solicitação foi indeferida..." class="w-full p-2.5 bg-rose-50/50 border border-rose-200 rounded-xl text-xs font-semibold text-slate-900"></textarea>
+                    <p class="text-[10px] text-slate-400 mt-1">Este motivo ficará visível para o servidor no Portal do Servidor.</p>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="fecharModalReprovar()" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-xs font-bold">Cancelar</button>
+                <button onclick="salvarReprovacao()" class="px-4 py-2 bg-rose-600 text-white rounded-xl text-xs font-extrabold hover:bg-rose-700">Confirmar Indeferimento</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function abrirModalAprovar(id, nome, dias) {
+            document.getElementById('aprovar_id').value = id;
+            document.getElementById('lbl_aprovar_servidor').innerText = nome;
+            document.getElementById('aprovar_dias').value = dias || 1;
+            document.getElementById('aprovar_obs').value = '';
+            document.getElementById('modalAprovar').classList.remove('hidden');
+            document.getElementById('modalAprovar').classList.add('flex');
+        }
+
+        function fecharModalAprovar() {
+            document.getElementById('modalAprovar').classList.add('hidden');
+            document.getElementById('modalAprovar').classList.remove('flex');
+        }
+
+        function salvarAprovacao() {
+            const id = document.getElementById('aprovar_id').value;
+            const dias = document.getElementById('aprovar_dias').value;
+            const obs = document.getElementById('aprovar_obs').value;
+
+            fetch('/api/atestados/aprovar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: id, dias_liberados: dias, observacao: obs })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    fecharModalAprovar();
+                    window.location.reload();
+                } else {
+                    alert(res.message);
+                }
+            });
+        }
+
+        function abrirModalReprovar(id, nome) {
+            document.getElementById('reprovar_id').value = id;
+            document.getElementById('lbl_reprovar_servidor').innerText = nome;
+            document.getElementById('reprovar_motivo').value = '';
+            document.getElementById('modalReprovar').classList.remove('hidden');
+            document.getElementById('modalReprovar').classList.add('flex');
+        }
+
+        function fecharModalReprovar() {
+            document.getElementById('modalReprovar').classList.add('hidden');
+            document.getElementById('modalReprovar').classList.remove('flex');
+        }
+
+        function salvarReprovacao() {
+            const id = document.getElementById('reprovar_id').value;
+            const motivo = document.getElementById('reprovar_motivo').value.trim();
+
+            if (!motivo) {
+                alert("O motivo do indeferimento é OBRIGATÓRIO!");
+                return;
+            }
+
+            fetch('/api/atestados/reprovar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id: id, motivo_rejeicao: motivo })
+            }).then(r => r.json()).then(res => {
+                if (res.success) {
+                    fecharModalReprovar();
+                    window.location.reload();
+                } else {
+                    alert(res.message);
+                }
+            });
+        }
+    </script>
+</body>
+</html>

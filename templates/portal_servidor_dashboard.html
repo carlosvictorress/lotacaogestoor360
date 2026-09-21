@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel do Servidor - Minhas Justificativas | SEME</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="min-h-full flex flex-col bg-slate-50 text-slate-800">
+
+    <!-- BARRA SUPERIOR -->
+    <header class="bg-emerald-900 text-white shadow-md sticky top-0 z-30">
+        <div class="max-w-4xl mx-auto px-4 py-3.5 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-800 text-emerald-200 flex items-center justify-center font-black text-lg border border-emerald-700">
+                    {{ funcionario.nome[0] }}
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold leading-tight">{{ funcionario.nome }}</h1>
+                    <p class="text-[11px] text-emerald-300 font-mono font-medium">CPF: {{ funcionario.cpf }}</p>
+                </div>
+            </div>
+            
+            <a href="{{ url_for('portal_servidor_logout') }}" title="Sair do Portal" class="px-3 py-1.5 bg-emerald-800/80 hover:bg-rose-700 text-emerald-100 hover:text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-emerald-700">
+                <i class="ph ph-sign-out text-base"></i> Sair
+            </a>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
+
+        <!-- MENSAGENS FLASH -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="p-4 rounded-2xl text-xs font-bold flex items-center gap-2.5 shadow-sm {% if category == 'error' or category == 'danger' %}bg-rose-50 text-rose-700 border border-rose-200{% else %}bg-emerald-50 text-emerald-800 border border-emerald-200{% endif %}">
+                        <i class="ph {% if category == 'error' or category == 'danger' %}ph-warning-circle text-xl text-rose-600{% else %}ph-check-circle text-xl text-emerald-600{% endif %}"></i>
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- CABEÇALHO DO PAINEL -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+                <h2 class="text-base font-extrabold text-slate-900 flex items-center gap-2">
+                    <i class="ph ph-file-text text-emerald-700 text-xl"></i> Minhas Justificativas & Atestados
+                </h2>
+                <p class="text-xs text-slate-500 font-medium">Acompanhe o protocolo e o resultado das suas ausências</p>
+            </div>
+
+            <a href="{{ url_for('portal_servidor_justificativa_nova') }}" class="w-full sm:w-auto px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-extrabold shadow-md transition flex items-center justify-center gap-2 uppercase tracking-wider">
+                <i class="ph ph-plus-circle text-lg"></i> Nova Justificativa
+            </a>
+        </div>
+
+        <!-- LISTAGEM DE PROTOCOLOS -->
+        <div class="space-y-4">
+            {% if justificativas and justificativas|length > 0 %}
+                {% for j in justificativas %}
+                    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-3">
+                        
+                        <!-- CABEÇALHO DO CARD -->
+                        <div class="bg-slate-50 p-3.5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-slate-200 text-slate-700 font-mono font-extrabold text-[11px] px-2.5 py-0.5 rounded-lg">
+                                    {{ j.protocolo }}
+                                </span>
+                                <span class="text-[11px] text-slate-400 font-medium">
+                                    Enviado em {{ j.data_solicitacao.strftime('%d/%m/%Y às %H:%M') }}
+                                </span>
+                            </div>
+
+                            {% if j.caminho_anexo or j.anexo_base64 %}
+                                <a href="{{ url_for('portal_servidor_download_atestado', id=j.id) }}" target="_blank" class="text-xs font-bold text-emerald-700 hover:underline flex items-center gap-1">
+                                    <i class="ph ph-paperclip"></i> Ver Documento
+                                </a>
+                            {% endif %}
+                        </div>
+
+                        <!-- CORPO DO CARD -->
+                        <div class="p-4 space-y-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                <div>
+                                    <span class="block text-[10px] font-bold uppercase text-slate-400">Motivo da Ausência / Descrição</span>
+                                    <p class="font-medium text-slate-800 mt-0.5">{{ j.motivo_ausencia }}</p>
+                                </div>
+                                <div class="flex gap-4">
+                                    <div>
+                                        <span class="block text-[10px] font-bold uppercase text-slate-400">Início Afastamento</span>
+                                        <p class="font-bold text-slate-900 mt-0.5">{{ j.data_inicio_afastamento.strftime('%d/%m/%Y') if j.data_inicio_afastamento else 'Não informado' }}</p>
+                                    </div>
+                                    <div>
+                                        <span class="block text-[10px] font-bold uppercase text-slate-400">Dias Solicitados</span>
+                                        <p class="font-bold text-slate-900 mt-0.5">{{ j.dias_solicitados }} dia(s)</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% if j.crm_medico_ocr or j.cid_ocr %}
+                                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200/60 flex flex-wrap gap-3 text-[11px] font-semibold text-slate-600">
+                                    {% if j.crm_medico_ocr %}
+                                        <span>👨‍⚕️ Médico: <strong class="text-slate-800">{{ j.crm_medico_ocr }}</strong></span>
+                                    {% endif %}
+                                    {% if j.cid_ocr %}
+                                        <span>🩺 CID: <strong class="text-slate-800">{{ j.cid_ocr }}</strong></span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+
+                            <!-- BANNER DE STATUS DO RH -->
+                            {% if j.status == 'PENDENTE' %}
+                                <div class="bg-amber-50 p-3 rounded-xl border border-amber-200/80 flex items-start gap-2.5 text-xs text-amber-900">
+                                    <i class="ph ph-clock text-xl text-amber-600 flex-shrink-0 mt-0.5"></i>
+                                    <div>
+                                        <strong class="font-extrabold uppercase text-[11px] block text-amber-800">Status: Pendente (Em Análise)</strong>
+                                        <p class="font-medium mt-0.5">Sua justificativa está em análise pelo Setor de Recursos Humanos da SEME.</p>
+                                    </div>
+                                </div>
+                            {% elif j.status == 'APROVADO' %}
+                                <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200/80 flex items-start gap-2.5 text-xs text-emerald-900">
+                                    <i class="ph ph-check-circle text-xl text-emerald-600 flex-shrink-0 mt-0.5"></i>
+                                    <div>
+                                        <strong class="font-extrabold uppercase text-[11px] block text-emerald-800">Status: Aprovado pelo RH</strong>
+                                        <p class="font-medium mt-0.5">
+                                            Solicitação Aprovada! O município liberou <strong class="font-extrabold text-emerald-900">{{ j.dias_liberados_municipio }} dia(s)</strong> de afastamento abonado.
+                                        </p>
+                                        {% if j.observacao_rh %}
+                                            <p class="text-[11px] text-emerald-700 italic mt-1">Obs RH: {{ j.observacao_rh }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% elif j.status == 'REJEITADO' %}
+                                <div class="bg-rose-50 p-3 rounded-xl border border-rose-200/80 flex items-start gap-2.5 text-xs text-rose-900">
+                                    <i class="ph ph-x-circle text-xl text-rose-600 flex-shrink-0 mt-0.5"></i>
+                                    <div class="space-y-1">
+                                        <strong class="font-extrabold uppercase text-[11px] block text-rose-800">Status: Indeferido / Rejeitado</strong>
+                                        <p class="font-medium">
+                                            Solicitação Indeferida pelo RH. <br>
+                                            <strong>Motivo:</strong> <span class="font-bold text-rose-950">{{ j.motivo_rejeicao or 'Não informado pelo administrador.' }}</span>
+                                        </p>
+                                        <div class="bg-white/80 p-2 rounded-lg border border-rose-200 text-[11px] font-bold text-rose-800 flex items-center gap-1.5 mt-1">
+                                            <i class="ph ph-warning"></i>
+                                            Orientação: Dirija-se ao RH da Secretaria Municipal de Educação portando o documento original.
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endif %}
+
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="bg-white p-12 text-center rounded-2xl border border-slate-200 space-y-3">
+                    <div class="w-12 h-12 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto text-2xl font-bold">
+                        📋
+                    </div>
+                    <h3 class="text-sm font-bold text-slate-700">Nenhuma justificativa enviada ainda</h3>
+                    <p class="text-xs text-slate-400 max-w-sm mx-auto">Caso tenha faltado ou precise enviar um atestado médico, clique no botão acima para registrar.</p>
+                </div>
+            {% endif %}
+        </div>
+
+    </main>
+
+    <!-- RODAPÉ -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-400 font-bold">
+        Gestoor 360 • Prefeitura Municipal de Valença do Piauí / SEME
+    </footer>
+
+</body>
+</html>
