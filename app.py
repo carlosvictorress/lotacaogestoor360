@@ -16,7 +16,7 @@ import json
 
 from datetime import date
 from datetime import date
-from flask import Flask, render_template, request, redirect, url_for, flash, Response, has_request_context
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, has_request_context, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
