@@ -131,7 +131,7 @@
                                         jornada_trabalho: {{ (c.jornada_trabalho or "20 (vinte) horas semanais")|tojson }},
                                         dt_inicio: {{ (c.dt_inicio.isoformat() if c.dt_inicio else None)|tojson }},
                                         dt_termino: {{ (c.dt_termino.isoformat() if c.dt_termino else None)|tojson }},
-                                        dt_assinatura: {{ (c.dt_assinatura.isoformat() if c.dt_assinatura else None)|tojson }},
+                                        dt_assinatura: {{ (c.dt_assinatura.isoformat() if c.dt_assinatura else (c.funcionario.dt_inicio.isoformat() if c.funcionario and c.funcionario.dt_inicio else None))|tojson }},
                                         representante_nome: {{ (c.representante_nome or "MARIA EDNA DE SOUSA QUARESMA")|tojson }},
                                         representante_cargo: {{ (c.representante_cargo or "Secretária Municipal de Educação")|tojson }},
                                         representante_rg_cpf: {{ (c.representante_rg_cpf or "676.079.263-72")|tojson }},

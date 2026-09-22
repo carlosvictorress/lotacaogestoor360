@@ -2113,9 +2113,12 @@ def processar_gerar_contrato():
         representante_rg_cpf = request.form.get("representante_rg_cpf", "676.079.263-72").strip()
         representante_endereco = request.form.get("representante_endereco", "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI").strip()
 
-        dt_inicio = parse_date(dt_inicio_str) if dt_inicio_str else date.today()
+        func = db.session.get(Funcionario, funcionario_id) if funcionario_id else None
+        dt_admissao_ficha = func.dt_inicio if (func and func.dt_inicio) else None
+
+        dt_inicio = parse_date(dt_inicio_str) if dt_inicio_str else (dt_admissao_ficha or date.today())
         dt_termino = parse_date(dt_termino_str) if dt_termino_str else None
-        dt_assinatura = parse_date(dt_assinatura_str) if dt_assinatura_str else (dt_inicio or date.today())
+        dt_assinatura = parse_date(dt_assinatura_str) if dt_assinatura_str else (dt_admissao_ficha or dt_inicio or date.today())
         
         ano_exercicio = dt_inicio.year if dt_inicio else datetime.now().year
         
@@ -2253,6 +2256,8 @@ def visualizar_contrato_documento(id):
     if not contrato:
         return "Contrato não encontrado", 404
 
+    dt_ass = contrato.dt_assinatura or (contrato.funcionario.dt_inicio if contrato.funcionario and contrato.funcionario.dt_inicio else contrato.dt_inicio)
+
     contrato_dict = {
         "id": contrato.id,
         "num_contrato": contrato.num_contrato,
@@ -2271,9 +2276,9 @@ def visualizar_contrato_documento(id):
         "jornada_trabalho": contrato.jornada_trabalho or "",
         "dt_inicio_extenso": formatar_data_extenso(contrato.dt_inicio),
         "dt_termino_extenso": formatar_data_extenso(contrato.dt_termino),
-        "dt_assinatura_extenso": formatar_data_extenso(contrato.dt_assinatura or contrato.dt_inicio),
+        "dt_assinatura_extenso": formatar_data_extenso(dt_ass),
         "dt_termino_formatada": contrato.dt_termino.strftime("%d/%m/%Y") if contrato.dt_termino else "",
-        "dt_assinatura_formatada": contrato.dt_assinatura.strftime("%d/%m/%Y") if contrato.dt_assinatura else (contrato.dt_inicio.strftime("%d/%m/%Y") if contrato.dt_inicio else ""),
+        "dt_assinatura_formatada": dt_ass.strftime("%d/%m/%Y") if dt_ass else "",
         "representante_nome": contrato.representante_nome,
         "representante_cargo": contrato.representante_cargo,
         "representante_rg_cpf": contrato.representante_rg_cpf,
@@ -2293,6 +2298,8 @@ def visualizar_contrato_extrato(id):
     if not contrato:
         return "Contrato não encontrado", 404
 
+    dt_ass_ext = contrato.dt_assinatura or (contrato.funcionario.dt_inicio if contrato.funcionario and contrato.funcionario.dt_inicio else contrato.dt_inicio)
+
     contrato_dict = {
         "id": contrato.id,
         "num_contrato": contrato.num_contrato,
@@ -2303,7 +2310,7 @@ def visualizar_contrato_extrato(id):
         "remuneracao_formatada": formatar_remuneracao_rs(contrato.remuneracao),
         "remuneracao_extenso": contrato.remuneracao_extenso or "",
         "dt_termino_formatada": contrato.dt_termino.strftime("%d/%m/%Y") if contrato.dt_termino else "",
-        "dt_assinatura_formatada": contrato.dt_assinatura.strftime("%d/%m/%Y") if contrato.dt_assinatura else (contrato.dt_inicio.strftime("%d/%m/%Y") if contrato.dt_inicio else ""),
+        "dt_assinatura_formatada": dt_ass_ext.strftime("%d/%m/%Y") if dt_ass_ext else "",
     }
 
     return render_template("contrato_extrato.html", contrato=contrato_dict)
