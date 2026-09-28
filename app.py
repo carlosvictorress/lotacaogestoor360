@@ -113,8 +113,8 @@ class LogAuditoria(db.Model):
     usuario = db.relationship("User", backref="logs")
     
     # --- CAMPOS ORIGINAIS (MANTIDOS INTACTOS) ---
-    acao = db.Column(db.String(50), nullable=False)
-    alvo = db.Column(db.String(200), nullable=False)
+    acao = db.Column(db.String(255), nullable=False)
+    alvo = db.Column(db.String(500), nullable=False)
     data_hora = db.Column(db.DateTime, default=datetime.utcnow)
     
     # --- NOVOS CAMPOS DE AUDITORIA MINUCIOSA ---
@@ -1947,6 +1947,14 @@ def atualizar_schema():
                     print(f"SUCESSO: Coluna '{col}' adicionada em 'log_auditoria'.")
                 except Exception as e:
                     conn.rollback()
+
+            # Expande tamanho de colunas acao e alvo no PostgreSQL se já existirem
+            try:
+                conn.execute(text("ALTER TABLE log_auditoria ALTER COLUMN acao TYPE VARCHAR(255)"))
+                conn.execute(text("ALTER TABLE log_auditoria ALTER COLUMN alvo TYPE VARCHAR(500)"))
+                conn.commit()
+            except Exception:
+                conn.rollback()
 
             # Processa tabela contrato_gerado
             for col, tipo in colunas_contrato:
@@ -4523,8 +4531,8 @@ def api_atestados_aprovar():
     # Log de auditoria
     log = LogAuditoria(
         usuario_id=current_user.id,
-        acao=f"Aprovou Atestado/Justificativa (Protocolo {just.protocolo})",
-        alvo=f"Servidor: {just.funcionario.nome} | Dias Liberados: {dias_val}"
+        acao=f"Aprovou Atestado {just.protocolo}"[:50],
+        alvo=f"Servidor: {just.funcionario.nome} | Dias: {dias_val}"[:250]
     )
     db.session.add(log)
     db.session.commit()
@@ -4557,8 +4565,8 @@ def api_atestados_reprovar():
     # Log de auditoria
     log = LogAuditoria(
         usuario_id=current_user.id,
-        acao=f"Indeferiu Atestado/Justificativa (Protocolo {just.protocolo})",
-        alvo=f"Servidor: {just.funcionario.nome} | Motivo: {motivo}"
+        acao=f"Indeferiu Atestado {just.protocolo}"[:50],
+        alvo=f"Servidor: {just.funcionario.nome} | Motivo: {motivo}"[:250]
     )
     db.session.add(log)
     db.session.commit()
