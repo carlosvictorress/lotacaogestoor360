@@ -4524,8 +4524,7 @@ def api_atestados_aprovar():
     log = LogAuditoria(
         usuario_id=current_user.id,
         acao=f"Aprovou Atestado/Justificativa (Protocolo {just.protocolo})",
-        alvo=f"Servidor: {just.funcionario.nome} | Dias Liberados: {dias_val}",
-        secretaria_id=just.secretaria_id
+        alvo=f"Servidor: {just.funcionario.nome} | Dias Liberados: {dias_val}"
     )
     db.session.add(log)
     db.session.commit()
@@ -4559,8 +4558,7 @@ def api_atestados_reprovar():
     log = LogAuditoria(
         usuario_id=current_user.id,
         acao=f"Indeferiu Atestado/Justificativa (Protocolo {just.protocolo})",
-        alvo=f"Servidor: {just.funcionario.nome} | Motivo: {motivo}",
-        secretaria_id=just.secretaria_id
+        alvo=f"Servidor: {just.funcionario.nome} | Motivo: {motivo}"
     )
     db.session.add(log)
     db.session.commit()
