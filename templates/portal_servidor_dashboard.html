@@ -130,32 +130,42 @@
                                     </div>
                                 </div>
                             {% elif j.status == 'APROVADO' %}
-                                <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200/80 flex items-start gap-2.5 text-xs text-emerald-900">
-                                    <i class="ph ph-check-circle text-xl text-emerald-600 flex-shrink-0 mt-0.5"></i>
-                                    <div>
-                                        <strong class="font-extrabold uppercase text-[11px] block text-emerald-800">Status: Aprovado pelo RH</strong>
-                                        <p class="font-medium mt-0.5">
-                                            Solicitação Aprovada! O município liberou <strong class="font-extrabold text-emerald-900">{{ j.dias_liberados_municipio }} dia(s)</strong> de afastamento abonado.
-                                        </p>
-                                        {% if j.observacao_rh %}
-                                            <p class="text-[11px] text-emerald-700 italic mt-1">Obs RH: {{ j.observacao_rh }}</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% elif j.status == 'REJEITADO' %}
-                                <div class="bg-rose-50 p-3 rounded-xl border border-rose-200/80 flex items-start gap-2.5 text-xs text-rose-900">
-                                    <i class="ph ph-x-circle text-xl text-rose-600 flex-shrink-0 mt-0.5"></i>
-                                    <div class="space-y-1">
-                                        <strong class="font-extrabold uppercase text-[11px] block text-rose-800">Status: Indeferido / Rejeitado</strong>
-                                        <p class="font-medium">
-                                            Solicitação Indeferida pelo RH. <br>
-                                            <strong>Motivo:</strong> <span class="font-bold text-rose-950">{{ j.motivo_rejeicao or 'Não informado pelo administrador.' }}</span>
-                                        </p>
-                                        <div class="bg-white/80 p-2 rounded-lg border border-rose-200 text-[11px] font-bold text-rose-800 flex items-center gap-1.5 mt-1">
-                                            <i class="ph ph-warning"></i>
-                                            Orientação: Dirija-se ao RH da Secretaria Municipal de Educação portando o documento original.
+                                <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200/80 flex items-start justify-between gap-2.5 text-xs text-emerald-900">
+                                    <div class="flex items-start gap-2.5">
+                                        <i class="ph ph-check-circle text-xl text-emerald-600 flex-shrink-0 mt-0.5"></i>
+                                        <div>
+                                            <strong class="font-extrabold uppercase text-[11px] block text-emerald-800">Status: Aprovado pelo RH</strong>
+                                            <p class="font-medium mt-0.5">
+                                                Solicitação Aprovada! O município liberou <strong class="font-extrabold text-emerald-900">{{ j.dias_liberados_municipio }} dia(s)</strong> de afastamento abonado.
+                                            </p>
+                                            {% if j.observacao_rh %}
+                                                <p class="text-[11px] text-emerald-700 italic mt-1">Obs RH: {{ j.observacao_rh }}</p>
+                                            {% endif %}
                                         </div>
                                     </div>
+                                    <a href="{{ url_for('atestado_parecer_pdf', id=j.id) }}" target="_blank" class="flex-shrink-0 px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                                        <i class="ph ph-file-pdf"></i> Imprimir Parecer
+                                    </a>
+                                </div>
+                            {% elif j.status == 'REJEITADO' %}
+                                <div class="bg-rose-50 p-3 rounded-xl border border-rose-200/80 flex items-start justify-between gap-2.5 text-xs text-rose-900">
+                                    <div class="flex items-start gap-2.5">
+                                        <i class="ph ph-x-circle text-xl text-rose-600 flex-shrink-0 mt-0.5"></i>
+                                        <div class="space-y-1">
+                                            <strong class="font-extrabold uppercase text-[11px] block text-rose-800">Status: Indeferido / Rejeitado</strong>
+                                            <p class="font-medium">
+                                                Solicitação Indeferida pelo RH. <br>
+                                                <strong>Motivo:</strong> <span class="font-bold text-rose-950">{{ j.motivo_rejeicao or 'Não informado pelo administrador.' }}</span>
+                                            </p>
+                                            <div class="bg-white/80 p-2 rounded-lg border border-rose-200 text-[11px] font-bold text-rose-800 flex items-center gap-1.5 mt-1">
+                                                <i class="ph ph-warning"></i>
+                                                Orientação: Dirija-se ao RH da Secretaria Municipal de Educação portando o documento original.
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <a href="{{ url_for('atestado_parecer_pdf', id=j.id) }}" target="_blank" class="flex-shrink-0 px-3 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                                        <i class="ph ph-file-pdf"></i> Imprimir Parecer
+                                    </a>
                                 </div>
                             {% endif %}
 

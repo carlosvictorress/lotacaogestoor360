@@ -1023,7 +1023,7 @@ def admin_dashboard():
     locais_trabalho = LocalTrabalho.query.order_by(LocalTrabalho.nome).all()
 
     try:
-        atestados_pendentes_count = JustificativaFalta.query.filter_by(status='Pendente').count()
+        atestados_pendentes_count = JustificativaFalta.query.filter_by(status='PENDENTE').count()
     except Exception:
         atestados_pendentes_count = 0
 
@@ -3256,6 +3256,22 @@ def gerar_relatorio_frequencia(func_id):
             pontos_por_dia[dia] = []
         pontos_por_dia[dia].append(r)
 
+    # Busca atestados/justificativas aprovadas do servidor
+    atestados_aprovados = JustificativaFalta.query.filter_by(
+        funcionario_id=func_id,
+        status="APROVADO"
+    ).all()
+
+    # Mapeia os dias com atestado aprovado
+    dias_atestado = set()
+    for just in atestados_aprovados:
+        if just.data_inicio_afastamento:
+            dias_lib = just.dias_liberados_municipio or just.dias_solicitados or 1
+            for d_offset in range(dias_lib):
+                dt_afast = just.data_inicio_afastamento + timedelta(days=d_offset)
+                if dt_afast.year == ano and dt_afast.month == mes:
+                    dias_atestado.add(dt_afast.day)
+
     # Gera a lista de todos os dias do mês para o relatório
     import calendar
 
@@ -3263,6 +3279,7 @@ def gerar_relatorio_frequencia(func_id):
 
     dias_trabalhados = 0
     dias_faltosos = 0
+    dias_abonados = 0
     folha_mensal = []
 
     for dia in range(1, ultimo_dia + 1):
@@ -3270,14 +3287,25 @@ def gerar_relatorio_frequencia(func_id):
         dia_semana = data_atual.weekday()  # 0=Segunda, 6=Domingo
 
         batidas = pontos_por_dia.get(dia, [])
-        status = "PRESENÇA" if batidas else "FALTA"
+        tem_atestado = dia in dias_atestado
 
-        # Lógica de Faltas: Se for dia útil (seg a sex) e não tiver batida
+        if batidas:
+            status = "PRESENÇA"
+        elif tem_atestado:
+            status = "ATESTADO (ABONADO)"
+        elif dia_semana < 5:
+            status = "FALTA"
+        else:
+            status = "FINAL DE SEMANA"
+
+        # Lógica de Faltas: Se for dia útil (seg a sex)
         if dia_semana < 5:
-            if not batidas:
-                dias_faltosos += 1
-            else:
+            if batidas:
                 dias_trabalhados += 1
+            elif tem_atestado:
+                dias_abonados += 1
+            else:
+                dias_faltosos += 1
 
         folha_mensal.append(
             {
@@ -3286,7 +3314,7 @@ def gerar_relatorio_frequencia(func_id):
                     dia_semana
                 ],
                 "batidas": batidas,
-                "status": status if dia_semana < 5 else "FINAL DE SEMANA",
+                "status": status,
             }
         )
 
@@ -3297,6 +3325,7 @@ def gerar_relatorio_frequencia(func_id):
         resumo={
             "trabalhados": dias_trabalhados,
             "faltas": dias_faltosos,
+            "abonados": dias_abonados,
             "mes": mes_ref,
         },
     )
@@ -4537,6 +4566,26 @@ def api_atestados_reprovar():
     db.session.commit()
 
     return jsonify({"success": True, "message": "Solicitação Indeferida com Sucesso!"})
+
+
+@app.route("/admin/atestados/pdf/<int:id>")
+def atestado_parecer_pdf(id):
+    just = JustificativaFalta.query.get_or_404(id)
+
+    # Permite acesso se for usuário logado no admin ou se for o próprio servidor no portal
+    servidor_id = session.get("servidor_id")
+    if not current_user.is_authenticated and servidor_id != just.funcionario_id:
+        flash("Acesso não autorizado.", "danger")
+        return redirect(url_for("portal_servidor_login"))
+
+    data_emissao = datetime.now().strftime("%d/%m/%Y às %H:%M")
+
+    return render_template(
+        "atestado_parecer_pdf.html",
+        j=just,
+        data_emissao=data_emissao
+    )
+
 
 
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===

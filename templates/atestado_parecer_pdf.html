@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Parecer Técnico de Atestado - Protocolo {{ j.protocolo }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 12mm;
+        }
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 10pt;
+            color: #1f2937;
+            margin: 0;
+            padding: 0;
+            background: #fff;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid #065f46;
+            padding-bottom: 12px;
+            margin-bottom: 15px;
+        }
+        .header-logo {
+            height: 50px;
+            margin-right: 15px;
+        }
+        .header-title {
+            flex: 1;
+        }
+        .header-title h1 {
+            font-size: 13pt;
+            font-weight: 800;
+            margin: 0;
+            color: #065f46;
+            text-transform: uppercase;
+        }
+        .header-title h2 {
+            font-size: 10pt;
+            font-weight: 600;
+            margin: 2px 0 0 0;
+            color: #374151;
+            text-transform: uppercase;
+        }
+        .header-title p {
+            font-size: 8pt;
+            margin: 2px 0 0 0;
+            color: #6b7280;
+        }
+
+        .badge-protocolo {
+            float: right;
+            background: #ecfdf5;
+            border: 1px solid #10b981;
+            color: #047857;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 9pt;
+            font-family: monospace;
+        }
+
+        .doc-title {
+            text-align: center;
+            margin: 20px 0;
+            padding: 8px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+        }
+        .doc-title h3 {
+            margin: 0;
+            font-size: 11pt;
+            font-weight: 800;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .section {
+            margin-bottom: 15px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .section-header {
+            background: #f1f5f9;
+            border-bottom: 1px solid #cbd5e1;
+            padding: 6px 10px;
+            font-size: 8.5pt;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: #334155;
+            letter-spacing: 0.5px;
+        }
+        
+        .grid-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .grid-table td {
+            padding: 6px 10px;
+            border-right: 1px solid #e2e8f0;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: top;
+        }
+        .grid-table tr:last-child td {
+            border-bottom: none;
+        }
+        .grid-table td:last-child {
+            border-right: none;
+        }
+
+        .label {
+            display: block;
+            font-size: 6.5pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #64748b;
+            margin-bottom: 2px;
+        }
+        .value {
+            display: block;
+            font-size: 9.5pt;
+            font-weight: 700;
+            color: #0f172a;
+        }
+
+        .status-box {
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 5px;
+        }
+        .status-aprovado {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+        }
+        .status-rejeitado {
+            background: #fff1f2;
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+        }
+        .status-pendente {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            color: #92400e;
+        }
+
+        .status-title {
+            font-size: 11pt;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+
+        .signatures {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-around;
+            page-break-inside: avoid;
+        }
+        .sig-block {
+            width: 220px;
+            text-align: center;
+        }
+        .sig-line {
+            border-top: 1px solid #0f172a;
+            margin-bottom: 4px;
+        }
+        .sig-title {
+            font-size: 8.5pt;
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .sig-sub {
+            font-size: 7.5pt;
+            color: #64748b;
+        }
+
+        .footer {
+            margin-top: 30px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 8px;
+            font-size: 7.5pt;
+            color: #94a3b8;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        @media print {
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <img src="/static/logo.jpg" class="header-logo" onerror="this.style.display='none'">
+        <div class="header-title">
+            <h1>Prefeitura Municipal de Valença do Piauí</h1>
+            <h2>Secretaria Municipal de Educação - SEME</h2>
+            <p>Sistema Gestoor 360 • Módulo de Recursos Humanos & Frequência</p>
+        </div>
+        <div class="badge-protocolo">
+            PROTOCOL: {{ j.protocolo }}
+        </div>
+    </div>
+
+    <div class="doc-title">
+        <h3>PARECER TÉCNICO DE ATESTADO / JUSTIFICATIVA DE AUSÊNCIA</h3>
+    </div>
+
+    <!-- DADOS DO SERVIDOR -->
+    <div class="section">
+        <div class="section-header">1. Identificação do Servidor</div>
+        <table class="grid-table">
+            <tr>
+                <td width="60%">
+                    <span class="label">Nome Completo do Servidor</span>
+                    <span class="value">{{ j.funcionario.nome }}</span>
+                </td>
+                <td width="40%">
+                    <span class="label">CPF</span>
+                    <span class="value">{{ j.funcionario.cpf }}</span>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <span class="label">Cargo / Função</span>
+                    <span class="value">{{ j.funcionario.funcao.nome if j.funcionario.funcao else 'Não Informado' }}</span>
+                </td>
+                <td>
+                    <span class="label">Unidade de Lotação / Escola</span>
+                    <span class="value">{{ j.funcionario.local_trabalho.nome if j.funcionario.local_trabalho else (j.funcionario.secretaria.nome if j.funcionario.secretaria else 'SEME') }}</span>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- DADOS DO ATESTADO -->
+    <div class="section">
+        <div class="section-header">2. Detalhes da Solicitação de Ausência</div>
+        <table class="grid-table">
+            <tr>
+                <td width="50%">
+                    <span class="label">Data de Início do Afastamento</span>
+                    <span class="value">{{ j.data_inicio_afastamento.strftime('%d/%m/%Y') if j.data_inicio_afastamento else 'Não informada' }}</span>
+                </td>
+                <td width="25%">
+                    <span class="label">Dias Solicitados</span>
+                    <span class="value">{{ j.dias_solicitados }} dia(s)</span>
+                </td>
+                <td width="25%">
+                    <span class="label">Data de Envio</span>
+                    <span class="value">{{ j.data_solicitacao.strftime('%d/%m/%Y às %H:%M') if j.data_solicitacao else '---' }}</span>
+                </td>
+            </tr>
+            <tr>
+                <td colspan="3">
+                    <span class="label">Motivo Informado / Descrição</span>
+                    <span class="value">{{ j.motivo_ausencia }}</span>
+                </td>
+            </tr>
+            {% if j.crm_medico_ocr or j.cid_ocr %}
+            <tr>
+                <td width="50%">
+                    <span class="label">Médico Responsável (CRM)</span>
+                    <span class="value">{{ j.crm_medico_ocr or 'Não informado' }}</span>
+                </td>
+                <td colspan="2">
+                    <span class="label">Classificação Internacional de Doenças (CID)</span>
+                    <span class="value">{{ j.cid_ocr or 'Não informado' }}</span>
+                </td>
+            </tr>
+            {% endif %}
+        </table>
+    </div>
+
+    <!-- DECISÃO E PARECER DO RH -->
+    <div class="section">
+        <div class="section-header">3. Parecer e Decisão do Setor de Recursos Humanos</div>
+        <div style="padding: 10px;">
+            {% if j.status == 'APROVADO' %}
+                <div class="status-box status-aprovado">
+                    <div class="status-title">🟢 SOLICITAÇÃO DEFERIDA / APROVADA</div>
+                    <p style="margin: 0 0 6px 0; font-size: 9.5pt;">
+                        O Recursos Humanos da Secretaria Municipal de Educação aprovou a solicitação de ausência, concedendo o abono referente a 
+                        <strong>{{ j.dias_liberados_municipio }} dia(s)</strong> de afastamento.
+                    </p>
+                    {% if j.observacao_rh %}
+                        <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed #a7f3d0; font-size: 9pt;">
+                            <strong>Observações do RH:</strong> {{ j.observacao_rh }}
+                        </div>
+                    {% endif %}
+                </div>
+            {% elif j.status == 'REJEITADO' %}
+                <div class="status-box status-rejeitado">
+                    <div class="status-title">🔴 SOLICITAÇÃO INDEFERIDA / REJEITADA</div>
+                    <p style="margin: 0 0 6px 0; font-size: 9.5pt;">
+                        A solicitação de ausência foi indeferida pelo Setor de Recursos Humanos da SEME.
+                    </p>
+                    <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed #fecaca; font-size: 9pt;">
+                        <strong>Motivo do Indeferimento:</strong> {{ j.motivo_rejeicao or 'Não informado pelo analista.' }}
+                    </div>
+                </div>
+            {% else %}
+                <div class="status-box status-pendente">
+                    <div class="status-title">🟡 SOLICITAÇÃO PENDENTE DE ANÁLISE</div>
+                    <p style="margin: 0; font-size: 9.5pt;">
+                        Esta solicitação encontra-se em fase de auditoria pelo Setor de Recursos Humanos da SEME.
+                    </p>
+                </div>
+            {% endif %}
+
+            <table class="grid-table" style="margin-top: 12px; border: 1px solid #e2e8f0;">
+                <tr>
+                    <td width="50%">
+                        <span class="label">Analisado Por</span>
+                        <span class="value">{{ j.analisado_por_user.username if j.analisado_por_user else (current_user.username if current_user.is_authenticated else 'Sistema Gestoor RH') }}</span>
+                    </td>
+                    <td width="50%">
+                        <span class="label">Data / Hora da Análise</span>
+                        <span class="value">{{ j.data_analise.strftime('%d/%m/%Y às %H:%M') if j.data_analise else data_emissao }}</span>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- ASSINATURAS -->
+    <div class="signatures">
+        <div class="sig-block">
+            <div class="sig-line"></div>
+            <div class="sig-title">Assinatura do Servidor</div>
+            <div class="sig-sub">{{ j.funcionario.nome }}</div>
+        </div>
+        <div class="sig-block">
+            <div class="sig-line"></div>
+            <div class="sig-title">Recursos Humanos / Chefia</div>
+            <div class="sig-sub">SEME - Valença do Piauí</div>
+        </div>
+    </div>
+
+    <!-- RODAPÉ -->
+    <div class="footer">
+        <div>Documento emitido eletronicamente pelo Sistema Gestoor 360 em {{ data_emissao }}</div>
+        <div>Protocolo: {{ j.protocolo }}</div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            window.print();
+        };
+    </script>
+</body>
+</html>

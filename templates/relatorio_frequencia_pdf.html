@@ -11,6 +11,7 @@
         th, td { border: 1px solid #000; padding: 4px; text-align: center; }
         th { background: #f2f2f2; font-size: 8pt; text-transform: uppercase; }
         .falta { color: red; font-weight: bold; }
+        .atestado { color: #047857; font-weight: bold; }
         .resumo { margin-top: 15px; font-weight: bold; border: 1px solid #000; padding: 10px; }
         .assinaturas { margin-top: 50px; display: flex; justify-content: space-around; }
         .linha { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
@@ -53,7 +54,7 @@
                 <td>{{ d.batidas[1].data_hora.strftime('%H:%M') if d.batidas|length > 1 else '--:--' }}</td>
                 <td>{{ d.batidas[2].data_hora.strftime('%H:%M') if d.batidas|length > 2 else '--:--' }}</td>
                 <td>{{ d.batidas[3].data_hora.strftime('%H:%M') if d.batidas|length > 3 else '--:--' }}</td>
-                <td class="{{ 'falta' if d.status == 'FALTA' else '' }}">{{ d.status }}</td>
+                <td class="{{ 'falta' if d.status == 'FALTA' else ('atestado' if 'ATESTADO' in d.status else '') }}">{{ d.status }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -62,7 +63,8 @@
     <div class="resumo">
         RESUMO MENSAL: 
         DIAS TRABALHADOS: {{ resumo.trabalhados }} | 
-        DIAS FALTOSOS: {{ resumo.faltas }}[cite: 12]
+        DIAS ABONADOS (ATESTADO): {{ resumo.abonados or 0 }} | 
+        DIAS FALTOSOS: {{ resumo.faltas }}
     </div>
 
     <div class="assinaturas">
