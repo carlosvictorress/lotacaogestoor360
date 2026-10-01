@@ -230,5 +230,6 @@
         function fecharModal() { modal.classList.add('hidden'); }
         modal.addEventListener('click', (e) => { if (e.target === modal) fecharModal(); });
     </script>
+    <script src="{{ url_for('static', filename='js/inactivity.js') }}"></script>
 </body>
 </html>

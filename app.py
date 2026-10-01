@@ -10,12 +10,10 @@ import math
 import re  # <--- ADICIONE ESTA LINHA AQUI
 import base64
 import pytz
-from datetime import datetime
+from datetime import datetime, timedelta, date
 import sqlite3
 import json
 
-from datetime import date
-from datetime import date
 from flask import Flask, render_template, request, redirect, url_for, flash, Response, has_request_context, session, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
@@ -28,13 +26,20 @@ from flask_login import (
 )
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
-from datetime import datetime
 from sqlalchemy import func, text, event
 
 load_dotenv()
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "chave_secreta_local")
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=15)
+
+@app.before_request
+def refresh_session_on_request():
+    if current_user and current_user.is_authenticated:
+        session.permanent = True
+        session.modified = True
+
 # Pega a URL do banco da variável de ambiente (Railway) ou usa o SQLite local como plano B
 db_url = os.getenv("DATABASE_URL")
 
@@ -708,10 +713,21 @@ def inject_global_data():
 
 
 @app.route("/logout")
-@login_required
 def logout():
+    reason = request.args.get("reason")
     logout_user()
+    if reason == "inactivity":
+        flash("Sua sessão foi encerrada após 15 minutos de inatividade por motivos de segurança.", "warning")
     return redirect(url_for("login"))
+
+
+@app.route("/api/ping_session", methods=["POST", "GET"])
+def ping_session():
+    if current_user and current_user.is_authenticated:
+        session.permanent = True
+        session.modified = True
+        return jsonify({"success": True, "message": "Sessão renovada com sucesso."})
+    return jsonify({"success": False, "message": "Usuário não autenticado."}), 401
 
 
 @app.route("/validar", methods=["GET"])

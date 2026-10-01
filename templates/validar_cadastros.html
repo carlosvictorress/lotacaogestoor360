@@ -210,5 +210,6 @@
         function executeConfirmAction() { if(confirmUrl) window.location.href = confirmUrl; }
         window.addEventListener('click', function(e){ const d = document.getElementById('notificationDropdown'); const b = document.getElementById('notificationBtn'); if(d && !d.classList.contains('hidden') && !d.contains(e.target) && !b.contains(e.target)) d.classList.add('hidden'); });
     </script>
+    <script src="{{ url_for('static', filename='js/inactivity.js') }}"></script>
 </body>
 </html>
