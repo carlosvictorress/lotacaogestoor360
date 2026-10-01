@@ -60,10 +60,10 @@
                     <div id="listaAtivos" class="absolute z-20 w-full mt-2 bg-white rounded-2xl shadow-xl border border-slate-200/80 max-h-64 overflow-y-auto hidden custom-scroll divide-y divide-slate-100">
                         {% for a in ativos %}
                         <div class="item-ativo p-4 hover:bg-slate-50/80 cursor-pointer transition-colors flex justify-between items-center group" 
-                             onclick="selecionarServidor('{{ a.id }}', '{{ a.nome }}')">
+                             onclick="selecionarServidor('{{ a.id }}', '{{ a.nome }}', '{{ a.dt_inicio.strftime('%Y-%m-%d') if a.dt_inicio else '' }}')">
                             <div>
                                 <p class="text-sm font-bold text-slate-800 uppercase tracking-tight group-hover:text-blue-600 transition-colors">{{ a.nome }}</p>
-                                <p class="text-xs text-slate-400 font-mono mt-0.5">{{ a.cpf }}</p>
+                                <p class="text-xs text-slate-400 font-mono mt-0.5">{{ a.cpf }} {% if a.dt_inicio %}| Adm: {{ a.dt_inicio.strftime('%d/%m/%Y') }}{% endif %}</p>
                             </div>
                             <span class="text-xs font-semibold text-slate-400 bg-slate-100 px-2.5 py-1 rounded-md group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">Selecionar</span>
                         </div>
@@ -71,12 +71,63 @@
                     </div>
                 </div>
                 <input type="hidden" id="selectServidor">
+                <input type="hidden" id="selectServidorDtInicio">
                 <button id="btnGerar" disabled onclick="abrirModalRecisao()" 
                         class="bg-slate-900 text-white px-8 py-4 rounded-2xl font-bold text-sm hover:bg-slate-800 transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-100 disabled:cursor-not-allowed border border-slate-900 shadow-sm inline-flex items-center justify-center gap-2">
                     <i class="ph ph-file-text text-base"></i> Gerar Rescisão
                 </button>
             </div>
             <div id="nomeSelecionado" class="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-xl text-xs font-bold hidden"></div>
+        </div>
+
+        <!-- NOVO CARD: RESCISÃO EM MASSA POR LOCAL DE TRABALHO -->
+        <div class="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200/60 fade-in" style="animation-delay: 0.12s;">
+            <div class="flex items-center gap-3.5 mb-6">
+                <div class="w-11 h-11 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center shadow-inner">
+                    <i class="ph ph-users-three text-2xl font-bold"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-slate-900 tracking-tight">Rescisão em Massa por Local de Trabalho</h2>
+                    <p class="text-xs text-slate-400 font-medium">Encerre os contratos de múltiplos servidores contratados do mesmo local no final do ano</p>
+                </div>
+            </div>
+
+            <form action="{{ url_for('processar_recisao_massa') }}" method="POST" id="formRescisaoMassa" class="space-y-5">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Selecionar Local de Trabalho</label>
+                        <select name="local_id" id="selectLocalMassa" onchange="carregarServidoresLocalMassa()" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-sm font-semibold text-slate-800 focus:bg-white focus:border-purple-500 outline-none transition-all">
+                            <option value="">-- Selecione a Unidade / Escola --</option>
+                            {% for l in locais %}
+                            <option value="{{ l.id }}">{{ l.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1.5">Data de Demissão (Saída)</label>
+                        <input type="date" name="data_saida" id="dataSaidaMassa" required class="w-full bg-slate-50 border border-slate-200 rounded-2xl p-3.5 text-sm font-bold text-slate-800 focus:bg-white focus:border-rose-500 outline-none transition-all">
+                    </div>
+                </div>
+
+                <div id="containerServidoresMassa" class="hidden space-y-3 pt-2">
+                    <div class="flex items-center justify-between bg-slate-100/80 p-3.5 rounded-2xl border border-slate-200/50">
+                        <span class="text-xs font-extrabold text-slate-700 uppercase" id="lblQtdServidoresMassa">Servidores Encontrados: 0</span>
+                        <div class="flex items-center gap-3">
+                            <button type="button" onclick="marcarTodosMassa(true)" class="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline">Marcar Todos</button>
+                            <span class="text-slate-300">|</span>
+                            <button type="button" onclick="marcarTodosMassa(false)" class="text-xs font-bold text-slate-500 hover:text-slate-700 hover:underline">Desmarcar Todos</button>
+                        </div>
+                    </div>
+                    
+                    <div id="listaServidoresMassa" class="max-h-64 overflow-y-auto custom-scroll border border-slate-200 rounded-2xl p-3 space-y-2 bg-slate-50/50">
+                        <!-- Preenchido via AJAX -->
+                    </div>
+
+                    <button type="button" onclick="confirmarRescisaoMassa()" id="btnProcessarMassa" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-4 rounded-2xl font-bold text-sm shadow-lg shadow-rose-600/10 transition-all active:scale-[0.98] inline-flex items-center justify-center gap-2">
+                        <i class="ph ph-warning-circle text-lg font-bold"></i> Processar Rescisão em Massa
+                    </button>
+                </div>
+            </form>
         </div>
 
         <div class="bg-white rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden fade-in" style="animation-delay: 0.15s;">
@@ -205,6 +256,8 @@
     </div>
 
     <script>
+        let servidorDtInicioSelecionado = "";
+
         function filtrarAtivos() {
             const busca = document.getElementById('buscaServidorAtivo').value.toUpperCase();
             const lista = document.getElementById('listaAtivos');
@@ -218,8 +271,9 @@
             } else { lista.classList.add('hidden'); }
         }
 
-        function selecionarServidor(id, nome) {
+        function selecionarServidor(id, nome, dtInicio) {
             document.getElementById('selectServidor').value = id;
+            servidorDtInicioSelecionado = dtInicio || "";
             document.getElementById('buscaServidorAtivo').value = nome;
             document.getElementById('listaAtivos').classList.add('hidden');
             document.getElementById('btnGerar').disabled = false;
@@ -238,10 +292,96 @@
 
         function abrirModalRecisao() {
             document.getElementById('input_func_id').value = document.getElementById('selectServidor').value;
+            const inputIni = document.querySelector('input[name="data_inicio"]');
+            const inputSai = document.querySelector('input[name="data_saida"]');
+            if (servidorDtInicioSelecionado) {
+                inputIni.value = servidorDtInicioSelecionado;
+            }
+            if (!inputSai.value) {
+                inputSai.value = new Date().toISOString().split('T')[0];
+            }
             document.getElementById('modalRecisao').classList.remove('hidden');
         }
 
         function fecharModal() { document.getElementById('modalRecisao').classList.add('hidden'); }
+
+        // --- LÓGICA DE RESCISÃO EM MASSA POR LOCAL ---
+        function carregarServidoresLocalMassa() {
+            const localId = document.getElementById('selectLocalMassa').value;
+            const container = document.getElementById('containerServidoresMassa');
+            const lista = document.getElementById('listaServidoresMassa');
+            const lblCount = document.getElementById('lblQtdServidoresMassa');
+            const inputSaida = document.getElementById('dataSaidaMassa');
+
+            if(!inputSaida.value) {
+                inputSaida.value = new Date().toISOString().split('T')[0];
+            }
+
+            if(!localId) {
+                container.classList.add('hidden');
+                lista.innerHTML = "";
+                return;
+            }
+
+            fetch('/api/servidores_por_local?local_id=' + localId)
+            .then(res => res.json())
+            .then(data => {
+                lblCount.innerText = "Servidores Encontrados: " + data.length;
+                if(data.length === 0) {
+                    lista.innerHTML = '<p class="text-xs text-slate-400 font-medium py-4 text-center">Nenhum servidor ativo encontrado neste local.</p>';
+                    container.classList.remove('hidden');
+                    return;
+                }
+
+                let html = "";
+                data.forEach(s => {
+                    html += `
+                        <label class="flex items-center justify-between p-3 bg-white hover:bg-purple-50/50 rounded-xl cursor-pointer border border-slate-200/80 transition-colors">
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" name="func_ids" value="${s.id}" checked class="chk-massa w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500">
+                                <div>
+                                    <span class="text-xs font-bold text-slate-800 uppercase block">${s.nome}</span>
+                                    <span class="text-[11px] text-slate-400 font-mono">CPF: ${s.cpf} | ${s.funcao}</span>
+                                </div>
+                            </div>
+                            <span class="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">Adm: ${s.dt_inicio}</span>
+                        </label>
+                    `;
+                });
+                lista.innerHTML = html;
+                container.classList.remove('hidden');
+            })
+            .catch(err => {
+                console.error(err);
+                alert("Erro ao buscar servidores do local.");
+            });
+        }
+
+        function marcarTodosMassa(status) {
+            const chks = document.querySelectorAll('.chk-massa');
+            chks.forEach(c => c.checked = status);
+        }
+
+        function confirmarRescisaoMassa() {
+            const selecionados = document.querySelectorAll('.chk-massa:checked');
+            const dataSaida = document.getElementById('dataSaidaMassa').value;
+            const selectLocal = document.getElementById('selectLocalMassa');
+            const nomeLocal = selectLocal.options[selectLocal.selectedIndex].text;
+
+            if(selecionados.length === 0) {
+                alert("Por favor, selecione pelo menos um servidor para rescindir.");
+                return;
+            }
+            if(!dataSaida) {
+                alert("Por favor, preencha a Data de Demissão (Saída).");
+                return;
+            }
+
+            const confirmacao = confirm(`ATENÇÃO: Você está prestes a inativar e gerar rescisão contratual para ${selecionados.length} servidores do local "${nomeLocal}" com data de saída ${dataSaida}.\n\nDeseja confirmar esta operação em massa?`);
+            if(confirmacao) {
+                document.getElementById('formRescisaoMassa').submit();
+            }
+        }
 
         // Funções do Novo Modal de Edição Permanente via API
         function abrirModalEditarDados(id, nome, rg, endereco, numContrato) {

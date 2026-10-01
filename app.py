@@ -54,6 +54,36 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
+def executar_migracao_inicial():
+    with app.app_context():
+        try:
+            with db.engine.connect() as conn:
+                try:
+                    conn.execute(text("ALTER TABLE funcionario ADD COLUMN ativo BOOLEAN DEFAULT 1;"))
+                    conn.commit()
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text("UPDATE funcionario SET ativo = 1 WHERE ativo IS NULL;"))
+                    conn.commit()
+                except Exception:
+                    pass
+
+                try:
+                    conn.execute(text("ALTER TABLE user ADD COLUMN pergunta_troca_senha_exibida BOOLEAN DEFAULT 0;"))
+                    conn.commit()
+                except Exception:
+                    pass
+                try:
+                    conn.execute(text("UPDATE user SET pergunta_troca_senha_exibida = 0 WHERE pergunta_troca_senha_exibida IS NULL;"))
+                    conn.commit()
+                except Exception:
+                    pass
+        except Exception as e:
+            print("Aviso na migração inicial do banco:", e)
+
+executar_migracao_inicial()
+
 # --- MODELOS ---
 
 
@@ -97,6 +127,7 @@ class User(UserMixin, db.Model):
     secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=True)
     termo_aceito = db.Column(db.Boolean, default=False)
     termo_aceito_em = db.Column(db.DateTime, nullable=True)
+    pergunta_troca_senha_exibida = db.Column(db.Boolean, default=False)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -143,6 +174,7 @@ class HistoricoLotacao(db.Model):
 
 class Funcionario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    ativo = db.Column(db.Boolean, default=True)
     token_validacao = db.Column(
         db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4())
     )
@@ -854,12 +886,17 @@ def exportar_pendentes():
 @login_required
 def pagina_recisoes():
     # Servidores ativos para o select/busca
-    ativos = Funcionario.query.order_by(Funcionario.nome).all()
+    ativos = Funcionario.query.filter(
+        (Funcionario.ativo == True) | (Funcionario.ativo.is_(None))
+    ).order_by(Funcionario.nome).all()
+    
+    locais = LocalTrabalho.query.order_by(LocalTrabalho.nome).all()
+
     # Histórico de quem já saiu
     historico = RescisaoHistorico.query.order_by(
         RescisaoHistorico.data_geracao.desc()
     ).all()
-    return render_template("recisao_painel.html", ativos=ativos, historico=historico)
+    return render_template("recisao_painel.html", ativos=ativos, historico=historico, locais=locais)
 
 
 @app.route("/admin", methods=["GET", "POST"])
@@ -951,7 +988,7 @@ def admin_dashboard():
     filtro_local = request.args.get("local_trabalho_id")
     busca_termo = request.args.get("busca_termo")
 
-    query = Funcionario.query
+    query = Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
 
     if filtro_secretaria:
         query = query.filter_by(secretaria_id=filtro_secretaria)
@@ -979,6 +1016,7 @@ def admin_dashboard():
     stats_sec_query = (
         db.session.query(Secretaria.nome, func.count(Funcionario.id))
         .join(Funcionario)
+        .filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
         .group_by(Secretaria.nome)
         .all()
     )
@@ -986,6 +1024,7 @@ def admin_dashboard():
 
     stats_vinculo_query = (
         db.session.query(Funcionario.tipo_vinculo, func.count(Funcionario.id))
+        .filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
         .group_by(Funcionario.tipo_vinculo)
         .all()
     )
@@ -993,8 +1032,8 @@ def admin_dashboard():
         (v[0] if v[0] else "Não Informado"): v[1] for v in stats_vinculo_query
     }
 
-    count_validados = Funcionario.query.filter_by(validado=True).count()
-    count_pendentes = Funcionario.query.filter_by(validado=False).count()
+    count_validados = Funcionario.query.filter_by(validado=True).filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))).count()
+    count_pendentes = Funcionario.query.filter_by(validado=False).filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))).count()
     stats_validacao = {"Aptos": count_validados, "Pendentes": count_pendentes}
 
     locais_stats_query = db.session.query(
@@ -1076,7 +1115,7 @@ def processar_recisao():
         dt_sai = date.today()
 
     try:
-        # Salva no histórico carregando os dados completos do funcionário antes de excluí-lo!
+        # Salva no histórico carregando os dados completos do funcionário antes de inativá-lo!
         nova_rescisao = RescisaoHistorico(
             nome=funcionario.nome,
             cpf=funcionario.cpf,
@@ -1101,11 +1140,13 @@ def processar_recisao():
             "num_contrato": funcionario.num_vinculo
         }
 
-        HistoricoLotacao.query.filter_by(funcionario_id=funcionario.id).delete()
-        RegistroPonto.query.filter_by(funcionario_id=funcionario.id).delete()
+        # Não exclui o funcionário do banco; inativa o servidor mantendo seu histórico
+        funcionario.ativo = False
+        funcionario.dt_termino = dt_sai
+        if dt_ini:
+            funcionario.dt_inicio = dt_ini
 
         nome_servidor = funcionario.nome
-        db.session.delete(funcionario)
         db.session.commit()
         
         registrar_log("GEROU RESCISAO", nome_servidor)
@@ -1121,6 +1162,178 @@ def processar_recisao():
         db.session.rollback()
         flash(f"Erro ao processar baixa: {str(e)}", "error")
         return redirect(url_for("pagina_recisoes"))
+
+
+@app.route("/api/servidores_por_local")
+@login_required
+def api_servidores_por_local():
+    local_id = request.args.get("local_id")
+    if not local_id:
+        return jsonify([])
+    
+    servidores = Funcionario.query.filter(
+        Funcionario.local_trabalho_id == local_id,
+        (Funcionario.ativo == True) | (Funcionario.ativo.is_(None))
+    ).order_by(Funcionario.nome).all()
+
+    resultado = []
+    for s in servidores:
+        dt_ini_str = s.dt_inicio.strftime("%d/%m/%Y") if s.dt_inicio else "N/D"
+        resultado.append({
+            "id": s.id,
+            "nome": s.nome,
+            "cpf": s.cpf or "N/D",
+            "funcao": s.funcao.nome if s.funcao else "N/A",
+            "dt_inicio": dt_ini_str,
+            "dt_inicio_iso": s.dt_inicio.strftime("%Y-%m-%d") if s.dt_inicio else ""
+        })
+    return jsonify(resultado)
+
+
+@app.route("/processar_recisao_massa", methods=["POST"])
+@login_required
+def processar_recisao_massa():
+    local_id = request.form.get("local_id")
+    data_saida_str = request.form.get("data_saida")
+    func_ids = request.form.getlist("func_ids")
+
+    dt_sai = parse_date(data_saida_str) or date.today()
+
+    if not func_ids:
+        flash("Nenhum servidor foi selecionado para rescisão em massa.", "error")
+        return redirect(url_for("pagina_recisoes"))
+
+    local_obj = db.session.get(LocalTrabalho, local_id) if local_id else None
+    local_nome = local_obj.nome if local_obj else "Local Desconhecido"
+
+    count = 0
+    try:
+        for fid in func_ids:
+            func = db.session.get(Funcionario, int(fid))
+            if func and (func.ativo is True or func.ativo is None):
+                dt_ini = func.dt_inicio or date.today()
+                nova_rescisao = RescisaoHistorico(
+                    nome=func.nome,
+                    cpf=func.cpf,
+                    rg=func.rg,
+                    endereco=func.endereco,
+                    funcao=func.funcao.nome if func.funcao else "N/A",
+                    num_contrato=func.num_vinculo,
+                    data_inicio=dt_ini,
+                    data_saida=dt_sai,
+                )
+                db.session.add(nova_rescisao)
+
+                func.ativo = False
+                func.dt_termino = dt_sai
+                count += 1
+
+        db.session.commit()
+        registrar_log("RESCISAO EM MASSA", f"{count} servidores inativados em {local_nome}")
+        flash(f"Rescisão em massa concluída com sucesso! {count} servidores foram inativados.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Erro ao processar rescisão em massa: {str(e)}", "error")
+
+    return redirect(url_for("pagina_recisoes"))
+
+
+@app.route("/api/buscar_servidor_inativo_cpf")
+@login_required
+def buscar_servidor_inativo_cpf():
+    cpf_raw = request.args.get("cpf", "").strip()
+    cpf_clean = re.sub(r"\D", "", cpf_raw)
+    if not cpf_clean or len(cpf_clean) != 11:
+        return jsonify({"encontrado": False})
+    
+    funcionarios = Funcionario.query.all()
+    func_inativo = None
+    for f in funcionarios:
+        if f.cpf and re.sub(r"\D", "", f.cpf) == cpf_clean and f.ativo is False:
+            func_inativo = f
+            break
+            
+    if not func_inativo:
+        return jsonify({"encontrado": False})
+        
+    return jsonify({
+        "encontrado": True,
+        "funcionario": {
+            "id": func_inativo.id,
+            "nome": func_inativo.nome or "",
+            "cpf": func_inativo.cpf or "",
+            "rg": func_inativo.rg or "",
+            "orgao_emissor_rg": func_inativo.orgao_emissor_rg or "",
+            "data_expedicao_rg": func_inativo.data_expedicao_rg.strftime("%Y-%m-%d") if func_inativo.data_expedicao_rg else "",
+            "data_nasc": func_inativo.data_nasc.strftime("%Y-%m-%d") if func_inativo.data_nasc else "",
+            "genero": func_inativo.genero or "",
+            "estado_civil": func_inativo.estado_civil or "",
+            "nacionalidade": func_inativo.nacionalidade or "BRASILEIRA",
+            "mae": func_inativo.mae or "",
+            "pai": func_inativo.pai or "",
+            "escolaridade": func_inativo.escolaridade or "",
+            "especialidade": func_inativo.especialidade or "",
+            "telefone": func_inativo.telefone or "",
+            "email": func_inativo.email or "",
+            "cep": func_inativo.cep or "",
+            "bairro": func_inativo.bairro or "",
+            "cidade": func_inativo.cidade or "VALENÇA DO PIAUÍ",
+            "uf": func_inativo.uf or "PI",
+            "endereco": func_inativo.endereco or "",
+            "pis": func_inativo.pis or "",
+            "titulo_eleitor": func_inativo.titulo_eleitor or "",
+            "zona_eleitoral": func_inativo.zona_eleitoral or "",
+            "secao_eleitoral": func_inativo.secao_eleitoral or "",
+            "is_pcd": "sim" if func_inativo.is_pcd else "nao",
+            "tipo_deficiencia": func_inativo.tipo_deficiencia or "",
+            "qtd_dependentes": func_inativo.qtd_dependentes or 0,
+            "ctps": func_inativo.ctps or "",
+            "cnh": func_inativo.cnh or "",
+            "banco": func_inativo.banco or "",
+            "agencia": func_inativo.agencia or "",
+            "conta": func_inativo.conta or "",
+            "tipo_conta": func_inativo.tipo_conta or "",
+            "contato_emergencia_nome": func_inativo.contato_emergencia_nome or "",
+            "contato_emergencia_tel": func_inativo.contato_emergencia_tel or "",
+            "tipo_sanguineo": func_inativo.tipo_sanguineo or "",
+            "funcao_id": func_inativo.funcao_id or "",
+            "local_trabalho_id": func_inativo.local_trabalho_id or "",
+            "tipo_vinculo": func_inativo.tipo_vinculo or "",
+            "remuneracao": func_inativo.remuneracao or "",
+            "jornada_trabalho": func_inativo.jornada_trabalho or "",
+        }
+    })
+
+
+@app.route("/api/alterar_minha_senha", methods=["POST"])
+@login_required
+def api_alterar_minha_senha():
+    try:
+        data = request.get_json() or request.form
+        nova_senha = data.get("nova_senha")
+        if not nova_senha or len(nova_senha.strip()) < 3:
+            return jsonify({"success": False, "message": "A nova senha deve ter pelo menos 3 caracteres."}), 400
+
+        current_user.set_password(nova_senha)
+        current_user.pergunta_troca_senha_exibida = True
+        db.session.commit()
+        registrar_log("REDEFINIU SENHA PROPRIA", current_user.username)
+        return jsonify({"success": True, "message": "Senha alterada com sucesso!"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@app.route("/api/dispensar_troca_senha", methods=["POST"])
+@login_required
+def api_dispensar_troca_senha():
+    try:
+        current_user.pergunta_troca_senha_exibida = True
+        db.session.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 500
 
 
 @app.route("/admin/editar_local", methods=["POST"])
@@ -1232,6 +1445,7 @@ def update_user():
         new_password = request.form.get("password")
         if new_password:
             u.set_password(new_password)
+            u.pergunta_troca_senha_exibida = False
 
         # Secretaria e Role
         sec_id = request.form.get("secretaria_id")
@@ -1402,7 +1616,7 @@ def exportar_excel():
     filtro_local = request.args.get("local_trabalho_id")
 
     # 3. Construção da Query filtrada
-    query = Funcionario.query
+    query = Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
     if filtro_secretaria:
         query = query.filter_by(secretaria_id=filtro_secretaria)
     if filtro_vinculo:
@@ -1777,7 +1991,7 @@ def sistema():
 
         return redirect(url_for("sistema"))
 
-    query = Funcionario.query
+    query = Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
     if not current_user.is_admin:
         query = query.filter_by(secretaria_id=current_user.secretaria_id)
     lista_funcionarios = query.order_by(Funcionario.id.desc()).all()
@@ -3051,12 +3265,11 @@ def gerar_rescisao_excluir(id):
             "funcao_nome": funcionario.funcao.nome if funcionario.funcao else "N/A",
         }
 
-        registrar_log("RESCISAO E EXCLUSAO", funcionario.nome)
+        registrar_log("RESCISAO DE SERVIDOR", funcionario.nome)
 
-        HistoricoLotacao.query.filter_by(funcionario_id=id).delete()
-        RegistroPonto.query.filter_by(funcionario_id=id).delete()
-
-        db.session.delete(funcionario)
+        funcionario.ativo = False
+        if not funcionario.dt_termino:
+            funcionario.dt_termino = date.today()
         db.session.commit()
 
         meses = [
@@ -3458,7 +3671,7 @@ def api_salvar_dados_rescisao():
 def relatorio_pessoal():
     # Aqui recuperamos todos os funcionários do banco de dados (exemplo usando SQLAlchemy)
     # Ajuste 'Funcionario' para o nome da sua classe de modelo se for diferente
-    funcionarios = Funcionario.query.all() 
+    funcionarios = Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))).all() 
     
     return render_template('relatorio_pessoal.html', funcionarios=funcionarios)    
 

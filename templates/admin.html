@@ -2518,6 +2518,88 @@ function abrirModalAuditoria(btn) {
             document.getElementById('modalEditarFuncao').classList.add('hidden');
         }
     </script>
+
+    <!-- MODAL: REDEFINIR SENHA (EXIBIDO APENAS 1 VEZ) -->
+    {% if current_user.is_authenticated and not current_user.pergunta_troca_senha_exibida %}
+    <div id="modalTrocaSenhaPrompt" class="fixed inset-0 bg-gray-900/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl p-6 md:p-8 max-w-md w-full shadow-2xl border border-gray-100 dark:border-gray-700 text-center space-y-5">
+            <div class="w-14 h-14 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-2xl flex items-center justify-center mx-auto shadow-inner">
+                <i class="ph ph-key text-3xl font-bold"></i>
+            </div>
+            <div>
+                <h3 class="text-xl font-extrabold text-gray-900 dark:text-white">Deseja Redefinir sua Senha?</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1 font-medium">Sua senha foi cadastrada pela administração. Para sua segurança, você pode redefini-la agora.</p>
+            </div>
+
+            <div id="formTrocaSenhaCamposAdmin" class="hidden text-left space-y-3 pt-2">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Nova Senha</label>
+                    <input type="password" id="novaSenhaInputAdmin" class="w-full border border-gray-200 p-2.5 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Confirmar Nova Senha</label>
+                    <input type="password" id="confirmaSenhaInputAdmin" class="w-full border border-gray-200 p-2.5 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white outline-none focus:border-blue-500">
+                </div>
+                <p id="msgErroTrocaSenhaAdmin" class="text-xs text-rose-600 font-bold hidden"></p>
+            </div>
+
+            <div class="flex flex-col gap-2 pt-2">
+                <button type="button" id="btnQueroAlterarSenhaAdmin" onclick="mostrarCamposSenhaAdmin()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold text-sm shadow-md transition-all">
+                    Sim, Quero Alterar Minha Senha
+                </button>
+                <button type="button" id="btnSalvarNovaSenhaAdmin" onclick="salvarNovaSenhaPromptAdmin()" class="hidden w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3.5 rounded-xl font-bold text-sm shadow-md transition-all">
+                    Salvar Nova Senha
+                </button>
+                <button type="button" onclick="dispensarTrocaSenhaPromptAdmin()" class="w-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 text-gray-700 dark:text-gray-200 py-3 rounded-xl font-semibold text-xs transition-all">
+                    Manter Senha Atual (Não alterar)
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+    function mostrarCamposSenhaAdmin() {
+        document.getElementById('formTrocaSenhaCamposAdmin').classList.remove('hidden');
+        document.getElementById('btnQueroAlterarSenhaAdmin').classList.add('hidden');
+        document.getElementById('btnSalvarNovaSenhaAdmin').classList.remove('hidden');
+    }
+    function salvarNovaSenhaPromptAdmin() {
+        const s1 = document.getElementById('novaSenhaInputAdmin').value;
+        const s2 = document.getElementById('confirmaSenhaInputAdmin').value;
+        const err = document.getElementById('msgErroTrocaSenhaAdmin');
+        if(!s1 || s1.length < 3) {
+            err.innerText = "A senha deve conter pelo menos 3 caracteres.";
+            err.classList.remove('hidden');
+            return;
+        }
+        if(s1 !== s2) {
+            err.innerText = "As senhas não coincidem.";
+            err.classList.remove('hidden');
+            return;
+        }
+        fetch('/api/alterar_minha_senha', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nova_senha: s1 })
+        }).then(r => r.json()).then(d => {
+            if(d.success) {
+                alert("Senha alterada com sucesso!");
+                document.getElementById('modalTrocaSenhaPrompt').remove();
+            } else {
+                err.innerText = d.message || "Erro ao alterar senha.";
+                err.classList.remove('hidden');
+            }
+        });
+    }
+    function dispensarTrocaSenhaPromptAdmin() {
+        fetch('/api/dispensar_troca_senha', { method: 'POST' })
+        .then(() => {
+            if(document.getElementById('modalTrocaSenhaPrompt')) {
+                document.getElementById('modalTrocaSenhaPrompt').remove();
+            }
+        });
+    }
+    </script>
+    {% endif %}
 </body>
 
 </html>
