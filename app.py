@@ -1306,6 +1306,116 @@ def api_dispensar_troca_senha():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
+@app.route("/api/varredura_duplicados")
+@login_required
+def api_varredura_duplicados():
+    if not current_user.is_admin:
+        return jsonify({"success": False, "message": "Acesso não autorizado."}), 403
+
+    funcionarios = Funcionario.query.all()
+    grupos_cpf = {}
+
+    for f in funcionarios:
+        if not f.cpf:
+            continue
+        cpf_clean = re.sub(r"\D", "", f.cpf)
+        if len(cpf_clean) != 11:
+            continue
+        if cpf_clean not in grupos_cpf:
+            grupos_cpf[cpf_clean] = []
+        grupos_cpf[cpf_clean].append(f)
+
+    grupos_duplicados = []
+    total_duplicados = 0
+
+    for cpf_clean, lista in grupos_cpf.items():
+        if len(lista) >= 2:
+            # Ordenação: o registro mais antigo (menor ID) ou o validado é considerado o Original
+            lista_ordenada = sorted(lista, key=lambda x: (not x.validado, x.id))
+            original = lista_ordenada[0]
+            duplicados = lista_ordenada[1:]
+            total_duplicados += len(duplicados)
+
+            cpf_fmt = f"{cpf_clean[:3]}.{cpf_clean[3:6]}.{cpf_clean[6:9]}-{cpf_clean[9:]}"
+            
+            orig_dt = original.data_criacao.strftime("%d/%m/%Y") if original.data_criacao else "N/D"
+            
+            duplicados_data = []
+            for dup in duplicados:
+                dup_dt = dup.data_criacao.strftime("%d/%m/%Y") if dup.data_criacao else "N/D"
+                duplicados_data.append({
+                    "id": dup.id,
+                    "nome": dup.nome,
+                    "cpf": dup.cpf or cpf_fmt,
+                    "data_criacao": dup_dt,
+                    "num_vinculo": dup.num_vinculo or "N/D",
+                    "tipo_vinculo": dup.tipo_vinculo or "N/D",
+                    "secretaria": dup.lotacao or (dup.secretaria.nome if dup.secretaria else "N/D"),
+                    "local": dup.local_trabalho.nome if dup.local_trabalho else "N/D",
+                    "funcao": dup.funcao.nome if dup.funcao else "N/D",
+                    "validado": dup.validado,
+                    "ativo": dup.ativo
+                })
+
+            grupos_duplicados.append({
+                "cpf_clean": cpf_clean,
+                "cpf_formatado": cpf_fmt,
+                "total_no_grupo": len(lista),
+                "original": {
+                    "id": original.id,
+                    "nome": original.nome,
+                    "cpf": original.cpf or cpf_fmt,
+                    "data_criacao": orig_dt,
+                    "num_vinculo": original.num_vinculo or "N/D",
+                    "tipo_vinculo": original.tipo_vinculo or "N/D",
+                    "secretaria": original.lotacao or (original.secretaria.nome if original.secretaria else "N/D"),
+                    "local": original.local_trabalho.nome if original.local_trabalho else "N/D",
+                    "funcao": original.funcao.nome if original.funcao else "N/D",
+                    "validado": original.validado,
+                    "ativo": original.ativo
+                },
+                "duplicados": duplicados_data
+            })
+
+    return jsonify({
+        "success": True,
+        "total_grupos": len(grupos_duplicados),
+        "total_duplicados": total_duplicados,
+        "grupos": grupos_duplicados
+    })
+
+
+@app.route("/api/excluir_duplicado/<int:func_id>", methods=["POST"])
+@login_required
+def api_excluir_duplicado(func_id):
+    if not current_user.is_admin:
+        return jsonify({"success": False, "message": "Acesso não autorizado."}), 403
+
+    ficha = db.session.get(Funcionario, func_id)
+    if not ficha:
+        return jsonify({"success": False, "message": "Registro não encontrado."}), 404
+
+    try:
+        nome_servidor = ficha.nome
+        cpf_servidor = ficha.cpf or "N/D"
+
+        # Limpa relacionamentos de movimentação e ponto antes de deletar o duplicado
+        HistoricoLotacao.query.filter_by(funcionario_id=func_id).delete()
+        RegistroPonto.query.filter_by(funcionario_id=func_id).delete()
+
+        db.session.delete(ficha)
+        db.session.commit()
+
+        registrar_log("EXCLUIU CADASTRO DUPLICADO", f"{nome_servidor} (CPF: {cpf_servidor}, ID #{func_id})")
+        return jsonify({
+            "success": True,
+            "message": f"Cadastro duplicado #{func_id} de {nome_servidor} foi excluído permanentemente. O registro original foi mantido seguro."
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Erro ao excluir duplicado: {str(e)}"}), 500
+
+
 @app.route("/admin/editar_local", methods=["POST"])
 @login_required
 def editar_local():
