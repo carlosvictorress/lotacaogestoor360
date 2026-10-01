@@ -54,36 +54,6 @@ db = SQLAlchemy(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
-def executar_migracao_inicial():
-    with app.app_context():
-        try:
-            with db.engine.connect() as conn:
-                try:
-                    conn.execute(text("ALTER TABLE funcionario ADD COLUMN ativo BOOLEAN DEFAULT 1;"))
-                    conn.commit()
-                except Exception:
-                    pass
-                try:
-                    conn.execute(text("UPDATE funcionario SET ativo = 1 WHERE ativo IS NULL;"))
-                    conn.commit()
-                except Exception:
-                    pass
-
-                try:
-                    conn.execute(text("ALTER TABLE user ADD COLUMN pergunta_troca_senha_exibida BOOLEAN DEFAULT 0;"))
-                    conn.commit()
-                except Exception:
-                    pass
-                try:
-                    conn.execute(text("UPDATE user SET pergunta_troca_senha_exibida = 0 WHERE pergunta_troca_senha_exibida IS NULL;"))
-                    conn.commit()
-                except Exception:
-                    pass
-        except Exception as e:
-            print("Aviso na migração inicial do banco:", e)
-
-executar_migracao_inicial()
-
 # --- MODELOS ---
 
 
@@ -2093,6 +2063,7 @@ def atualizar_schema():
                 ("contato_emergencia_nome", "VARCHAR(150)"),
                 ("contato_emergencia_tel", "VARCHAR(20)"),
                 ("tipo_sanguineo", "VARCHAR(5)"),
+                ("ativo", "BOOLEAN DEFAULT TRUE"),
             ]
 
             # 2. Colunas para a tabela 'local_trabalho'
@@ -2179,10 +2150,11 @@ def atualizar_schema():
                 except Exception as e:
                     conn.rollback()
 
-            # 6. Novas colunas para a tabela 'user' (Aceite do Termo de Responsabilidade)
+            # 6. Novas colunas para a tabela 'user' (Aceite do Termo de Responsabilidade e Redefinição de Senha)
             colunas_user = [
                 ("termo_aceito", "BOOLEAN DEFAULT FALSE"),
-                ("termo_aceito_em", "TIMESTAMP")
+                ("termo_aceito_em", "TIMESTAMP"),
+                ("pergunta_troca_senha_exibida", "BOOLEAN DEFAULT FALSE")
             ]
             for col, tipo in colunas_user:
                 try:
@@ -2191,6 +2163,19 @@ def atualizar_schema():
                     print(f"SUCESSO: Coluna '{col}' adicionada em 'user'.")
                 except Exception as e:
                     conn.rollback()
+
+            # Garante valores default sem NULL para as colunas de controle
+            try:
+                conn.execute(text("UPDATE funcionario SET ativo = TRUE WHERE ativo IS NULL"))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+
+            try:
+                conn.execute(text("UPDATE \"user\" SET pergunta_troca_senha_exibida = FALSE WHERE pergunta_troca_senha_exibida IS NULL"))
+                conn.commit()
+            except Exception:
+                conn.rollback()
 
             # 5. Migração automática do nome da Função de Apoio (no Railway PostgreSQL e SQLite local)
             try:
