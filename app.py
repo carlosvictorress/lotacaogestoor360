@@ -407,6 +407,46 @@ class JustificativaFalta(db.Model):
     analisado_por_user = db.relationship("User", backref=db.backref("justificativas_analisadas", lazy=True))
 
 
+class LocalVotacao(db.Model):
+    __tablename__ = "local_votacao"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(150), nullable=False)
+    zona_eleitoral = db.Column(db.String(20), nullable=False, default="026")
+    secoes = db.Column(db.Text, nullable=False)  # Ex: "0012, 0013, 0014, 0015"
+    bairro = db.Column(db.String(100), nullable=True)
+    endereco = db.Column(db.String(200), nullable=True)
+    cidade = db.Column(db.String(100), default="Valença do Piauí")
+    uf = db.Column(db.String(2), default="PI")
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    observacoes = db.Column(db.Text, nullable=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def get_secoes_list(self):
+        if not self.secoes:
+            return []
+        raw_items = re.split(r'[,;\s]+', str(self.secoes))
+        return [item.strip() for item in raw_items if item.strip()]
+
+    def get_secoes_normalized(self):
+        result = set()
+        for item in self.get_secoes_list():
+            norm = normalizar_numero_eleitoral(item)
+            if norm:
+                result.add(norm)
+        return result
+
+
+def normalizar_numero_eleitoral(val):
+    if not val:
+        return ""
+    digits = re.sub(r'\D', '', str(val))
+    if not digits:
+        return ""
+    return digits.lstrip('0') or "0"
+
+
 def gerar_proximo_numero_contrato(ano=None):
     if not ano:
         ano = datetime.now().year
@@ -4912,6 +4952,275 @@ def atestado_parecer_pdf(id):
     return render_template(
         "atestado_parecer_pdf.html",
         j=just,
+        data_emissao=data_emissao
+    )
+
+
+# ==========================================
+# MÓDULO DE MAPEAMENTO ELEITORAL & LOCAIS DE VOTAÇÃO
+# ==========================================
+
+@app.route("/eleitoral", methods=["GET"])
+@login_required
+def eleitoral_index():
+    sec_id = request.args.get("secretaria_id", type=int)
+    busca = request.args.get("busca", "").strip()
+
+    secretarias = Secretaria.query.order_by(Secretaria.nome).all()
+    locais = LocalVotacao.query.order_by(LocalVotacao.nome).all()
+
+    query_func = Funcionario.query.filter_by(ativo=True)
+    if sec_id:
+        query_func = query_func.filter_by(secretaria_id=sec_id)
+    
+    funcionarios = query_func.all()
+
+    locais_dados = []
+    mapeados_ids = set()
+
+    for loc in locais:
+        if busca and busca.lower() not in loc.nome.lower() and busca.lower() not in (loc.bairro or "").lower() and busca not in loc.secoes:
+            continue
+
+        sec_norm_set = loc.get_secoes_normalized()
+        loc_zona_norm = normalizar_numero_eleitoral(loc.zona_eleitoral)
+
+        funcs_no_local = []
+        for f in funcionarios:
+            f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
+            f_sec_norm = normalizar_numero_eleitoral(f.secao_eleitoral)
+
+            zona_matches = (not f_zona_norm or f_zona_norm == loc_zona_norm)
+            if zona_matches and f_sec_norm and f_sec_norm in sec_norm_set:
+                funcs_no_local.append(f)
+                mapeados_ids.add(f.id)
+
+        por_secretaria = {}
+        for f in funcs_no_local:
+            sec_nome = f.secretaria.nome if f.secretaria else "Sem Secretaria"
+            por_secretaria[sec_nome] = por_secretaria.get(sec_nome, 0) + 1
+
+        locais_dados.append({
+            "local": loc,
+            "total_servidores": len(funcs_no_local),
+            "por_secretaria": por_secretaria,
+            "secoes_lista": loc.get_secoes_list()
+        })
+
+    total_servidores = len(funcionarios)
+    total_com_titulo = sum(1 for f in funcionarios if f.titulo_eleitor or f.secao_eleitoral)
+    total_mapeados = len(mapeados_ids)
+    total_pendentes = total_servidores - total_mapeados
+
+    top_locais = sorted(locais_dados, key=lambda x: x["total_servidores"], reverse=True)[:5]
+
+    return render_template(
+        "locais_votacao.html",
+        locais_dados=locais_dados,
+        secretarias=secretarias,
+        sec_id_selecionado=sec_id,
+        busca=busca,
+        stats={
+            "total_servidores": total_servidores,
+            "total_com_titulo": total_com_titulo,
+            "total_mapeados": total_mapeados,
+            "total_pendentes": total_pendentes,
+            "total_locais": len(locais),
+            "top_locais": top_locais
+        }
+    )
+
+
+@app.route("/eleitoral/local/novo", methods=["POST"])
+@login_required
+def eleitoral_local_novo():
+    nome = request.form.get("nome", "").strip()
+    zona_eleitoral = request.form.get("zona_eleitoral", "026").strip()
+    secoes = request.form.get("secoes", "").strip()
+    bairro = request.form.get("bairro", "").strip()
+    endereco = request.form.get("endereco", "").strip()
+    observacoes = request.form.get("observacoes", "").strip()
+
+    if not nome or not secoes:
+        flash("Nome do Colégio e Seções são obrigatórios!", "danger")
+        return redirect(url_for("eleitoral_index"))
+
+    novo_local = LocalVotacao(
+        nome=nome,
+        zona_eleitoral=zona_eleitoral,
+        secoes=secoes,
+        bairro=bairro,
+        endereco=endereco,
+        observacoes=observacoes
+    )
+    db.session.add(novo_local)
+
+    log = LogAuditoria(
+        usuario_id=current_user.id,
+        acao="Cadastrou Local de Votação"[:50],
+        alvo=f"Local: {nome} | Z: {zona_eleitoral} | Seções: {secoes}"[:250]
+    )
+    db.session.add(log)
+    db.session.commit()
+
+    flash(f"Local de Votação '{nome}' cadastrado com sucesso!", "success")
+    return redirect(url_for("eleitoral_index"))
+
+
+@app.route("/eleitoral/local/<int:id>/editar", methods=["POST"])
+@login_required
+def eleitoral_local_editar(id):
+    local = LocalVotacao.query.get_or_404(id)
+
+    local.nome = request.form.get("nome", local.nome).strip()
+    local.zona_eleitoral = request.form.get("zona_eleitoral", local.zona_eleitoral).strip()
+    local.secoes = request.form.get("secoes", local.secoes).strip()
+    local.bairro = request.form.get("bairro", local.bairro).strip()
+    local.endereco = request.form.get("endereco", local.endereco).strip()
+    local.observacoes = request.form.get("observacoes", local.observacoes).strip()
+
+    log = LogAuditoria(
+        usuario_id=current_user.id,
+        acao=f"Editou Local Votação ID {id}"[:50],
+        alvo=f"Local: {local.nome} | Seções: {local.secoes}"[:250]
+    )
+    db.session.add(log)
+    db.session.commit()
+
+    flash(f"Local de Votação '{local.nome}' atualizado!", "success")
+    return redirect(url_for("eleitoral_index"))
+
+
+@app.route("/eleitoral/local/<int:id>/excluir", methods=["POST"])
+@login_required
+def eleitoral_local_excluir(id):
+    local = LocalVotacao.query.get_or_404(id)
+    nome = local.nome
+
+    db.session.delete(local)
+    log = LogAuditoria(
+        usuario_id=current_user.id,
+        acao=f"Excluiu Local Votação ID {id}"[:50],
+        alvo=f"Local Excluído: {nome}"[:250]
+    )
+    db.session.add(log)
+    db.session.commit()
+
+    flash(f"Local de Votação '{nome}' excluído com sucesso.", "warning")
+    return redirect(url_for("eleitoral_index"))
+
+
+@app.route("/api/eleitoral/local/<int:id>/servidores", methods=["GET"])
+@login_required
+def api_eleitoral_servidores_local(id):
+    local = LocalVotacao.query.get_or_404(id)
+    sec_id = request.args.get("secretaria_id", type=int)
+
+    sec_norm_set = local.get_secoes_normalized()
+    loc_zona_norm = normalizar_numero_eleitoral(local.zona_eleitoral)
+
+    query = Funcionario.query.filter_by(ativo=True)
+    if sec_id:
+        query = query.filter_by(secretaria_id=sec_id)
+
+    funcionarios = query.all()
+    resultado = []
+
+    for f in funcionarios:
+        f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
+        f_sec_norm = normalizar_numero_eleitoral(f.secao_eleitoral)
+
+        zona_matches = (not f_zona_norm or f_zona_norm == loc_zona_norm)
+        if zona_matches and f_sec_norm and f_sec_norm in sec_norm_set:
+            resultado.append({
+                "id": f.id,
+                "nome": f.nome,
+                "cpf": f.cpf or "---",
+                "funcao": f.funcao.nome if f.funcao else "---",
+                "secretaria": f.secretaria.nome if f.secretaria else "---",
+                "local_trabalho": f.local_trabalho.nome if f.local_trabalho else "---",
+                "zona": f.zona_eleitoral or local.zona_eleitoral,
+                "secao": f.secao_eleitoral or "---",
+                "telefone": f.telefone or "---"
+            })
+
+    resultado.sort(key=lambda x: x["nome"])
+
+    return jsonify({
+        "success": True,
+        "local": {
+            "id": local.id,
+            "nome": local.nome,
+            "zona": local.zona_eleitoral,
+            "secoes": local.secoes,
+            "bairro": local.bairro or "---",
+            "endereco": local.endereco or "---"
+        },
+        "total": len(resultado),
+        "servidores": resultado
+    })
+
+
+@app.route("/eleitoral/pdf", methods=["GET"])
+@login_required
+def eleitoral_pdf():
+    tipo = request.args.get("tipo", "sintetico")
+    sec_id = request.args.get("secretaria_id", type=int)
+    local_id = request.args.get("local_id", type=int)
+
+    sec_selecionada = Secretaria.query.get(sec_id) if sec_id else None
+
+    if local_id:
+        locais = LocalVotacao.query.filter_by(id=local_id).all()
+    else:
+        locais = LocalVotacao.query.order_by(LocalVotacao.nome).all()
+
+    query_func = Funcionario.query.filter_by(ativo=True)
+    if sec_id:
+        query_func = query_func.filter_by(secretaria_id=sec_id)
+    funcionarios = query_func.all()
+
+    relatorio_dados = []
+    total_geral_eleitores = 0
+
+    for loc in locais:
+        sec_norm_set = loc.get_secoes_normalized()
+        loc_zona_norm = normalizar_numero_eleitoral(loc.zona_eleitoral)
+
+        funcs_no_local = []
+        for f in funcionarios:
+            f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
+            f_sec_norm = normalizar_numero_eleitoral(f.secao_eleitoral)
+
+            zona_matches = (not f_zona_norm or f_zona_norm == loc_zona_norm)
+            if zona_matches and f_sec_norm and f_sec_norm in sec_norm_set:
+                funcs_no_local.append(f)
+
+        if funcs_no_local:
+            funcs_no_local.sort(key=lambda x: (x.secao_eleitoral or "", x.nome))
+
+        por_secretaria = {}
+        for f in funcs_no_local:
+            snome = f.secretaria.nome if f.secretaria else "Sem Secretaria"
+            por_secretaria[snome] = por_secretaria.get(snome, 0) + 1
+
+        total_geral_eleitores += len(funcs_no_local)
+
+        relatorio_dados.append({
+            "local": loc,
+            "total_servidores": len(funcs_no_local),
+            "por_secretaria": por_secretaria,
+            "servidores": funcs_no_local
+        })
+
+    data_emissao = datetime.now().strftime("%d/%m/%Y às %H:%M")
+
+    return render_template(
+        "locais_votacao_pdf.html",
+        tipo=tipo,
+        locais_dados=relatorio_dados,
+        sec_selecionada=sec_selecionada,
+        total_geral_eleitores=total_geral_eleitores,
         data_emissao=data_emissao
     )
 

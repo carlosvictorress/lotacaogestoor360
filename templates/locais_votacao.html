@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapeamento Eleitoral & Locais de Votação - Valença do Piauí</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F3F4F6; }
+        .modal { transition: opacity 0.25s ease; }
+        body.modal-active { overflow-x: hidden; overflow-y: visible !important; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col">
+
+    <!-- TOP BAR DE NAVEGAÇÃO -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-blue-600 p-2 rounded-lg text-white">
+                        <i class="ph ph-vote text-2xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold leading-tight">Mapeamento Eleitoral dos Servidores</h1>
+                        <p class="text-xs text-slate-400">Prefeitura Municipal de Valença do Piauí - Gestão 360</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-3">
+                    <a href="{{ url_for('sistema') }}" class="flex items-center space-x-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-2 rounded-lg transition font-medium">
+                        <i class="ph ph-arrow-left"></i>
+                        <span>Voltar ao Sistema</span>
+                    </a>
+                    {% if current_user.is_admin %}
+                    <a href="{{ url_for('admin_dashboard') }}" class="flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg transition font-medium">
+                        <i class="ph ph-gauge"></i>
+                        <span>Dashboard Admin</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- MENSAGENS FLASH -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="space-y-2">
+            {% for category, message in messages %}
+                <div class="p-4 rounded-xl text-sm font-medium flex items-center justify-between shadow-sm {% if category == 'success' %}bg-emerald-50 text-emerald-800 border border-emerald-200{% elif category == 'warning' %}bg-amber-50 text-amber-800 border border-amber-200{% else %}bg-rose-50 text-rose-800 border border-rose-200{% endif %}">
+                    <div class="flex items-center space-x-2">
+                        <i class="ph {% if category == 'success' %}ph-check-circle text-lg{% elif category == 'warning' %}ph-warning text-lg{% else %}ph-warning-circle text-lg{% endif %}"></i>
+                        <span>{{ message }}</span>
+                    </div>
+                </div>
+            {% endfor %}
+            </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- CARDS ESTATÍSTICOS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total de Servidores</p>
+                    <h3 class="text-2xl font-extrabold text-gray-900 mt-1">{{ stats.total_servidores }}</h3>
+                    <p class="text-xs text-gray-400 mt-1">Ativos no sistema</p>
+                </div>
+                <div class="bg-blue-50 text-blue-600 p-3 rounded-xl">
+                    <i class="ph ph-users-three text-3xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Mapeados nos Colégios</p>
+                    <h3 class="text-2xl font-extrabold text-emerald-600 mt-1">{{ stats.total_mapeados }}</h3>
+                    <p class="text-xs text-emerald-600 mt-1 font-medium">{{ "%.1f"|format((stats.total_mapeados / stats.total_servidores * 100) if stats.total_servidores > 0 else 0) }}% vinculados</p>
+                </div>
+                <div class="bg-emerald-50 text-emerald-600 p-3 rounded-xl">
+                    <i class="ph ph-check-square-offset text-3xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Colégios Cadastrados</p>
+                    <h3 class="text-2xl font-extrabold text-indigo-600 mt-1">{{ stats.total_locais }}</h3>
+                    <p class="text-xs text-gray-400 mt-1">Locais de Votação</p>
+                </div>
+                <div class="bg-indigo-50 text-indigo-600 p-3 rounded-xl">
+                    <i class="ph ph-buildings text-3xl"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pendentes / Não Mapeados</p>
+                    <h3 class="text-2xl font-extrabold text-amber-600 mt-1">{{ stats.total_pendentes }}</h3>
+                    <p class="text-xs text-amber-600 mt-1">Seção não vinculada</p>
+                </div>
+                <div class="bg-amber-50 text-amber-600 p-3 rounded-xl">
+                    <i class="ph ph-user-focus text-3xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- BARRA DE AÇÕES, FILTROS E PESQUISA -->
+        <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+            <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                <div>
+                    <h2 class="text-base font-bold text-gray-900">Locais de Votação e Alocação de Servidores</h2>
+                    <p class="text-xs text-gray-500">Cadastre os locais e veja o quantitativo de eleitores em cada seção.</p>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <button onclick="abrirModalNovoLocal()" class="flex-1 md:flex-none inline-flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-sm transition">
+                        <i class="ph ph-plus-circle text-base"></i>
+                        <span>Novo Colégio Eleitoral</span>
+                    </button>
+
+                    <!-- IMPRESSÃO PDF -->
+                    <div class="relative inline-block text-left">
+                        <a href="{{ url_for('eleitoral_pdf', tipo='sintetico', secretaria_id=sec_id_selecionado) }}" target="_blank" class="inline-flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-900 text-white text-xs font-semibold px-3.5 py-2.5 rounded-xl shadow-sm transition">
+                            <i class="ph ph-file-pdf text-base text-red-400"></i>
+                            <span>PDF Sintético</span>
+                        </a>
+                        <a href="{{ url_for('eleitoral_pdf', tipo='analitico', secretaria_id=sec_id_selecionado) }}" target="_blank" class="inline-flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold px-3.5 py-2.5 rounded-xl border border-slate-300 transition">
+                            <i class="ph ph-printer text-base text-blue-600"></i>
+                            <span>PDF Analítico</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FORMULÁRIO DE FILTRO -->
+            <form method="GET" action="{{ url_for('eleitoral_index') }}" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Filtrar por Secretaria</label>
+                    <select name="secretaria_id" onchange="this.form.submit()" class="w-full bg-gray-50 border border-gray-300 text-gray-800 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 focus:bg-white transition">
+                        <option value="">Todas as Secretarias</option>
+                        {% for sec in secretarias %}
+                        <option value="{{ sec.id }}" {% if sec_id_selecionado == sec.id %}selected{% endif %}>{{ sec.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Buscar por Colégio ou Seção</label>
+                    <div class="relative">
+                        <input type="text" name="busca" value="{{ busca }}" placeholder="Ex: Escola Anísio ou 0012..." class="w-full bg-gray-50 border border-gray-300 text-gray-800 text-xs rounded-xl pl-9 pr-3 py-2.5 outline-none focus:border-blue-500 focus:bg-white transition">
+                        <i class="ph ph-magnifying-glass absolute left-3 top-3 text-gray-400 text-sm"></i>
+                    </div>
+                </div>
+
+                <div class="flex items-end space-x-2">
+                    <button type="submit" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition">
+                        Filtrar
+                    </button>
+                    {% if sec_id_selecionado or busca %}
+                    <a href="{{ url_for('eleitoral_index') }}" class="bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-semibold px-3 py-2.5 rounded-xl transition">
+                        Limpar
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        <!-- LISTA DE LOCAIS DE VOTAÇÃO E SERVIDORES -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- COLUNA PRINCIPAL: TABELA DE LOCAIS (2 COLUNAS LG) -->
+            <div class="lg:col-span-2 space-y-4">
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                        <h3 class="text-sm font-bold text-gray-900 flex items-center space-x-2">
+                            <i class="ph ph-buildings text-blue-600 text-lg"></i>
+                            <span>Colégios Eleitorais Registrados ({{ locais_dados|length }})</span>
+                        </h3>
+                    </div>
+
+                    {% if locais_dados %}
+                    <div class="divide-y divide-gray-100">
+                        {% for item in locais_dados %}
+                        {% set loc = item.local %}
+                        <div class="p-5 hover:bg-gray-50/80 transition space-y-3">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div>
+                                    <div class="flex items-center space-x-2">
+                                        <h4 class="text-sm font-bold text-gray-900">{{ loc.nome }}</h4>
+                                        <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                            Zona {{ loc.zona_eleitoral }}
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-gray-500 mt-0.5">
+                                        <i class="ph ph-map-pin text-gray-400"></i> {{ loc.bairro or 'Bairro não informado' }} {% if loc.endereco %} - {{ loc.endereco }}{% endif %}
+                                    </p>
+                                </div>
+
+                                <div class="flex items-center space-x-2">
+                                    <button onclick="verServidoresModal({{ loc.id }})" class="inline-flex items-center space-x-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-blue-200 transition">
+                                        <i class="ph ph-users text-sm"></i>
+                                        <span>{{ item.total_servidores }} Eleitores</span>
+                                    </button>
+
+                                    <!-- BOTÃO EDITAR -->
+                                    <button onclick='abrirModalEditarLocal({{ loc.id }}, {{ loc.nome|tojson }}, {{ loc.zona_eleitoral|tojson }}, {{ loc.secoes|tojson }}, {{ (loc.bairro or "")|tojson }}, {{ (loc.endereco or "")|tojson }}, {{ (loc.observacoes or "")|tojson }})' class="text-gray-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-gray-100 transition" title="Editar">
+                                        <i class="ph ph-pencil-simple text-lg"></i>
+                                    </button>
+
+                                    <!-- BOTÃO EXCLUIR -->
+                                    <form method="POST" action="{{ url_for('eleitoral_local_excluir', id=loc.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir o local {{ loc.nome }}?');" class="inline">
+                                        <button type="submit" class="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition" title="Excluir">
+                                            <i class="ph ph-trash text-lg"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <!-- BADGES DAS SEÇÕES -->
+                            <div class="flex flex-wrap items-center gap-1.5 text-xs">
+                                <span class="text-gray-400 font-medium text-[11px]">Seções:</span>
+                                {% for sec in item.secoes_lista %}
+                                <span class="bg-gray-100 border border-gray-200 text-gray-700 font-semibold px-2 py-0.5 rounded text-[11px]">
+                                    {{ sec }}
+                                </span>
+                                {% endfor %}
+                            </div>
+
+                            <!-- RESUMO POR SECRETARIA NO LOCAL -->
+                            {% if item.por_secretaria %}
+                            <div class="flex flex-wrap items-center gap-2 pt-1">
+                                {% for sec_nome, qtd in item.por_secretaria.items() %}
+                                <span class="inline-flex items-center space-x-1 bg-slate-100 text-slate-700 text-[10px] font-semibold px-2 py-0.5 rounded-md">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                    <span>{{ sec_nome }}: <strong>{{ qtd }}</strong></span>
+                                </span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="p-12 text-center">
+                        <i class="ph ph-buildings text-4xl text-gray-300"></i>
+                        <h4 class="text-sm font-bold text-gray-700 mt-2">Nenhum Colégio Eleitoral Encontrado</h4>
+                        <p class="text-xs text-gray-400 mt-1">Clique no botão "Novo Colégio Eleitoral" acima para cadastrar os locais de votação.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- COLUNA LATERAL: TOP COLÉGIOS E DICAS -->
+            <div class="space-y-6">
+                <!-- TOP COLÉGIOS -->
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+                    <h3 class="text-sm font-bold text-gray-900 flex items-center space-x-2 border-b border-gray-100 pb-3">
+                        <i class="ph ph-trophy text-amber-500 text-lg"></i>
+                        <span>Maiores Colégios da Prefeitura</span>
+                    </h3>
+
+                    <div class="space-y-3">
+                        {% for item in stats.top_locais %}
+                        <div class="flex items-center justify-between text-xs p-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                            <div class="truncate max-w-[170px]">
+                                <p class="font-bold text-gray-900 truncate">{{ item.local.nome }}</p>
+                                <p class="text-[10px] text-gray-400">{{ item.local.bairro or 'Valença do Piauí' }}</p>
+                            </div>
+                            <span class="bg-blue-600 text-white font-extrabold px-2.5 py-1 rounded-lg">
+                                {{ item.total_servidores }}
+                            </span>
+                        </div>
+                        {% else %}
+                        <p class="text-xs text-gray-400 text-center py-4">Sem estatísticas suficientes.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- CARD INFORMATIVO / DICA -->
+                <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-5 shadow-sm space-y-3">
+                    <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                        <i class="ph ph-lightbulb text-lg"></i>
+                        <span>Como funciona o Mapeamento?</span>
+                    </div>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        O sistema realiza o <strong>cruzamento automático</strong> lendo o número da zona e seção cadastrados no perfil de cada servidor e associando ao Colégio Eleitoral que possui a mesma seção.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- MODAL NOVO LOCAL -->
+    <div id="modalNovoLocal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <h3 class="font-bold text-sm flex items-center space-x-2">
+                    <i class="ph ph-plus-circle text-blue-400 text-lg"></i>
+                    <span>Cadastrar Novo Colégio Eleitoral</span>
+                </h3>
+                <button onclick="fecharModalNovoLocal()" class="text-slate-400 hover:text-white">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <form method="POST" action="{{ url_for('eleitoral_local_novo') }}" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nome do Colégio / Local de Votação *</label>
+                    <input type="text" name="nome" required placeholder="Ex: Escola Municipal Anísio Teixeira" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 focus:bg-white">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Zona Eleitoral *</label>
+                        <input type="text" name="zona_eleitoral" value="026" required placeholder="026" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 focus:bg-white">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Bairro</label>
+                        <input type="text" name="bairro" placeholder="Ex: Centro" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 focus:bg-white">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Seções Pertencentes a este Colégio *</label>
+                    <input type="text" name="secoes" required placeholder="Digite as seções separadas por vírgula. Ex: 0012, 0013, 0014" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 focus:bg-white">
+                    <p class="text-[10px] text-gray-400 mt-1">Separe os números das seções por vírgula.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Endereço Completo</label>
+                    <input type="text" name="endereco" placeholder="Rua, Número, Referência" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500 focus:bg-white">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Observações</label>
+                    <textarea name="observacoes" rows="2" placeholder="Notas sobre acessibilidade, transporte ou logística..." class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl p-3 outline-none focus:border-blue-500 focus:bg-white"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
+                    <button type="button" onclick="fecharModalNovoLocal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-xl">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm">Cadastrar Local</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL EDITAR LOCAL -->
+    <div id="modalEditarLocal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden">
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <h3 class="font-bold text-sm flex items-center space-x-2">
+                    <i class="ph ph-pencil-simple text-amber-400 text-lg"></i>
+                    <span>Editar Colégio Eleitoral</span>
+                </h3>
+                <button onclick="fecharModalEditarLocal()" class="text-slate-400 hover:text-white">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <form id="formEditarLocal" method="POST" action="" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nome do Colégio *</label>
+                    <input type="text" id="edit_nome" name="nome" required class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Zona Eleitoral *</label>
+                        <input type="text" id="edit_zona" name="zona_eleitoral" required class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Bairro</label>
+                        <input type="text" id="edit_bairro" name="bairro" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Seções *</label>
+                    <input type="text" id="edit_secoes" name="secoes" required class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Endereço</label>
+                    <input type="text" id="edit_endereco" name="endereco" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2.5 outline-none focus:border-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Observações</label>
+                    <textarea id="edit_observacoes" name="observacoes" rows="2" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-xs rounded-xl p-3 outline-none focus:border-blue-500"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end space-x-2 pt-2 border-t border-gray-100">
+                    <button type="button" onclick="fecharModalEditarLocal()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-4 py-2.5 rounded-xl">Cancelar</button>
+                    <button type="submit" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-sm">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL LISTA DE SERVIDORES DO LOCAL (AJAX) -->
+    <div id="modalServidores" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white w-full max-w-4xl max-h-[85vh] rounded-2xl shadow-xl overflow-hidden flex flex-col">
+            <div class="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+                <div>
+                    <h3 id="modalServidoresTitulo" class="font-bold text-base flex items-center space-x-2">
+                        <i class="ph ph-users-three text-blue-400 text-xl"></i>
+                        <span>Servidores Mapeados</span>
+                    </h3>
+                    <p id="modalServidoresSubtitulo" class="text-xs text-slate-400">---</p>
+                </div>
+                <button onclick="fecharModalServidores()" class="text-slate-400 hover:text-white">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+
+            <!-- FILTRO INTERNO NA MODAL -->
+            <div class="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-3">
+                <input type="text" id="filtroModalServidores" onkeyup="filtrarTabelaModal()" placeholder="Buscar servidor por nome, CPF ou seção..." class="w-full max-w-md bg-white border border-gray-300 text-gray-900 text-xs rounded-xl px-3 py-2 outline-none focus:border-blue-500">
+                <span id="badgeTotalModal" class="bg-blue-600 text-white text-xs font-extrabold px-3 py-1 rounded-full whitespace-nowrap">0 Servidores</span>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 uppercase font-bold border-b border-gray-200">
+                                <th class="p-3">Servidor</th>
+                                <th class="p-3">Secretaria</th>
+                                <th class="p-3">Função / Cargo</th>
+                                <th class="p-3 text-center">Seção</th>
+                                <th class="p-3 text-center">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelaServidoresBody" class="divide-y divide-gray-100">
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="px-6 py-3 bg-gray-50 border-t border-gray-200 flex justify-end">
+                <button onclick="fecharModalServidores()" class="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2 rounded-xl">Fechar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS DE INTERAÇÃO -->
+    <script>
+        function abrirModalNovoLocal() {
+            document.getElementById('modalNovoLocal').classList.remove('hidden');
+        }
+        function fecharModalNovoLocal() {
+            document.getElementById('modalNovoLocal').classList.add('hidden');
+        }
+
+        function abrirModalEditarLocal(id, nome, zona, secoes, bairro, endereco, observacoes) {
+            document.getElementById('formEditarLocal').action = "/eleitoral/local/" + id + "/editar";
+            document.getElementById('edit_nome').value = nome;
+            document.getElementById('edit_zona').value = zona;
+            document.getElementById('edit_secoes').value = secoes;
+            document.getElementById('edit_bairro').value = bairro;
+            document.getElementById('edit_endereco').value = endereco;
+            document.getElementById('edit_observacoes').value = observacoes;
+            document.getElementById('modalEditarLocal').classList.remove('hidden');
+        }
+        function fecharModalEditarLocal() {
+            document.getElementById('modalEditarLocal').classList.add('hidden');
+        }
+
+        let servidoresAtuaisModal = [];
+
+        function verServidoresModal(localId) {
+            const secId = "{{ sec_id_selecionado or '' }}";
+            let url = "/api/eleitoral/local/" + localId + "/servidores";
+            if (secId) {
+                url += "?secretaria_id=" + secId;
+            }
+
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        servidoresAtuaisModal = data.servidores;
+                        document.getElementById('modalServidoresTitulo').innerHTML = '<i class="ph ph-users-three text-blue-400 text-xl"></i><span>' + data.local.nome + '</span>';
+                        document.getElementById('modalServidoresSubtitulo').innerText = 'Zona ' + data.local.zona + ' | Seções: ' + data.local.secoes + ' | Bairro: ' + data.local.bairro;
+                        document.getElementById('badgeTotalModal').innerText = data.total + " Servidores";
+                        
+                        renderizarTabelaModal(data.servidores);
+                        document.getElementById('modalServidores').classList.remove('hidden');
+                    }
+                })
+                .catch(err => alert("Erro ao carregar servidores: " + err));
+        }
+
+        function fecharModalServidores() {
+            document.getElementById('modalServidores').classList.add('hidden');
+        }
+
+        function renderizarTabelaModal(lista) {
+            const tbody = document.getElementById('tabelaServidoresBody');
+            tbody.innerHTML = '';
+
+            if (lista.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-gray-400">Nenhum servidor encontrado para este local.</td></tr>';
+                return;
+            }
+
+            lista.forEach(s => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50';
+
+                let whatsappBtn = '';
+                if (s.telefone && s.telefone !== '---') {
+                    let numLimpo = s.telefone.replace(/\D/g, '');
+                    if (numLimpo.length >= 10) {
+                        whatsappBtn = `<a href="https://wa.me/55${numLimpo}" target="_blank" class="text-emerald-600 hover:text-emerald-800 p-1" title="WhatsApp"><i class="ph ph-whatsapp-logo text-lg"></i></a>`;
+                    }
+                }
+
+                tr.innerHTML = `
+                    <td class="p-3">
+                        <p class="font-bold text-gray-900">${s.nome}</p>
+                        <p class="text-[10px] text-gray-400">CPF: ${s.cpf}</p>
+                    </td>
+                    <td class="p-3 text-gray-700 font-medium">${s.secretaria}</td>
+                    <td class="p-3 text-gray-600">${s.funcao}</td>
+                    <td class="p-3 text-center">
+                        <span class="bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded text-[11px]">
+                            ${s.secao}
+                        </span>
+                    </td>
+                    <td class="p-3 text-center">
+                        ${whatsappBtn}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filtrarTabelaModal() {
+            const termo = document.getElementById('filtroModalServidores').value.toLowerCase();
+            const filtrados = servidoresAtuaisModal.filter(s => 
+                s.nome.toLowerCase().includes(termo) || 
+                s.cpf.includes(termo) || 
+                s.secao.includes(termo)
+            );
+            renderizarTabelaModal(filtrados);
+        }
+    </script>
+</body>
+</html>

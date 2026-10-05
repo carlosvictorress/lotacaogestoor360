@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório Eleitoral - Prefeitura Municipal de Valença do Piauí</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 12mm 10mm;
+        }
+
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            font-size: 9pt;
+            color: #1a1a1a;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* HEADER TIMBRADO OFICIAL */
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #000000;
+            padding-bottom: 6px;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .header img {
+            height: 42px;
+            margin-bottom: 4px;
+        }
+
+        .header h1 {
+            font-size: 11pt;
+            font-weight: bold;
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .header h2 {
+            font-size: 10pt;
+            font-weight: bold;
+            margin: 2px 0 0 0;
+            text-transform: uppercase;
+            color: #333333;
+        }
+
+        .header .badge-tipo {
+            display: inline-block;
+            background: #000000;
+            color: #ffffff;
+            font-size: 8pt;
+            font-weight: bold;
+            padding: 2px 10px;
+            margin-top: 5px;
+            text-transform: uppercase;
+            border-radius: 3px;
+        }
+
+        .meta-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 8pt;
+            color: #555;
+            margin-bottom: 12px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 4px;
+        }
+
+        /* TABELAS DO RELATÓRIO */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+            page-break-inside: auto;
+        }
+
+        tr {
+            page-break-inside: avoid;
+            page-break-after: auto;
+        }
+
+        th, td {
+            border: 1px solid #000000;
+            padding: 5px 6px;
+            text-align: left;
+            vertical-align: middle;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            font-size: 8pt;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .local-header {
+            background-color: #1e293b;
+            color: #ffffff;
+            font-weight: bold;
+            font-size: 9pt;
+            padding: 6px 8px;
+        }
+
+        .sec-badge {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #0f172a;
+            font-weight: bold;
+            font-size: 7.5pt;
+            padding: 1px 5px;
+            border-radius: 2px;
+        }
+
+        .total-box {
+            margin-top: 15px;
+            border: 2px solid #000;
+            padding: 8px 12px;
+            font-weight: bold;
+            font-size: 9.5pt;
+            background: #f8fafc;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* ASSINATURA */
+        .assinaturas {
+            margin-top: 40px;
+            display: flex;
+            justify-content: space-around;
+            page-break-inside: avoid;
+        }
+
+        .linha-assinatura {
+            border-top: 1px solid #000;
+            width: 220px;
+            text-align: center;
+            padding-top: 4px;
+            font-size: 8pt;
+            font-weight: bold;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { padding: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- BARRA DE AÇÃO FLUTUANTE (SOMENTE TELA) -->
+    <div class="no-print" style="position: fixed; top: 10px; right: 10px; z-index: 999; background: #fff; border: 1px solid #ccc; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+        <button onclick="window.print()" style="background: #2563eb; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px;">
+            🖨️ Imprimir / Salvar PDF
+        </button>
+    </div>
+
+    <!-- CABEÇALHO OFICIAL -->
+    <div class="header">
+        <img src="/static/logo.jpg" onerror="this.style.display='none'">
+        <h1>PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h1>
+        <h2>RELATÓRIO DE MAPEAMENTO ELEITORAL DOS SERVIDORES</h2>
+        <div class="badge-tipo">
+            MODO: {{ 'SINTÉTICO (RESUMIDO POR COLÉGIO)' if tipo == 'sintetico' else 'ANALÍTICO (LISTA NOMINAL COMPLETA)' }}
+        </div>
+    </div>
+
+    <!-- METADADOS DA IMPRESSÃO -->
+    <div class="meta-info">
+        <div><strong>SECRETARIA FILTRADA:</strong> {{ sec_selecionada.nome if sec_selecionada else 'TODAS AS SECRETARIAS' }}</div>
+        <div><strong>DATA DA EMISSÃO:</strong> {{ data_emissao }}</div>
+    </div>
+
+    {% if tipo == 'sintetico' %}
+
+        <!-- MODO SINTÉTICO: RESUMO POR LOCAL E SECRETARIA -->
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 5%;">#</th>
+                    <th style="width: 45%;">Local de Votação / Colégio Eleitoral</th>
+                    <th style="width: 15%;">Zona / Seções</th>
+                    <th style="width: 20%;">Bairro</th>
+                    <th style="width: 15%; text-align: center;">Total Eleitores</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in locais_dados %}
+                {% set loc = item.local %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>
+                        <strong>{{ loc.nome }}</strong>
+                        {% if item.por_secretaria %}
+                        <div style="font-size: 7.5pt; color: #475569; margin-top: 2px;">
+                            {% for snome, qtd in item.por_secretaria.items() %}
+                            <span>{{ snome }}: <strong>{{ qtd }}</strong></span>{% if not loop.last %} | {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <strong>Z-{{ loc.zona_eleitoral }}</strong><br>
+                        <span style="font-size: 7pt; color: #555;">Sec: {{ loc.secoes }}</span>
+                    </td>
+                    <td>{{ loc.bairro or '---' }}</td>
+                    <td style="text-align: center; font-weight: bold; font-size: 10pt;">
+                        {{ item.total_servidores }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 20px;">Nenhum registro encontrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    {% else %}
+
+        <!-- MODO ANALÍTICO: LISTA NOMINAL DETALHADA POR LOCAL -->
+        {% for item in locais_dados %}
+        {% set loc = item.local %}
+        <div style="margin-bottom: 18px; border: 1px solid #000;">
+            <div class="local-header">
+                📍 {{ loc.nome }} (ZONA {{ loc.zona_eleitoral }}) - {{ item.total_servidores }} SERVIDORES
+                <div style="font-size: 8pt; font-weight: normal; margin-top: 2px; color: #cbd5e1;">
+                    Bairro: {{ loc.bairro or '---' }} | Seções pertencentes: {{ loc.secoes }}
+                </div>
+            </div>
+
+            <table style="margin-bottom: 0; border: none;">
+                <thead>
+                    <tr>
+                        <th style="width: 5%; border-top: none;">#</th>
+                        <th style="width: 35%; border-top: none;">Nome do Servidor</th>
+                        <th style="width: 15%; border-top: none;">CPF</th>
+                        <th style="width: 25%; border-top: none;">Secretaria / Função</th>
+                        <th style="width: 10%; text-align: center; border-top: none;">Seção</th>
+                        <th style="width: 10%; border-top: none;">Contato</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in item.servidores %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td><strong>{{ f.nome }}</strong></td>
+                        <td>{{ f.cpf or '---' }}</td>
+                        <td>
+                            <strong>{{ f.secretaria.nome if f.secretaria else '---' }}</strong><br>
+                            <span style="font-size: 7.5pt; color: #555;">{{ f.funcao.nome if f.funcao else '---' }}</span>
+                        </td>
+                        <td style="text-align: center;">
+                            <span class="sec-badge">{{ f.secao_eleitoral or '---' }}</span>
+                        </td>
+                        <td>{{ f.telefone or '---' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; font-style: italic; color: #666;">Nenhum servidor vinculado às seções deste local.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+
+    {% endif %}
+
+    <!-- BOX DE TOTALIZADOR GERAL -->
+    <div class="total-box">
+        <span>TOTAL GERAL DE SERVIDORES MAPEADOS NO RELATÓRIO:</span>
+        <span>{{ total_geral_eleitores }} ELEITORES</span>
+    </div>
+
+    <!-- CAMPO PARA ASSINATURAS E APOSIÇÃO -->
+    <div class="assinaturas">
+        <div class="linha-assinatura">
+            Responsável pelo Mapeamento<br>
+            <span style="font-size: 7pt; font-weight: normal; color: #555;">Gestão de Pessoas / RH</span>
+        </div>
+        <div class="linha-assinatura">
+            Visto da Secretaria Municipal<br>
+            <span style="font-size: 7pt; font-weight: normal; color: #555;">Prefeitura Municipal de Valença do Piauí</span>
+        </div>
+    </div>
+
+    <script>
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 500);
+        };
+    </script>
+</body>
+</html>
