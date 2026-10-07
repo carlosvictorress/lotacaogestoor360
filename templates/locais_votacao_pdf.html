@@ -164,17 +164,67 @@
         <h1>PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h1>
         <h2>RELATÓRIO DE MAPEAMENTO ELEITORAL DOS SERVIDORES</h2>
         <div class="badge-tipo">
-            MODO: {{ 'SINTÉTICO (RESUMIDO POR COLÉGIO)' if tipo == 'sintetico' else 'ANALÍTICO (LISTA NOMINAL COMPLETA)' }}
+            {% if tipo == 'pendentes' %}
+                MODO: SERVIDORES PENDENTES / FORA DA ZONA 18 / NÃO MAPEADOS
+            {% elif tipo == 'sintetico' %}
+                MODO: SINTÉTICO (RESUMIDO POR COLÉGIO)
+            {% else %}
+                MODO: ANALÍTICO (LISTA NOMINAL COMPLETA{% if secao_filtro %} - SEÇÃO {{ secao_filtro }}{% endif %})
+            {% endif %}
         </div>
     </div>
 
     <!-- METADADOS DA IMPRESSÃO -->
     <div class="meta-info">
-        <div><strong>SECRETARIA FILTRADA:</strong> {{ sec_selecionada.nome if sec_selecionada else 'TODAS AS SECRETARIAS' }}</div>
+        <div><strong>SECRETARIA:</strong> {{ sec_selecionada.nome if sec_selecionada else 'TODAS AS SECRETARIAS' }}</div>
+        {% if local_selecionado %}
+        <div><strong>COLÉGIO ELEITORAL:</strong> {{ local_selecionado.nome }}</div>
+        {% endif %}
+        {% if secao_filtro %}
+        <div><strong>SEÇÃO FILTRADA:</strong> {{ secao_filtro }}</div>
+        {% endif %}
         <div><strong>DATA DA EMISSÃO:</strong> {{ data_emissao }}</div>
     </div>
 
-    {% if tipo == 'sintetico' %}
+    {% if tipo == 'pendentes' %}
+
+        <!-- MODO PENDENTES / FORA DA ZONA -->
+        <table style="margin-bottom: 18px;">
+            <thead>
+                <tr>
+                    <th style="width: 4%;">#</th>
+                    <th style="width: 32%;">Nome do Servidor</th>
+                    <th style="width: 14%;">CPF</th>
+                    <th style="width: 25%;">Secretaria / Cargo</th>
+                    <th style="width: 13%; text-align: center;">Zona / Seção</th>
+                    <th style="width: 12%;">Contato</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in servidores_pendentes %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td><strong>{{ f.nome }}</strong></td>
+                    <td>{{ f.cpf or '---' }}</td>
+                    <td>
+                        <strong>{{ f.secretaria.nome if f.secretaria else '---' }}</strong><br>
+                        <span style="font-size: 7.5pt; color: #555;">{{ f.funcao.nome if f.funcao else '---' }}</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <strong>Z: {{ f.zona_eleitoral or '---' }}</strong><br>
+                        <span class="sec-badge">S: {{ f.secao_eleitoral or '---' }}</span>
+                    </td>
+                    <td>{{ f.telefone or '---' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="text-align: center; padding: 20px;">Nenhum servidor pendente ou fora da zona encontrado.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    {% elif tipo == 'sintetico' %}
 
         <!-- MODO SINTÉTICO: RESUMO POR LOCAL E SECRETARIA -->
         <table>
@@ -266,6 +316,8 @@
                 </tbody>
             </table>
         </div>
+        {% else %}
+        <div style="text-align: center; padding: 20px; font-weight: bold; color: #666;">Nenhum servidor ou colégio encontrado para os filtros selecionados.</div>
         {% endfor %}
 
     {% endif %}
