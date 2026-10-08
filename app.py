@@ -412,7 +412,7 @@ class LocalVotacao(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(150), nullable=False)
-    zona_eleitoral = db.Column(db.String(20), nullable=False, default="026")
+    zona_eleitoral = db.Column(db.String(20), nullable=False, default="018")
     secoes = db.Column(db.Text, nullable=False)  # Ex: "0012, 0013, 0014, 0015"
     bairro = db.Column(db.String(100), nullable=True)
     endereco = db.Column(db.String(200), nullable=True)
@@ -4957,8 +4957,61 @@ def atestado_parecer_pdf(id):
 
 
 # ==========================================
-# MÓDULO DE MAPEAMENTO ELEITORAL & LOCAIS DE VOTAÇÃO
-# ==========================================
+def obter_servidores_pendentes(funcionarios, locais):
+    """
+    Retorna os IDs e a lista estruturada com o diagnóstico dos servidores que possuem pendências eleitorais:
+    - Zona Eleitoral em branco
+    - Zona Eleitoral diferente da Zona 18 ('018' ou '18')
+    - Seção Eleitoral em branco
+    - Seção e Zona que não coincidem com nenhum Colégio Eleitoral cadastrado no sistema
+    """
+    mapeados_ids = set()
+
+    for loc in locais:
+        sec_norm_set = loc.get_secoes_normalized()
+        loc_zona_norm = normalizar_numero_eleitoral(loc.zona_eleitoral)
+
+        for f in funcionarios:
+            f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
+            f_sec_norm = normalizar_numero_eleitoral(f.secao_eleitoral)
+
+            zona_matches = (not f_zona_norm or f_zona_norm in ["18", "018", loc_zona_norm])
+            if zona_matches and f_sec_norm and f_sec_norm in sec_norm_set:
+                mapeados_ids.add(f.id)
+
+    pendentes_dados = []
+    pendentes_ids = set()
+
+    for f in funcionarios:
+        f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
+        f_sec_norm = normalizar_numero_eleitoral(f.secao_eleitoral)
+
+        sem_zona = not f_zona_norm
+        fora_zona18 = bool(f_zona_norm and f_zona_norm not in ["18", "018"])
+        sem_secao = not f_sec_norm
+        nao_mapeado = f.id not in mapeados_ids
+
+        if sem_zona or fora_zona18 or sem_secao or nao_mapeado:
+            pendentes_ids.add(f.id)
+            motivos = []
+
+            if sem_zona:
+                motivos.append("Zona em branco")
+            elif fora_zona18:
+                motivos.append(f"Zona {f.zona_eleitoral} (Fora da Zona 18)")
+
+            if sem_secao:
+                motivos.append("Seção em branco")
+            elif nao_mapeado:
+                motivos.append("Seção/Zona diferente do cadastro dos colégios")
+
+            pendentes_dados.append({
+                "funcionario": f,
+                "motivo": " | ".join(motivos) if motivos else "Pendência Cadastral"
+            })
+
+    return pendentes_ids, pendentes_dados
+
 
 @app.route("/eleitoral", methods=["GET"])
 @login_required
@@ -4990,7 +5043,7 @@ def eleitoral_index():
             f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
             f_sec_norm = normalizar_numero_eleitoral(f.secao_eleitoral)
 
-            zona_matches = (not f_zona_norm or f_zona_norm == loc_zona_norm)
+            zona_matches = (not f_zona_norm or f_zona_norm in ["18", "018", loc_zona_norm])
             if zona_matches and f_sec_norm and f_sec_norm in sec_norm_set:
                 funcs_no_local.append(f)
                 mapeados_ids.add(f.id)
@@ -5010,7 +5063,10 @@ def eleitoral_index():
     total_servidores = len(funcionarios)
     total_com_titulo = sum(1 for f in funcionarios if f.titulo_eleitor or f.secao_eleitoral)
     total_mapeados = len(mapeados_ids)
-    total_pendentes = total_servidores - total_mapeados
+    
+    # Pendências eleitorais calculadas via função unificada
+    pendentes_ids, _ = obter_servidores_pendentes(funcionarios, locais)
+    total_pendentes = len(pendentes_ids)
 
     top_locais = sorted(locais_dados, key=lambda x: x["total_servidores"], reverse=True)[:5]
 
@@ -5035,7 +5091,7 @@ def eleitoral_index():
 @login_required
 def eleitoral_local_novo():
     nome = request.form.get("nome", "").strip()
-    zona_eleitoral = request.form.get("zona_eleitoral", "026").strip()
+    zona_eleitoral = request.form.get("zona_eleitoral", "018").strip()
     secoes = request.form.get("secoes", "").strip()
     bairro = request.form.get("bairro", "").strip()
     endereco = request.form.get("endereco", "").strip()
@@ -5130,7 +5186,7 @@ def api_eleitoral_servidores_local(id):
         f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
         f_sec_norm = normalizar_numero_eleitoral(f.secao_eleitoral)
 
-        zona_matches = (not f_zona_norm or f_zona_norm == loc_zona_norm)
+        zona_matches = (not f_zona_norm or f_zona_norm in ["18", "018", loc_zona_norm])
         if zona_matches and f_sec_norm and f_sec_norm in sec_norm_set:
             resultado.append({
                 "id": f.id,
@@ -5167,56 +5223,28 @@ def api_eleitoral_servidores_pendentes():
     sec_id = request.args.get("secretaria_id", type=int)
 
     locais = LocalVotacao.query.all()
-    mapeados_ids = set()
-
     query = Funcionario.query.filter_by(ativo=True)
     if sec_id:
         query = query.filter_by(secretaria_id=sec_id)
     
     funcionarios = query.all()
-
-    for loc in locais:
-        sec_norm_set = loc.get_secoes_normalized()
-        loc_zona_norm = normalizar_numero_eleitoral(loc.zona_eleitoral)
-
-        for f in funcionarios:
-            f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
-            f_sec_norm = normalizar_numero_eleitoral(f.secao_eleitoral)
-
-            zona_matches = (not f_zona_norm or f_zona_norm == loc_zona_norm)
-            if zona_matches and f_sec_norm and f_sec_norm in sec_norm_set:
-                mapeados_ids.add(f.id)
+    _, pendentes_dados = obter_servidores_pendentes(funcionarios, locais)
 
     resultado = []
-    for f in funcionarios:
-        f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
-        is_pendente = f.id not in mapeados_ids
-        is_fora_zona18 = bool(f_zona_norm and f_zona_norm not in ["18", "018", "26", "026"])
-
-        if is_pendente or is_fora_zona18:
-            motivos = []
-            if not f.secao_eleitoral:
-                motivos.append("Sem Seção")
-            elif is_pendente:
-                motivos.append("Seção não pertencente a colégio cadastrado")
-
-            if not f.zona_eleitoral:
-                motivos.append("Sem Zona")
-            elif is_fora_zona18:
-                motivos.append(f"Zona {f.zona_eleitoral} (Fora da Zona 18/26)")
-
-            resultado.append({
-                "id": f.id,
-                "nome": f.nome,
-                "cpf": f.cpf or "---",
-                "funcao": f.funcao.nome if f.funcao else "---",
-                "secretaria": f.secretaria.nome if f.secretaria else "---",
-                "local_trabalho": f.local_trabalho.nome if f.local_trabalho else "---",
-                "zona": f.zona_eleitoral or "---",
-                "secao": f.secao_eleitoral or "---",
-                "telefone": f.telefone or "---",
-                "motivo": " | ".join(motivos) if motivos else "Não Mapeado"
-            })
+    for item in pendentes_dados:
+        f = item["funcionario"]
+        resultado.append({
+            "id": f.id,
+            "nome": f.nome,
+            "cpf": f.cpf or "---",
+            "funcao": f.funcao.nome if f.funcao else "---",
+            "secretaria": f.secretaria.nome if f.secretaria else "---",
+            "local_trabalho": f.local_trabalho.nome if f.local_trabalho else "---",
+            "zona": f.zona_eleitoral or "---",
+            "secao": f.secao_eleitoral or "---",
+            "telefone": f.telefone or "---",
+            "motivo": item["motivo"]
+        })
 
     resultado.sort(key=lambda x: x["nome"])
 
@@ -5247,28 +5275,8 @@ def eleitoral_pdf():
     locais_all = LocalVotacao.query.order_by(LocalVotacao.nome).all()
 
     if pendentes_flag:
-        mapeados_ids = set()
-        for loc in locais_all:
-            sec_norm_set = loc.get_secoes_normalized()
-            loc_zona_norm = normalizar_numero_eleitoral(loc.zona_eleitoral)
-
-            for f in funcionarios:
-                f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
-                f_sec_norm = normalizar_numero_eleitoral(f.secao_eleitoral)
-
-                zona_matches = (not f_zona_norm or f_zona_norm == loc_zona_norm)
-                if zona_matches and f_sec_norm and f_sec_norm in sec_norm_set:
-                    mapeados_ids.add(f.id)
-
-        servidores_pendentes = []
-        for f in funcionarios:
-            f_zona_norm = normalizar_numero_eleitoral(f.zona_eleitoral)
-            is_pendente = f.id not in mapeados_ids
-            is_fora_zona = bool(f_zona_norm and f_zona_norm not in ["18", "018", "26", "026"])
-
-            if is_pendente or is_fora_zona:
-                servidores_pendentes.append(f)
-
+        _, pendentes_dados = obter_servidores_pendentes(funcionarios, locais_all)
+        servidores_pendentes = [item["funcionario"] for item in pendentes_dados]
         servidores_pendentes.sort(key=lambda x: (x.secretaria.nome if x.secretaria else "", x.nome))
         data_emissao = datetime.now().strftime("%d/%m/%Y às %H:%M")
 
