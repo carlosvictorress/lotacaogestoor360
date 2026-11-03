@@ -169,6 +169,19 @@
 </head>
 <body>
 
+    <div class="no-print" style="position: sticky; top: 0; z-index: 9999; background: #1e1b4b; color: #fff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; font-family: system-ui, -apple-system, sans-serif; font-size: 13px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <strong>Contrato Nº {{ contrato.num_contrato }}</strong>
+            <span style="opacity: 0.7;">|</span>
+            <label for="top_dt_assinatura" style="font-weight: 600; color: #ddd6fe;">Data da Assinatura (Contrato + Extrato):</label>
+            <input type="date" id="top_dt_assinatura" value="{{ contrato.dt_assinatura_iso }}" onchange="atualizarDataAssinaturaDoc(this.value)" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #8b5cf6; background: #fff; color: #1e1b4b; font-weight: 700; cursor: pointer;">
+            <span id="msg_salvo_doc" style="color: #6ee7b7; font-weight: 700; display: none;">✓ Data atualizada!</span>
+        </div>
+        <button onclick="window.print()" style="background: #7c3aed; color: #fff; border: none; padding: 7px 16px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+            🖨️ Imprimir Contrato e Extrato
+        </button>
+    </div>
+
     <!-- PÁGINA 1: CONTRATO ADMINISTRATIVO -->
     <div class="page">
         <div class="timbre-header">
@@ -267,7 +280,7 @@
         <p class="clause"><strong>CLÁUSULA DÉCIMA SEGUNDA</strong> - Fica eleito o FORO da Comarca de Valença do Piauí – PI, com expressa renúncia de qualquer outro, para serem dirimidas quaisquer dúvidas pertinentes ao presente contrato.</p>
         <p class="clause">As partes firmam o presente instrumento em 02 (duas) vias de igual teor e forma, obrigando-se por si e seus sucessores, ao fiel cumprimento do que ora ficou ajustado, elegendo-o.</p>
 
-        <p class="date-line">Valença do Piauí/PI, {{ contrato.dt_assinatura_extenso }}.</p>
+        <p class="date-line">Valença do Piauí/PI, <span id="span_dt_assinatura_extenso">{{ contrato.dt_assinatura_extenso }}</span>.</p>
 
         <div class="signatures-container">
             <div class="signature-box">
@@ -308,12 +321,34 @@
                 <strong>RECURSOS:</strong> Orçamento Anual do Município do exercício de {{ contrato.ano_exercicio }}, mais especificamente dos recursos do Fundo Nacional de Desenvolvimento da Educação (FUNDEB); Fundo de Participação dos Municípios (FPM); do Imposto sobre a Propriedade de Veículos Automotores (IPVA); do Imposto sobre a Circulação de Mercadorias e Serviços (ICMS) e da Arrecadação Própria do Município. 
                 <strong>VALOR:</strong> {{ contrato.remuneracao_formatada }} ({{ contrato.remuneracao_extenso }}) mensais. 
                 <strong>VIGÊNCIA:</strong> {{ contrato.dt_termino_formatada }}. 
-                <strong>DATA DA ASSINATURA:</strong> {{ contrato.dt_assinatura_formatada }}.
+                <strong>DATA DA ASSINATURA:</strong> <span id="span_dt_assinatura_formatada">{{ contrato.dt_assinatura_formatada }}</span>.
             </p>
         </div>
     </div>
 
     <script>
+        function atualizarDataAssinaturaDoc(novaData) {
+            if (!novaData) return;
+            var formData = new FormData();
+            formData.append('dt_assinatura', novaData);
+            fetch('/contrato/alterar_data_assinatura/{{ contrato.id }}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('span_dt_assinatura_extenso').innerText = data.dt_assinatura_extenso;
+                    document.getElementById('span_dt_assinatura_formatada').innerText = data.dt_assinatura_formatada;
+                    var msg = document.getElementById('msg_salvo_doc');
+                    msg.style.display = 'inline';
+                    setTimeout(function() { msg.style.display = 'none'; }, 2500);
+                } else {
+                    alert('Erro ao atualizar data: ' + (data.message || 'Erro desconhecido'));
+                }
+            });
+        }
+
         window.onload = function() {
             window.print();
         };

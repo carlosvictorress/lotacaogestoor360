@@ -2541,6 +2541,42 @@ def processar_gerar_contrato():
         return {"success": False, "message": str(e)}, 500
 
 
+@app.route("/contrato/alterar_data_assinatura/<int:id>", methods=["POST"])
+@login_required
+def alterar_data_assinatura_contrato(id):
+    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
+        return {"success": False, "message": "Acesso negado: Apenas administradores podem alterar a data de assinatura."}, 403
+
+    contrato = db.session.get(ContratoGerado, id)
+    if not contrato:
+        return {"success": False, "message": "Contrato não encontrado."}, 404
+
+    data_json = request.get_json(silent=True) or {}
+    dt_assinatura_str = (
+        request.form.get("dt_assinatura")
+        or data_json.get("dt_assinatura")
+        or ""
+    ).strip()
+
+    nova_dt = parse_date(dt_assinatura_str)
+    if not nova_dt:
+        return {"success": False, "message": "Data de assinatura inválida."}, 400
+
+    try:
+        contrato.dt_assinatura = nova_dt
+        db.session.commit()
+        return {
+            "success": True,
+            "contrato_id": contrato.id,
+            "dt_assinatura_iso": nova_dt.isoformat(),
+            "dt_assinatura_formatada": nova_dt.strftime("%d/%m/%Y"),
+            "dt_assinatura_extenso": formatar_data_extenso(nova_dt),
+        }
+    except Exception as e:
+        db.session.rollback()
+        return {"success": False, "message": str(e)}, 500
+
+
 @app.route("/contrato/editar/<int:id>", methods=["POST"])
 @login_required
 def editar_contrato(id):
@@ -2552,45 +2588,91 @@ def editar_contrato(id):
         return {"success": False, "message": "Contrato não encontrado."}, 404
 
     motivo = request.form.get("motivo_edicao", "").strip()
-    if not motivo:
-        return {"success": False, "message": "É obrigatório informar o motivo da edição do contrato."}, 400
 
     try:
-        # Manter num_contrato e ano_exercicio originais intactos
-        contrato.contratado_nome = request.form.get("contratado_nome", "").strip()
-        contrato.contratado_cpf = request.form.get("contratado_cpf", "").strip()
-        contrato.contratado_rg = request.form.get("contratado_rg", "").strip()
-        contrato.contratado_nacionalidade = request.form.get("contratado_nacionalidade", "brasileiro(a)").strip()
-        contrato.contratado_naturalidade = request.form.get("contratado_naturalidade", "piauiense").strip()
-        contrato.contratado_estado_civil = request.form.get("contratado_estado_civil", "solteiro(a)").strip()
-        contrato.contratado_endereco = request.form.get("contratado_endereco", "").strip()
+        novo_nome = request.form.get("contratado_nome", "").strip()
+        novo_cpf = request.form.get("contratado_cpf", "").strip()
+        novo_rg = request.form.get("contratado_rg", "").strip()
+        novo_nac = request.form.get("contratado_nacionalidade", "brasileiro(a)").strip()
+        novo_nat = request.form.get("contratado_naturalidade", "piauiense").strip()
+        novo_ec = request.form.get("contratado_estado_civil", "solteiro(a)").strip()
+        novo_end = request.form.get("contratado_endereco", "").strip()
 
-        contrato.funcao_nome = request.form.get("funcao_nome", "").strip()
-        contrato.jornada_trabalho = request.form.get("jornada_trabalho", "").strip()
-        contrato.remuneracao = request.form.get("remuneracao", "").strip()
-        contrato.remuneracao_extenso = request.form.get("remuneracao_extenso", "").strip()
+        nova_funcao = request.form.get("funcao_nome", "").strip()
+        nova_jornada = request.form.get("jornada_trabalho", "").strip()
+        nova_rem = request.form.get("remuneracao", "").strip()
+        nova_rem_ext = request.form.get("remuneracao_extenso", "").strip()
 
         dt_inicio_str = request.form.get("dt_inicio")
         dt_termino_str = request.form.get("dt_termino")
         dt_assinatura_str = request.form.get("dt_assinatura")
 
-        if dt_inicio_str: contrato.dt_inicio = parse_date(dt_inicio_str)
-        if dt_termino_str: contrato.dt_termino = parse_date(dt_termino_str)
-        if dt_assinatura_str: contrato.dt_assinatura = parse_date(dt_assinatura_str)
+        novo_dt_inicio = parse_date(dt_inicio_str) if dt_inicio_str else contrato.dt_inicio
+        novo_dt_termino = parse_date(dt_termino_str) if dt_termino_str else contrato.dt_termino
+        novo_dt_assinatura = parse_date(dt_assinatura_str) if dt_assinatura_str else contrato.dt_assinatura
 
-        contrato.representante_nome = request.form.get("representante_nome", "MARIA EDNA DE SOUSA QUARESMA").strip()
-        contrato.representante_cargo = request.form.get("representante_cargo", "Secretária Municipal de Educação").strip()
-        contrato.representante_rg_cpf = request.form.get("representante_rg_cpf", "676.079.263-72").strip()
-        contrato.representante_endereco = request.form.get("representante_endereco", "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI").strip()
+        novo_rep_nome = request.form.get("representante_nome", "MARIA EDNA DE SOUSA QUARESMA").strip()
+        novo_rep_cargo = request.form.get("representante_cargo", "Secretária Municipal de Educação").strip()
+        novo_rep_cpf = request.form.get("representante_rg_cpf", "676.079.263-72").strip()
+        novo_rep_end = request.form.get("representante_endereco", "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI").strip()
 
-        contrato.editado = True
-        contrato.motivo_edicao = motivo
-        contrato.data_edicao = datetime.utcnow()
-        contrato.quem_editou_id = current_user.id
+        # Verifica se houve alteração em qualquer campo além da data de assinatura
+        alterou_outros_campos = any([
+            novo_nome != (contrato.contratado_nome or "").strip(),
+            novo_cpf != (contrato.contratado_cpf or "").strip(),
+            novo_rg != (contrato.contratado_rg or "").strip(),
+            novo_nac != (contrato.contratado_nacionalidade or "brasileiro(a)").strip(),
+            novo_nat != (contrato.contratado_naturalidade or "piauiense").strip(),
+            novo_ec != (contrato.contratado_estado_civil or "solteiro(a)").strip(),
+            novo_end != (contrato.contratado_endereco or "").strip(),
+            nova_funcao != (contrato.funcao_nome or "").strip(),
+            nova_jornada != (contrato.jornada_trabalho or "").strip(),
+            nova_rem != (contrato.remuneracao or "").strip(),
+            nova_rem_ext != (contrato.remuneracao_extenso or "").strip(),
+            novo_dt_inicio != contrato.dt_inicio,
+            novo_dt_termino != contrato.dt_termino,
+            novo_rep_nome != (contrato.representante_nome or "MARIA EDNA DE SOUSA QUARESMA").strip(),
+            novo_rep_cargo != (contrato.representante_cargo or "Secretária Municipal de Educação").strip(),
+            novo_rep_cpf != (contrato.representante_rg_cpf or "676.079.263-72").strip(),
+            novo_rep_end != (contrato.representante_endereco or "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI").strip(),
+        ])
+
+        if alterou_outros_campos and not motivo:
+            return {"success": False, "message": "É obrigatório informar o motivo da edição ao alterar dados cadastrais ou cláusulas do contrato."}, 400
+
+        # Manter num_contrato e ano_exercicio originais intactos
+        contrato.contratado_nome = novo_nome
+        contrato.contratado_cpf = novo_cpf
+        contrato.contratado_rg = novo_rg
+        contrato.contratado_nacionalidade = novo_nac
+        contrato.contratado_naturalidade = novo_nat
+        contrato.contratado_estado_civil = novo_ec
+        contrato.contratado_endereco = novo_end
+
+        contrato.funcao_nome = nova_funcao
+        contrato.jornada_trabalho = nova_jornada
+        contrato.remuneracao = nova_rem
+        contrato.remuneracao_extenso = nova_rem_ext
+
+        contrato.dt_inicio = novo_dt_inicio
+        contrato.dt_termino = novo_dt_termino
+        contrato.dt_assinatura = novo_dt_assinatura
+
+        contrato.representante_nome = novo_rep_nome
+        contrato.representante_cargo = novo_rep_cargo
+        contrato.representante_rg_cpf = novo_rep_cpf
+        contrato.representante_endereco = novo_rep_end
+
+        if alterou_outros_campos:
+            contrato.editado = True
+            contrato.motivo_edicao = motivo
+            contrato.data_edicao = datetime.utcnow()
+            contrato.quem_editou_id = current_user.id
 
         db.session.commit()
 
-        registrar_log("Editou Contrato", f"Contrato Nº {contrato.num_contrato} ({contrato.contratado_nome}) - Motivo: {motivo}")
+        if alterou_outros_campos:
+            registrar_log("Editou Contrato", f"Contrato Nº {contrato.num_contrato} ({contrato.contratado_nome}) - Motivo: {motivo}")
 
         return {
             "success": True,
@@ -2654,6 +2736,7 @@ def visualizar_contrato_documento(id):
         "dt_assinatura_extenso": formatar_data_extenso(dt_ass),
         "dt_termino_formatada": contrato.dt_termino.strftime("%d/%m/%Y") if contrato.dt_termino else "",
         "dt_assinatura_formatada": dt_ass.strftime("%d/%m/%Y") if dt_ass else "",
+        "dt_assinatura_iso": dt_ass.isoformat() if dt_ass else "",
         "representante_nome": contrato.representante_nome,
         "representante_cargo": contrato.representante_cargo,
         "representante_rg_cpf": contrato.representante_rg_cpf,
@@ -2686,6 +2769,7 @@ def visualizar_contrato_extrato(id):
         "remuneracao_extenso": contrato.remuneracao_extenso or "",
         "dt_termino_formatada": contrato.dt_termino.strftime("%d/%m/%Y") if contrato.dt_termino else "",
         "dt_assinatura_formatada": dt_ass_ext.strftime("%d/%m/%Y") if dt_ass_ext else "",
+        "dt_assinatura_iso": dt_ass_ext.isoformat() if dt_ass_ext else "",
     }
 
     return render_template("contrato_extrato.html", contrato=contrato_dict)

@@ -74,6 +74,7 @@
                             <th class="px-6 py-4">Servidor / CPF</th>
                             <th class="px-6 py-4">Função</th>
                             <th class="px-6 py-4">Jornada</th>
+                            <th class="px-6 py-4">Data da Assinatura</th>
                             <th class="px-6 py-4">Data da Geração</th>
                             <th class="px-6 py-4">Quem Gerou</th>
                             <th class="px-6 py-4 text-center">Ações</th>
@@ -81,6 +82,7 @@
                     </thead>
                     <tbody class="divide-y divide-slate-100">
                         {% for c in historico %}
+                        {% set dt_ass_row = c.dt_assinatura or c.dt_inicio or (c.funcionario.dt_inicio if c.funcionario and c.funcionario.dt_inicio else None) %}
                         <tr class="hover:bg-slate-50/80 transition-colors">
                             <td class="px-6 py-4 font-bold text-purple-700">
                                 {{ c.num_contrato }}
@@ -97,6 +99,21 @@
                             </td>
                             <td class="px-6 py-4 text-slate-600 font-medium">{{ c.funcao_nome or 'N/A' }}</td>
                             <td class="px-6 py-4 text-slate-600">{{ c.jornada_trabalho or 'N/A' }}</td>
+                            <td class="px-6 py-4">
+                                {% if current_user.is_admin %}
+                                <div class="flex items-center gap-1.5">
+                                    <input type="date" id="row_dt_ass_{{ c.id }}" value="{{ dt_ass_row.isoformat() if dt_ass_row else '' }}"
+                                        onchange="alterarDataAssinaturaRapido({{ c.id }}, this.value, this)"
+                                        class="px-2.5 py-1.5 bg-purple-50/70 hover:bg-purple-100/70 border border-purple-200 rounded-lg text-xs font-bold text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-500 transition cursor-pointer"
+                                        title="Altere a data de assinatura diretamente aqui (salva automaticamente para o Contrato e Extrato sem exigir justificativa e sem marcar como Editado)">
+                                    <span id="status_dt_ass_{{ c.id }}" class="text-[11px] font-bold text-emerald-600 hidden whitespace-nowrap">
+                                        <i class="ph ph-check-circle"></i> Salvo
+                                    </span>
+                                </div>
+                                {% else %}
+                                <span class="text-slate-600 text-xs font-semibold">{{ dt_ass_row.strftime('%d/%m/%Y') if dt_ass_row else 'N/A' }}</span>
+                                {% endif %}
+                            </td>
                             <td class="px-6 py-4 text-slate-500 text-xs font-semibold">
                                 {{ c.data_geracao.strftime('%d/%m/%Y às %H:%M') if c.data_geracao else 'N/A' }}
                             </td>
@@ -152,7 +169,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7" class="px-6 py-12 text-center text-slate-400 font-medium">
+                            <td colspan="8" class="px-6 py-12 text-center text-slate-400 font-medium">
                                 <i class="ph ph-files text-4xl block mb-2 text-slate-300"></i>
                                 Nenhum contrato gerado até o momento.
                             </td>
@@ -190,12 +207,13 @@
                 <!-- CORPO ROLANTE DO FORMULÁRIO -->
                 <div class="flex-1 overflow-y-auto p-6 space-y-5">
 
-                    <!-- CAMPO OBRIGATÓRIO: MOTIVO DA EDIÇÃO -->
+                    <!-- CAMPO MOTIVO DA EDIÇÃO (DISPENSADO SE ALTERAR APENAS DATA DE ASSINATURA) -->
                     <div class="bg-amber-50/80 border border-amber-200/80 rounded-2xl p-3.5">
-                        <label class="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-                            <i class="ph ph-warning-circle text-amber-600 text-sm"></i> Motivo / Justificativa da Edição*
+                        <label class="block text-xs font-bold text-amber-900 uppercase tracking-wider mb-1 flex items-center gap-1">
+                            <i class="ph ph-warning-circle text-amber-600 text-sm"></i> Motivo / Justificativa da Edição
                         </label>
-                        <textarea name="motivo_edicao" id="me_motivo_edicao" required rows="2" class="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm" placeholder="Descreva o motivo da alteração dos dados deste contrato..."></textarea>
+                        <p class="text-[11px] text-amber-700 mb-1.5">Obrigatório apenas ao alterar dados cadastrais ou cláusulas. Se alterar somente a <strong>Data de Assinatura</strong>, pode deixar em branco (não marca como Editado).</p>
+                        <textarea name="motivo_edicao" id="me_motivo_edicao" rows="2" class="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm" placeholder="Descreva o motivo caso altere dados cadastrais ou cláusulas deste contrato..."></textarea>
                     </div>
 
                     <!-- DADOS DO CONTRATADO -->
@@ -341,7 +359,8 @@
 
             document.getElementById('me_dt_inicio').value = c.dt_inicio || '';
             document.getElementById('me_dt_termino').value = c.dt_termino || '';
-            document.getElementById('me_dt_assinatura').value = c.dt_assinatura || c.dt_inicio || '';
+            var inputRapido = document.getElementById('row_dt_ass_' + c.id);
+            document.getElementById('me_dt_assinatura').value = (inputRapido && inputRapido.value) ? inputRapido.value : (c.dt_assinatura || c.dt_inicio || '');
 
             document.getElementById('me_representante_nome').value = c.representante_nome || 'MARIA EDNA DE SOUSA QUARESMA';
             document.getElementById('me_representante_cargo').value = c.representante_cargo || 'Secretária Municipal de Educação';
@@ -353,6 +372,36 @@
 
         function fecharModalEditar() {
             document.getElementById('modalEditarContrato').classList.add('hidden');
+        }
+
+        function alterarDataAssinaturaRapido(contratoId, novaData, inputEl) {
+            if (!novaData) return;
+            var statusEl = document.getElementById('status_dt_ass_' + contratoId);
+            inputEl.disabled = true;
+
+            var formData = new FormData();
+            formData.append('dt_assinatura', novaData);
+
+            fetch('/contrato/alterar_data_assinatura/' + contratoId, {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                inputEl.disabled = false;
+                if (data.success) {
+                    if (statusEl) {
+                        statusEl.classList.remove('hidden');
+                        setTimeout(() => { statusEl.classList.add('hidden'); }, 2500);
+                    }
+                } else {
+                    alert('Erro ao atualizar data de assinatura: ' + (data.message || 'Erro desconhecido'));
+                }
+            })
+            .catch(err => {
+                inputEl.disabled = false;
+                alert('Erro de conexão ao salvar data: ' + err);
+            });
         }
 
         function enviarEditarContrato(e) {

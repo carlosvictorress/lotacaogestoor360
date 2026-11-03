@@ -60,6 +60,19 @@
 </head>
 <body>
 
+    <div class="no-print" style="position: sticky; top: 0; z-index: 9999; background: #1e3a8a; color: #fff; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; font-family: system-ui, -apple-system, sans-serif; font-size: 13px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <strong>Extrato Nº {{ contrato.num_contrato }}</strong>
+            <span style="opacity: 0.7;">|</span>
+            <label for="top_dt_assinatura_ext" style="font-weight: 600; color: #bfdbfe;">Data da Assinatura:</label>
+            <input type="date" id="top_dt_assinatura_ext" value="{{ contrato.dt_assinatura_iso }}" onchange="atualizarDataAssinaturaExtrato(this.value)" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #60a5fa; background: #fff; color: #1e3a8a; font-weight: 700; cursor: pointer;">
+            <span id="msg_salvo_ext" style="color: #6ee7b7; font-weight: 700; display: none;">✓ Data atualizada!</span>
+        </div>
+        <button onclick="window.print()" style="background: #2563eb; color: #fff; border: none; padding: 7px 16px; border-radius: 8px; font-weight: 700; cursor: pointer;">
+            🖨️ Imprimir Extrato
+        </button>
+    </div>
+
     <div class="timbre-header">
         <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre da Prefeitura">
     </div>
@@ -77,11 +90,32 @@
             <strong>RECURSOS:</strong> Orçamento Anual do Município do exercício de {{ contrato.ano_exercicio }}, mais especificamente dos recursos do Fundo Nacional de Desenvolvimento da Educação (FUNDEB); Fundo de Participação dos Municípios (FPM); do Imposto sobre a Propriedade de Veículos Automotores (IPVA); do Imposto sobre a Circulação de Mercadorias e Serviços (ICMS) e da Arrecadação Própria do Município. 
             <strong>VALOR:</strong> {{ contrato.remuneracao_formatada }} ({{ contrato.remuneracao_extenso }}) mensais. 
             <strong>VIGÊNCIA:</strong> {{ contrato.dt_termino_formatada }}. 
-            <strong>DATA DA ASSINATURA:</strong> {{ contrato.dt_assinatura_formatada }}.
+            <strong>DATA DA ASSINATURA:</strong> <span id="span_dt_assinatura_ext">{{ contrato.dt_assinatura_formatada }}</span>.
         </p>
     </div>
 
     <script>
+        function atualizarDataAssinaturaExtrato(novaData) {
+            if (!novaData) return;
+            var formData = new FormData();
+            formData.append('dt_assinatura', novaData);
+            fetch('/contrato/alterar_data_assinatura/{{ contrato.id }}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('span_dt_assinatura_ext').innerText = data.dt_assinatura_formatada;
+                    var msg = document.getElementById('msg_salvo_ext');
+                    msg.style.display = 'inline';
+                    setTimeout(function() { msg.style.display = 'none'; }, 2500);
+                } else {
+                    alert('Erro ao atualizar data: ' + (data.message || 'Erro desconhecido'));
+                }
+            });
+        }
+
         window.onload = function() {
             window.print();
         };
