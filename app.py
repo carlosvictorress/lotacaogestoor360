@@ -13,8 +13,10 @@ import pytz
 from datetime import datetime, timedelta, date
 import sqlite3
 import json
+import hmac
+import secrets
 
-from flask import Flask, render_template, request, redirect, url_for, flash, Response, has_request_context, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, has_request_context, session, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
@@ -27,6 +29,7 @@ from flask_login import (
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from sqlalchemy import func, text, event
+import backup_service
 
 load_dotenv()
 
@@ -436,6 +439,26 @@ class LocalVotacao(db.Model):
             if norm:
                 result.add(norm)
         return result
+
+
+class BackupHistorico(db.Model):
+    __tablename__ = "backup_historico"
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome_arquivo = db.Column(db.String(255), nullable=False)
+    tipo = db.Column(db.String(30), default="MANUAL")  # MANUAL, PRE_RESTORE, RESTAURACAO
+    status = db.Column(db.String(30), default="CONCLUIDO")
+    tamanho_bytes = db.Column(db.BigInteger, default=0)
+    sha256 = db.Column(db.String(64), nullable=True)
+    total_tabelas = db.Column(db.Integer, default=0)
+    total_registros = db.Column(db.Integer, default=0)
+    total_arquivos = db.Column(db.Integer, default=0)
+    origem_banco = db.Column(db.String(50), nullable=True)
+    observacao = db.Column(db.Text, nullable=True)
+    criado_por_id = db.Column(db.Integer, nullable=True)
+    criado_por_nome = db.Column(db.String(100), nullable=True)
+    ip_origem = db.Column(db.String(50), nullable=True)
+    data_hora = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 def normalizar_numero_eleitoral(val):
@@ -5430,6 +5453,463 @@ def eleitoral_pdf():
         data_emissao=data_emissao
     )
 
+
+# ==============================================================================
+# MÓDULO COMPLETO DE BACKUP & RESTAURAÇÃO (FULL SYSTEM ENCRYPTED SNAPSHOT)
+# ==============================================================================
+
+def _is_backup_admin():
+    return bool(
+        current_user.is_authenticated
+        and (getattr(current_user, "is_admin", False) or getattr(current_user, "role", "") == "admin")
+    )
+
+
+def _get_backup_csrf_token():
+    token = session.get("backup_csrf_token")
+    if not token:
+        token = secrets.token_hex(32)
+        session["backup_csrf_token"] = token
+    return token
+
+
+def _validate_backup_csrf():
+    expected = session.get("backup_csrf_token")
+    if not expected:
+        return False
+    provided = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
+    if not provided and request.is_json:
+        provided = (request.get_json(silent=True) or {}).get("csrf_token")
+    return bool(provided and hmac.compare_digest(str(expected), str(provided)))
+
+
+def _formatar_tamanho(num_bytes):
+    try:
+        n = float(num_bytes or 0)
+    except (TypeError, ValueError):
+        return "0 B"
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024.0 or unit == "GB":
+            return f"{n:.2f} {unit}" if unit != "B" else f"{int(n)} B"
+        n /= 1024.0
+    return f"{n:.2f} GB"
+
+
+@app.route("/admin/backup", methods=["GET"])
+@login_required
+def admin_backup():
+    if not _is_backup_admin():
+        flash("Acesso negado: Apenas administradores podem acessar o Módulo de Backup e Restauração.", "error")
+        return redirect(url_for("sistema"))
+
+    inventario = backup_service.get_system_inventory(db, app.root_path)
+    bkp_dir = backup_service.get_backup_dir(app.root_path)
+
+    historico_db = (
+        BackupHistorico.query.order_by(BackupHistorico.data_hora.desc())
+        .limit(50)
+        .all()
+    )
+
+    fuso_br = pytz.timezone("America/Sao_Paulo")
+    historico_lista = []
+    ultimo_backup_ok = None
+
+    for item in historico_db:
+        caminho = os.path.join(bkp_dir, os.path.basename(item.nome_arquivo))
+        disponivel = os.path.isfile(caminho)
+        dt_br = (
+            pytz.utc.localize(item.data_hora).astimezone(fuso_br)
+            if item.data_hora
+            else None
+        )
+        entry = {
+            "id": item.id,
+            "nome_arquivo": item.nome_arquivo,
+            "tipo": item.tipo,
+            "status": item.status,
+            "tamanho_bytes": item.tamanho_bytes or 0,
+            "tamanho_fmt": _formatar_tamanho(item.tamanho_bytes),
+            "sha256": item.sha256 or "",
+            "total_tabelas": item.total_tabelas or 0,
+            "total_registros": item.total_registros or 0,
+            "total_arquivos": item.total_arquivos or 0,
+            "origem_banco": item.origem_banco or "",
+            "observacao": item.observacao or "",
+            "criado_por_nome": item.criado_por_nome or "Sistema",
+            "ip_origem": item.ip_origem or "",
+            "data_hora_fmt": dt_br.strftime("%d/%m/%Y às %H:%M:%S") if dt_br else "---",
+            "disponivel": disponivel,
+        }
+        historico_lista.append(entry)
+        if ultimo_backup_ok is None and item.tipo in ("MANUAL", "PRE_RESTORE") and item.status == "CONCLUIDO":
+            ultimo_backup_ok = {
+                "data_hora_fmt": entry["data_hora_fmt"],
+                "dias_atras": (datetime.utcnow() - item.data_hora).days if item.data_hora else 999,
+                "nome_arquivo": item.nome_arquivo,
+            }
+
+    return render_template(
+        "admin_backup.html",
+        inventario=inventario,
+        total_media_fmt=_formatar_tamanho(inventario["total_media_bytes"]),
+        historico=historico_lista,
+        ultimo_backup_ok=ultimo_backup_ok,
+        csrf_token=_get_backup_csrf_token(),
+        role=current_user.role,
+        is_admin=current_user.is_admin,
+    )
+
+
+@app.route("/api/backup/gerar", methods=["POST"])
+@login_required
+def api_backup_gerar():
+    if not _is_backup_admin():
+        return jsonify({"success": False, "message": "Acesso não autorizado."}), 403
+    if not _validate_backup_csrf():
+        return jsonify({"success": False, "message": "Token de segurança inválido. Recarregue a página."}), 400
+
+    data = request.get_json(silent=True) or request.form
+    senha_backup = (data.get("backup_password") or "").strip()
+    confirmar_senha = (data.get("backup_password_confirm") or "").strip()
+    observacao = (data.get("observacao") or "").strip()[:300]
+
+    if len(senha_backup) < 8:
+        return jsonify({"success": False, "message": "A senha de criptografia do backup deve ter no mínimo 8 caracteres."}), 400
+    if senha_backup != confirmar_senha:
+        return jsonify({"success": False, "message": "As senhas do backup não coincidem."}), 400
+
+    try:
+        resultado = backup_service.create_full_backup(
+            db=db,
+            app_root=app.root_path,
+            password=senha_backup,
+            created_by=current_user.username,
+            prefix="gestoor360_full",
+            observacao=observacao,
+        )
+        manifest = resultado["manifest"]
+        totals = manifest["totals"]
+
+        registro = BackupHistorico(
+            nome_arquivo=resultado["filename"],
+            tipo="MANUAL",
+            status="CONCLUIDO",
+            tamanho_bytes=resultado["size_bytes"],
+            sha256=resultado["sha256"],
+            total_tabelas=totals["tables"],
+            total_registros=totals["records"],
+            total_arquivos=totals["media_files"],
+            origem_banco=manifest["source_dialect"],
+            observacao=observacao or "Backup completo sob demanda",
+            criado_por_id=current_user.id,
+            criado_por_nome=current_user.username,
+            ip_origem=request.remote_addr,
+            data_hora=datetime.utcnow(),
+        )
+        db.session.add(registro)
+        db.session.commit()
+
+        registrar_log(
+            "GEROU BACKUP COMPLETO",
+            f"{resultado['filename']} ({totals['records']} registros, {totals['media_files']} mídias, {_formatar_tamanho(resultado['size_bytes'])})",
+        )
+
+        return jsonify(
+            {
+                "success": True,
+                "message": "Backup completo gerado e criptografado com sucesso!",
+                "backup": {
+                    "id": registro.id,
+                    "filename": resultado["filename"],
+                    "size_bytes": resultado["size_bytes"],
+                    "size_fmt": _formatar_tamanho(resultado["size_bytes"]),
+                    "sha256": resultado["sha256"],
+                    "totals": totals,
+                    "download_url": url_for("admin_backup_download", backup_id=registro.id),
+                },
+            }
+        )
+    except backup_service.BackupError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Erro ao gerar backup: {str(e)}"}), 500
+
+
+@app.route("/admin/backup/download/<int:backup_id>", methods=["GET"])
+@login_required
+def admin_backup_download(backup_id):
+    if not _is_backup_admin():
+        flash("Acesso não autorizado.", "error")
+        return redirect(url_for("sistema"))
+
+    registro = db.session.get(BackupHistorico, backup_id)
+    if not registro:
+        flash("Registro de backup não encontrado.", "error")
+        return redirect(url_for("admin_backup"))
+
+    safe_name = os.path.basename(registro.nome_arquivo)
+    caminho = os.path.join(backup_service.get_backup_dir(app.root_path), safe_name)
+    if not os.path.isfile(caminho):
+        flash("O arquivo físico deste backup não está mais disponível no servidor (apenas registro histórico).", "error")
+        return redirect(url_for("admin_backup"))
+
+    registrar_log("BAIXOU BACKUP COMPLETO", f"{safe_name} (ID #{backup_id})")
+    return send_file(
+        caminho,
+        as_attachment=True,
+        download_name=safe_name,
+        mimetype="application/octet-stream",
+    )
+
+
+@app.route("/api/backup/verificar/<int:backup_id>", methods=["POST"])
+@login_required
+def api_backup_verificar(backup_id):
+    if not _is_backup_admin():
+        return jsonify({"success": False, "message": "Acesso não autorizado."}), 403
+    if not _validate_backup_csrf():
+        return jsonify({"success": False, "message": "Token de segurança inválido. Recarregue a página."}), 400
+
+    registro = db.session.get(BackupHistorico, backup_id)
+    if not registro:
+        return jsonify({"success": False, "message": "Backup não encontrado."}), 404
+
+    safe_name = os.path.basename(registro.nome_arquivo)
+    caminho = os.path.join(backup_service.get_backup_dir(app.root_path), safe_name)
+    if not os.path.isfile(caminho):
+        return jsonify({"success": False, "message": "Arquivo físico não encontrado no servidor."}), 404
+
+    data = request.get_json(silent=True) or request.form
+    senha_backup = (data.get("backup_password") or "").strip()
+
+    try:
+        with open(caminho, "rb") as f_in:
+            enc_bytes = f_in.read()
+        preview, _ = backup_service.inspect_backup_bytes(db, enc_bytes, senha_backup)
+        return jsonify(
+            {
+                "success": True,
+                "message": "Integridade 100% verificada! Todas as tabelas e arquivos passaram na validação AES-256-GCM e SHA-256.",
+                "totals": preview["manifest"]["totals"],
+                "created_at_br": preview["manifest"]["created_at_br"],
+                "sha256": preview["sha256"],
+            }
+        )
+    except backup_service.BackupError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro ao verificar integridade: {str(e)}"}), 500
+
+
+@app.route("/api/backup/excluir/<int:backup_id>", methods=["POST"])
+@login_required
+def api_backup_excluir(backup_id):
+    if not _is_backup_admin():
+        return jsonify({"success": False, "message": "Acesso não autorizado."}), 403
+    if not _validate_backup_csrf():
+        return jsonify({"success": False, "message": "Token de segurança inválido. Recarregue a página."}), 400
+
+    data = request.get_json(silent=True) or request.form
+    admin_password = data.get("admin_password") or ""
+    if not current_user.check_password(admin_password):
+        return jsonify({"success": False, "message": "Senha do administrador incorreta."}), 403
+
+    registro = db.session.get(BackupHistorico, backup_id)
+    if not registro:
+        return jsonify({"success": False, "message": "Backup não encontrado."}), 404
+
+    safe_name = os.path.basename(registro.nome_arquivo)
+    caminho = os.path.join(backup_service.get_backup_dir(app.root_path), safe_name)
+    try:
+        if os.path.isfile(caminho):
+            os.remove(caminho)
+        registro.status = "ARQUIVO_REMOVIDO"
+        db.session.commit()
+        registrar_log("REMOVEU ARQUIVO DE BACKUP", f"{safe_name} (ID #{backup_id})")
+        return jsonify({"success": True, "message": "Arquivo de backup removido do disco do servidor com sucesso."})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Erro ao remover arquivo: {str(e)}"}), 500
+
+
+@app.route("/api/backup/inspecionar", methods=["POST"])
+@login_required
+def api_backup_inspecionar():
+    if not _is_backup_admin():
+        return jsonify({"success": False, "message": "Acesso não autorizado."}), 403
+    if not _validate_backup_csrf():
+        return jsonify({"success": False, "message": "Token de segurança inválido. Recarregue a página."}), 400
+
+    senha_backup = (request.form.get("backup_password") or "").strip()
+    server_backup_id = request.form.get("backup_id", type=int)
+
+    if not senha_backup:
+        return jsonify({"success": False, "message": "Informe a senha de criptografia do arquivo de backup."}), 400
+
+    try:
+        if server_backup_id:
+            registro = db.session.get(BackupHistorico, server_backup_id)
+            if not registro:
+                return jsonify({"success": False, "message": "Backup selecionado não encontrado."}), 404
+            safe_name = os.path.basename(registro.nome_arquivo)
+            caminho = os.path.join(backup_service.get_backup_dir(app.root_path), safe_name)
+            if not os.path.isfile(caminho):
+                return jsonify({"success": False, "message": "Arquivo físico não está mais disponível no servidor."}), 404
+            with open(caminho, "rb") as f_in:
+                enc_bytes = f_in.read()
+            origem_nome = safe_name
+        else:
+            arquivo = request.files.get("backup_file")
+            if not arquivo or not arquivo.filename:
+                return jsonify({"success": False, "message": "Selecione um arquivo '.g360bkp' para inspecionar."}), 400
+            enc_bytes = arquivo.read()
+            origem_nome = os.path.basename(arquivo.filename)
+
+        preview, _ = backup_service.inspect_backup_bytes(db, enc_bytes, senha_backup)
+        staging_token = backup_service.stage_uploaded_backup(app.root_path, enc_bytes)
+
+        manifest = preview["manifest"]
+        return jsonify(
+            {
+                "success": True,
+                "staging_token": staging_token,
+                "filename": origem_nome,
+                "sha256": preview["sha256"],
+                "size_fmt": _formatar_tamanho(preview["size_bytes"]),
+                "created_at_br": manifest.get("created_at_br"),
+                "created_by": manifest.get("created_by"),
+                "observacao": manifest.get("observacao") or "",
+                "source_dialect": manifest.get("source_dialect"),
+                "totals": manifest.get("totals"),
+                "comparison": preview["comparison"],
+                "warnings": preview["warnings"],
+            }
+        )
+    except backup_service.BackupError as e:
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "message": f"Erro ao inspecionar backup: {str(e)}"}), 500
+
+
+@app.route("/api/backup/restaurar", methods=["POST"])
+@login_required
+def api_backup_restaurar():
+    if not _is_backup_admin():
+        return jsonify({"success": False, "message": "Acesso não autorizado."}), 403
+    if not _validate_backup_csrf():
+        return jsonify({"success": False, "message": "Token de segurança inválido. Recarregue a página."}), 400
+
+    data = request.get_json(silent=True) or request.form
+    staging_token = (data.get("staging_token") or "").strip()
+    backup_password = (data.get("backup_password") or "").strip()
+    admin_password = data.get("admin_password") or ""
+    confirm_phrase = (data.get("confirm_phrase") or "").strip().upper()
+
+    if confirm_phrase != "RESTAURAR TUDO":
+        return jsonify({"success": False, "message": "Digite exatamente a frase de confirmação: RESTAURAR TUDO"}), 400
+    if not current_user.check_password(admin_password):
+        return jsonify({"success": False, "message": "Senha do administrador logado está incorreta."}), 403
+
+    admin_id_anterior = current_user.id
+    admin_username_anterior = current_user.username
+    ip_origem = request.remote_addr
+    stg_path = None
+
+    try:
+        enc_bytes, stg_path = backup_service.read_staged_backup(app.root_path, staging_token)
+        resultado = backup_service.restore_full_backup(
+            db=db,
+            app_root=app.root_path,
+            encrypted_bytes=enc_bytes,
+            password=backup_password,
+            restored_by=admin_username_anterior,
+            safety_password=backup_password,
+        )
+
+        # Registra o Auto-Snapshot de Segurança e o Evento de Restauração no BackupHistorico
+        sb = resultado["safety_backup"]
+        sb_totals = sb["manifest"]["totals"]
+        reg_safety = BackupHistorico(
+            nome_arquivo=sb["filename"],
+            tipo="PRE_RESTORE",
+            status="CONCLUIDO",
+            tamanho_bytes=sb["size_bytes"],
+            sha256=sb["sha256"],
+            total_tabelas=sb_totals["tables"],
+            total_registros=sb_totals["records"],
+            total_arquivos=sb_totals["media_files"],
+            origem_banco=sb["manifest"]["source_dialect"],
+            observacao=sb["manifest"].get("observacao") or "Snapshot automático pré-restauração",
+            criado_por_id=admin_id_anterior,
+            criado_por_nome=f"AUTO ({admin_username_anterior})",
+            ip_origem=ip_origem,
+            data_hora=datetime.utcnow(),
+        )
+        reg_restore = BackupHistorico(
+            nome_arquivo=f"RESTORE_{resultado['backup_created_at'] or ''}".strip(),
+            tipo="RESTAURACAO",
+            status="CONCLUIDO",
+            tamanho_bytes=len(enc_bytes),
+            sha256=backup_service._sha256_bytes(enc_bytes),
+            total_tabelas=len(resultado["restored_tables"]),
+            total_registros=resultado["restored_records"],
+            total_arquivos=resultado["restored_media_files"],
+            origem_banco=db.engine.dialect.name,
+            observacao=f"Restauração completa aplicada a partir do backup de {resultado['backup_created_at']}. Auto-snapshot salvo em {sb['filename']}.",
+            criado_por_id=admin_id_anterior,
+            criado_por_nome=admin_username_anterior,
+            ip_origem=ip_origem,
+            data_hora=datetime.utcnow(),
+        )
+        db.session.add(reg_safety)
+        db.session.add(reg_restore)
+        db.session.commit()
+
+        # Verifica se o usuário atual ainda existe após a restauração
+        user_ainda_existe = db.session.get(User, admin_id_anterior)
+        require_relogin = user_ainda_existe is None
+        if user_ainda_existe:
+            registrar_log(
+                "RESTAUROU BACKUP COMPLETO",
+                f"Backup de {resultado['backup_created_at']} ({resultado['restored_records']} registros, {resultado['restored_media_files']} mídias)",
+            )
+        else:
+            log_sys = LogAuditoria(
+                usuario_id=None,
+                acao="RESTAUROU BACKUP COMPLETO",
+                alvo=f"Restaurado por {admin_username_anterior} (backup de {resultado['backup_created_at']})",
+                ip_origem=ip_origem,
+                rota_acessada=request.path[:250],
+            )
+            db.session.add(log_sys)
+            db.session.commit()
+            logout_user()
+
+        return jsonify(
+            {
+                "success": True,
+                "message": f"Sistema restaurado com sucesso! {resultado['restored_records']} registros e {resultado['restored_media_files']} arquivos de mídia foram recuperados.",
+                "restored_records": resultado["restored_records"],
+                "restored_media_files": resultado["restored_media_files"],
+                "safety_backup_filename": sb["filename"],
+                "safety_backup_download_url": url_for("admin_backup_download", backup_id=reg_safety.id),
+                "require_relogin": require_relogin,
+            }
+        )
+    except backup_service.BackupError as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Falha na restauração (rollback aplicado, nenhum dado alterado): {str(e)}"}), 500
+    finally:
+        if stg_path and os.path.isfile(stg_path):
+            try:
+                os.remove(stg_path)
+            except OSError:
+                pass
 
 
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===

@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Backup & Restauração Completa — Gestoor 360</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .menu-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+        .menu-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+        .dark .menu-scroll::-webkit-scrollbar-thumb { background: #475569; }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-100 min-h-screen flex flex-col transition-colors">
+
+    <!-- TOP BAR -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30 border-b border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center">
+                    <i class="ph ph-database text-2xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-base sm:text-lg font-extrabold tracking-tight">Central de Backup & Restauração</h1>
+                        <span class="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            <i class="ph ph-shield-check"></i> AES-256-GCM
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-400">Snapshot completo do banco de dados + mídias com verificação SHA-256</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <button onclick="toggleDarkMode()" title="Alternar tema"
+                    class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+                    <i id="theme-icon" class="ph ph-moon text-lg"></i>
+                </button>
+                <a href="{{ url_for('admin_dashboard') }}"
+                    class="inline-flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold px-3.5 py-2 rounded-xl transition border border-slate-700">
+                    <i class="ph ph-arrow-left"></i>
+                    <span>Painel Admin</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- FLASH MESSAGES -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="space-y-2">
+            {% for category, message in messages %}
+            <div class="p-4 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm {{ 'bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900' if category == 'success' else 'bg-rose-50 text-rose-800 border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900' }}">
+                <i class="ph {{ 'ph-check-circle' if category == 'success' else 'ph-warning-circle' }} text-lg"></i>
+                <span>{{ message }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- ALERTA DINÂMICO AJAX -->
+        <div id="alertBox" class="hidden p-4 rounded-2xl text-sm font-semibold flex items-start justify-between gap-3 shadow-sm border"></div>
+
+        <!-- KPI CARDS DE INVENTÁRIO E SAÚDE -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Saúde do Backup -->
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm border-t-4 {% if ultimo_backup_ok and ultimo_backup_ok.dias_atras <= 7 %}border-t-emerald-500{% elif ultimo_backup_ok %}border-t-amber-500{% else %}border-t-rose-500{% endif %}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-gray-400">Último Backup</span>
+                    <div class="w-8 h-8 rounded-lg {% if ultimo_backup_ok and ultimo_backup_ok.dias_atras <= 7 %}bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400{% elif ultimo_backup_ok %}bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400{% else %}bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400{% endif %} flex items-center justify-center">
+                        <i class="ph ph-shield-check text-lg"></i>
+                    </div>
+                </div>
+                {% if ultimo_backup_ok %}
+                <p class="text-sm font-extrabold text-gray-900 dark:text-white">{{ ultimo_backup_ok.data_hora_fmt }}</p>
+                <p class="text-xs mt-1 {% if ultimo_backup_ok.dias_atras <= 7 %}text-emerald-600 dark:text-emerald-400{% else %}text-amber-600 dark:text-amber-400{% endif %} font-medium">
+                    {% if ultimo_backup_ok.dias_atras == 0 %}Protegido hoje{% elif ultimo_backup_ok.dias_atras == 1 %}Há 1 dia{% else %}Há {{ ultimo_backup_ok.dias_atras }} dias{% endif %}
+                </p>
+                {% else %}
+                <p class="text-base font-extrabold text-rose-600 dark:text-rose-400">Nenhum backup</p>
+                <p class="text-xs text-gray-400 mt-1">Gere seu primeiro backup agora</p>
+                {% endif %}
+            </div>
+
+            <!-- Motor de Banco -->
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm border-t-4 border-t-indigo-500">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-gray-400">Banco de Dados</span>
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                        <i class="ph ph-hard-drives text-lg"></i>
+                    </div>
+                </div>
+                <p class="text-sm font-extrabold text-gray-900 dark:text-white">{{ inventario.engine_label }}</p>
+                <p class="text-xs text-gray-400 mt-1">{{ inventario.total_tables }} tabelas mapeadas automaticamente</p>
+            </div>
+
+            <!-- Registros -->
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm border-t-4 border-t-blue-500">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-gray-400">Total de Registros</span>
+                    <div class="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                        <i class="ph ph-rows text-lg"></i>
+                    </div>
+                </div>
+                <p class="text-2xl font-extrabold text-gray-900 dark:text-white">{{ inventario.total_records }}</p>
+                <p class="text-xs text-gray-400 mt-1">100% incluídos com IDs originais</p>
+            </div>
+
+            <!-- Mídias -->
+            <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm border-t-4 border-t-purple-500">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-gray-400">Arquivos & Mídias</span>
+                    <div class="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 flex items-center justify-center">
+                        <i class="ph ph-images text-lg"></i>
+                    </div>
+                </div>
+                <p class="text-2xl font-extrabold text-gray-900 dark:text-white">{{ inventario.total_media_files }}</p>
+                <p class="text-xs text-gray-400 mt-1">Fotos, timbres e logos ({{ total_media_fmt }})</p>
+            </div>
+        </div>
+
+        <!-- AÇÕES PRINCIPAIS: GERAR BACKUP | RESTAURAR BACKUP -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- CARD 1: GERAR BACKUP COMPLETO -->
+            <section class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden flex flex-col">
+                <div class="px-6 py-4 bg-gradient-to-r from-emerald-600 to-teal-700 text-white flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+                            <i class="ph ph-cloud-arrow-down text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-extrabold uppercase tracking-wide">Gerar Backup Completo</h2>
+                            <p class="text-[11px] text-emerald-100">Salva banco inteiro + fotos + timbres em arquivo único .g360bkp</p>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="formGerarBackup" class="p-6 space-y-4 flex-1 flex flex-col">
+                    <div class="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/60 rounded-xl p-3.5 text-xs text-emerald-900 dark:text-emerald-200 flex items-start gap-2.5">
+                        <i class="ph ph-lock-key text-lg text-emerald-600 dark:text-emerald-400 mt-0.5 flex-shrink-0"></i>
+                        <p>
+                            O pacote sai criptografado com <strong>AES-256-GCM</strong>. Defina uma <strong>Senha de Criptografia</strong> forte e guarde-a em local seguro — ela será exigida para abrir ou restaurar este backup em qualquer servidor.
+                        </p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">Senha do Backup (mín. 8 chars)*</label>
+                            <div class="relative">
+                                <input type="password" id="bkp_pass" required minlength="8" autocomplete="new-password"
+                                    placeholder="Digite uma senha forte"
+                                    class="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <button type="button" onclick="togglePass('bkp_pass')" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                                    <i class="ph ph-eye text-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">Confirmar Senha*</label>
+                            <div class="relative">
+                                <input type="password" id="bkp_pass_confirm" required minlength="8" autocomplete="new-password"
+                                    placeholder="Repita a senha"
+                                    class="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <button type="button" onclick="togglePass('bkp_pass_confirm')" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                                    <i class="ph ph-eye text-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">Identificação / Observação (opcional)</label>
+                        <input type="text" id="bkp_obs" maxlength="300"
+                            placeholder="Ex: Backup antes da virada 2027 / Fechamento mensal"
+                            class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+                    </div>
+
+                    <label class="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 cursor-pointer select-none">
+                        <input type="checkbox" id="bkp_auto_download" checked class="rounded text-emerald-600 focus:ring-emerald-500">
+                        <span>Iniciar download automático do arquivo <code>.g360bkp</code> assim que terminar (recomendado)</span>
+                    </label>
+
+                    <!-- Resultado imediato do backup gerado -->
+                    <div id="boxResultadoBackup" class="hidden rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/30 p-4 text-xs space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="font-extrabold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
+                                <i class="ph ph-check-circle text-base"></i> Backup pronto para guarda segura!
+                            </span>
+                            <a id="linkDownloadGerado" href="#"
+                                class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg transition shadow-sm">
+                                <i class="ph ph-download-simple"></i> Baixar .g360bkp
+                            </a>
+                        </div>
+                        <p class="text-gray-600 dark:text-gray-300" id="lblResumoGerado"></p>
+                        <p class="font-mono text-[10px] text-gray-500 dark:text-gray-400 break-all">
+                            <strong>SHA-256:</strong> <span id="lblShaGerado"></span>
+                        </p>
+                    </div>
+
+                    <div class="pt-2 mt-auto">
+                        <button type="submit" id="btnGerarBackup"
+                            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-5 rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center justify-center gap-2 text-sm">
+                            <i class="ph ph-shield-plus text-lg"></i>
+                            <span>Gerar Backup Completo Agora</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- CARD 2: RESTAURAR SISTEMA COMPLETO -->
+            <section class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden flex flex-col">
+                <div class="px-6 py-4 bg-gradient-to-r from-amber-600 to-rose-700 text-white flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
+                            <i class="ph ph-clock-counter-clockwise text-xl"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-sm font-extrabold uppercase tracking-wide">Restaurar Backup Completo</h2>
+                            <p class="text-[11px] text-amber-100">Inspeção prévia + Auto-Snapshot de segurança antes de aplicar</p>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="formInspecionarBackup" class="p-6 space-y-4 flex-1 flex flex-col">
+                    <div class="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3.5 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+                        <i class="ph ph-warning-circle text-lg text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0"></i>
+                        <p>
+                            <strong>Passo 1 (Sem Risco):</strong> Primeiro enviamos e validamos o arquivo <code>.g360bkp</code>. Nada no sistema será alterado até você conferir a prévia completa e confirmar no Passo 2.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">Arquivo de Backup (.g360bkp)*</label>
+                        <input type="file" id="restore_file" accept=".g360bkp" required
+                            class="block w-full text-xs text-gray-600 dark:text-gray-300 file:mr-3 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-slate-900 file:text-white hover:file:bg-slate-800 dark:file:bg-indigo-600 dark:hover:file:bg-indigo-700 border border-gray-300 dark:border-gray-600 rounded-xl bg-gray-50 dark:bg-gray-700 cursor-pointer">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">Senha de Criptografia do Backup*</label>
+                        <div class="relative">
+                            <input type="password" id="restore_bkp_pass" required autocomplete="off"
+                                placeholder="Senha usada quando o backup foi gerado"
+                                class="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+                            <button type="button" onclick="togglePass('restore_bkp_pass')" class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                                <i class="ph ph-eye text-lg"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="text-[11px] text-gray-500 dark:text-gray-400 space-y-1 bg-gray-50 dark:bg-gray-900/40 rounded-xl p-3 border border-gray-200 dark:border-gray-700">
+                        <p class="font-bold text-gray-700 dark:text-gray-200">Garantias automáticas na restauração:</p>
+                        <p>• Validação integral SHA-256 de todas as tabelas e fotos antes de iniciar.</p>
+                        <p>• Criação automática de um <strong>Backup de Emergência</strong> do estado atual antes de substituir.</p>
+                        <p>• Transação atômica: se ocorrer qualquer erro, 100% é revertido (rollback).</p>
+                    </div>
+
+                    <div class="pt-2 mt-auto">
+                        <button type="submit" id="btnInspecionarBackup"
+                            class="w-full bg-slate-900 hover:bg-slate-800 dark:bg-amber-600 dark:hover:bg-amber-700 text-white font-bold py-3 px-5 rounded-xl shadow-md transition flex items-center justify-center gap-2 text-sm">
+                            <i class="ph ph-magnifying-glass-plus text-lg"></i>
+                            <span>Inspecionar e Validar Backup</span>
+                        </button>
+                    </div>
+                </form>
+            </section>
+        </div>
+
+        <!-- INVENTÁRIO DETALHADO DE TUDO QUE É SALVO -->
+        <section class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <button type="button" onclick="document.getElementById('inventarioBody').classList.toggle('hidden'); document.getElementById('invChevron').classList.toggle('rotate-180')"
+                class="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-gray-50 dark:hover:bg-gray-700/50 transition">
+                <div class="flex items-center gap-3">
+                    <i class="ph ph-list-checks text-xl text-indigo-500"></i>
+                    <div>
+                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">Inventário Completo Protegido no Backup</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Clique para visualizar as {{ inventario.total_tables }} tabelas e contagens exatas incluídas automaticamente</p>
+                    </div>
+                </div>
+                <i id="invChevron" class="ph ph-caret-down text-xl text-gray-400 transition-transform"></i>
+            </button>
+
+            <div id="inventarioBody" class="hidden border-t border-gray-100 dark:border-gray-700 p-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {% for tbl in inventario.tables %}
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-200/80 dark:border-gray-700">
+                        <div class="min-w-0 pr-2">
+                            <p class="text-xs font-bold text-gray-800 dark:text-gray-100 truncate">{{ tbl.label }}</p>
+                            <p class="text-[10px] font-mono text-gray-400">{{ tbl.name }}</p>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 whitespace-nowrap">
+                            {{ tbl.count }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <!-- HISTÓRICO DE BACKUPS E RESTAURAÇÕES -->
+        <section class="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div class="flex items-center gap-2.5">
+                    <i class="ph ph-clock-clockwise text-xl text-emerald-600"></i>
+                    <div>
+                        <h3 class="text-sm font-extrabold text-gray-900 dark:text-white">Histórico de Backups & Restaurações</h3>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Registro auditável de todos os snapshots gerados e restaurações aplicadas</p>
+                    </div>
+                </div>
+                <span class="text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 w-fit">
+                    {{ historico|length }} evento(s)
+                </span>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-gray-50 dark:bg-gray-700/70 text-[11px] uppercase font-bold text-gray-500 dark:text-gray-300">
+                        <tr>
+                            <th class="px-5 py-3.5">Data / Hora (BR)</th>
+                            <th class="px-5 py-3.5">Tipo & Arquivo</th>
+                            <th class="px-5 py-3.5">Conteúdo</th>
+                            <th class="px-5 py-3.5">Tamanho</th>
+                            <th class="px-5 py-3.5">Responsável</th>
+                            <th class="px-5 py-3.5 text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+                        {% for h in historico %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/40 transition">
+                            <td class="px-5 py-3.5 font-mono text-gray-600 dark:text-gray-300 whitespace-nowrap">{{ h.data_hora_fmt }}</td>
+                            <td class="px-5 py-3.5">
+                                <div class="flex items-center gap-2 mb-0.5">
+                                    {% if h.tipo == 'MANUAL' %}
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">BACKUP MANUAL</span>
+                                    {% elif h.tipo == 'PRE_RESTORE' %}
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">AUTO PRÉ-RESTORE</span>
+                                    {% else %}
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">RESTAURAÇÃO</span>
+                                    {% endif %}
+                                    {% if h.tipo != 'RESTAURACAO' %}
+                                        {% if h.disponivel %}
+                                        <span class="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">● No servidor</span>
+                                        {% else %}
+                                        <span class="text-[10px] text-gray-400">○ Apenas histórico</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                                <p class="font-bold text-gray-900 dark:text-white break-all">{{ h.nome_arquivo }}</p>
+                                {% if h.observacao %}
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{{ h.observacao }}</p>
+                                {% endif %}
+                            </td>
+                            <td class="px-5 py-3.5 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                                <span class="font-bold text-gray-900 dark:text-white">{{ h.total_registros }}</span> reg. •
+                                <span>{{ h.total_tabelas }}</span> tab. •
+                                <span>{{ h.total_arquivos }}</span> mídias
+                            </td>
+                            <td class="px-5 py-3.5 font-mono text-gray-600 dark:text-gray-300 whitespace-nowrap">{{ h.tamanho_fmt }}</td>
+                            <td class="px-5 py-3.5">
+                                <p class="font-bold text-gray-800 dark:text-gray-200">{{ h.criado_por_nome }}</p>
+                                {% if h.ip_origem %}<p class="text-[10px] font-mono text-gray-400">{{ h.ip_origem }}</p>{% endif %}
+                            </td>
+                            <td class="px-5 py-3.5 text-right whitespace-nowrap">
+                                {% if h.disponivel and h.tipo != 'RESTAURACAO' %}
+                                <div class="inline-flex items-center gap-1.5">
+                                    <a href="{{ url_for('admin_backup_download', backup_id=h.id) }}" title="Baixar arquivo .g360bkp"
+                                        class="p-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 transition">
+                                        <i class="ph ph-download-simple text-base"></i>
+                                    </a>
+                                    <button type="button" onclick="abrirModalVerificar({{ h.id }}, {{ h.nome_arquivo|tojson }})" title="Verificar integridade SHA-256"
+                                        class="p-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300 transition">
+                                        <i class="ph ph-seal-check text-base"></i>
+                                    </button>
+                                    <button type="button" onclick="abrirInspecaoServidor({{ h.id }}, {{ h.nome_arquivo|tojson }})" title="Restaurar este backup"
+                                        class="p-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 transition">
+                                        <i class="ph ph-clock-counter-clockwise text-base"></i>
+                                    </button>
+                                    <button type="button" onclick="abrirModalExcluirBackup({{ h.id }}, {{ h.nome_arquivo|tojson }})" title="Remover arquivo do disco"
+                                        class="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 transition">
+                                        <i class="ph ph-trash text-base"></i>
+                                    </button>
+                                </div>
+                                {% else %}
+                                <span class="text-gray-400 text-[11px]">—</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="px-6 py-10 text-center text-gray-400">
+                                <i class="ph ph-database text-3xl mb-2 block opacity-40"></i>
+                                Nenhum backup registrado ainda. Gere seu primeiro backup completo acima.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL PASSO 2: PRÉVIA & CONFIRMAÇÃO DE RESTAURAÇÃO -->
+    <div id="modalConfirmarRestore" class="fixed inset-0 bg-slate-900/75 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div class="px-6 py-4 bg-rose-700 text-white flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-2.5">
+                    <i class="ph ph-warning-octagon text-2xl"></i>
+                    <div>
+                        <h3 class="text-sm font-extrabold uppercase tracking-wide">Passo 2 — Confirmar Restauração Completa</h3>
+                        <p class="text-[11px] text-rose-100">Revise cuidadosamente a prévia antes de substituir o sistema atual</p>
+                    </div>
+                </div>
+                <button type="button" onclick="fecharModalRestore()" class="text-rose-200 hover:text-white p-1">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto menu-scroll space-y-5 flex-1">
+                <!-- Selo de integridade -->
+                <div class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-start gap-3">
+                    <i class="ph ph-seal-check text-2xl text-emerald-600 dark:text-emerald-400 flex-shrink-0"></i>
+                    <div class="text-xs space-y-1">
+                        <p class="font-extrabold text-emerald-800 dark:text-emerald-300">Integridade 100% Validada (AES-256-GCM + SHA-256)</p>
+                        <p class="text-emerald-900 dark:text-emerald-200" id="restorePreviewMeta"></p>
+                        <p class="font-mono text-[10px] text-emerald-700 dark:text-emerald-400 break-all" id="restorePreviewSha"></p>
+                    </div>
+                </div>
+
+                <!-- Avisos de schema (se houver) -->
+                <div id="restoreWarningsBox" class="hidden p-3.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-200 space-y-1"></div>
+
+                <!-- Tabela comparativa -->
+                <div>
+                    <h4 class="text-xs font-extrabold uppercase text-gray-500 dark:text-gray-400 mb-2">Comparativo: Banco Atual × Backup a Restaurar</h4>
+                    <div class="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden max-h-56 overflow-y-auto menu-scroll">
+                        <table class="w-full text-xs text-left">
+                            <thead class="bg-gray-50 dark:bg-gray-700 text-[10px] uppercase font-bold text-gray-500 dark:text-gray-300 sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-2">Tabela</th>
+                                    <th class="px-4 py-2 text-right">Atual</th>
+                                    <th class="px-4 py-2 text-right">No Backup</th>
+                                </tr>
+                            </thead>
+                            <tbody id="restoreComparisonBody" class="divide-y divide-gray-100 dark:divide-gray-700"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Confirmação reforçada -->
+                <form id="formExecutarRestore" class="space-y-4 bg-rose-50/70 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-900/60 p-4 rounded-xl">
+                    <input type="hidden" id="restore_staging_token">
+                    <p class="text-xs text-rose-900 dark:text-rose-200 font-semibold">
+                        Um <strong>Snapshot Automático de Segurança</strong> do banco atual será gravado antes da substituição. Para autorizar, confirme abaixo:
+                    </p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-gray-700 dark:text-gray-300 mb-1">Sua Senha de Administrador*</label>
+                            <input type="password" id="restore_admin_pass" required autocomplete="current-password"
+                                placeholder="Senha do seu login atual"
+                                class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm outline-none focus:ring-2 focus:ring-rose-500">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold uppercase text-gray-700 dark:text-gray-300 mb-1">Digite exatamente: <code>RESTAURAR TUDO</code>*</label>
+                            <input type="text" id="restore_confirm_phrase" required autocomplete="off"
+                                placeholder="RESTAURAR TUDO"
+                                class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-mono uppercase outline-none focus:ring-2 focus:ring-rose-500">
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-end gap-3 pt-1">
+                        <button type="button" onclick="fecharModalRestore()"
+                            class="px-4 py-2.5 rounded-xl bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-xs font-bold text-gray-800 dark:text-gray-100 transition">
+                            Cancelar
+                        </button>
+                        <button type="submit" id="btnExecutarRestore"
+                            class="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold shadow-md transition flex items-center gap-2">
+                            <i class="ph ph-warning-circle text-base"></i>
+                            <span>Executar Restauração Completa</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL VERIFICAR / RESTAURAR SNAPSHOT DO SERVIDOR / EXCLUIR -->
+    <div id="modalAcaoSnapshot" class="fixed inset-0 bg-slate-900/70 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-2xl w-full max-w-md p-6 shadow-2xl border border-gray-200 dark:border-gray-700 space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 id="modalSnapTitle" class="text-sm font-extrabold text-gray-900 dark:text-white">Ação no Backup</h3>
+                <button type="button" onclick="fecharModalSnap()" class="text-gray-400 hover:text-gray-700 dark:hover:text-white">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+            <p id="modalSnapDesc" class="text-xs text-gray-500 dark:text-gray-400"></p>
+            <form id="formSnapAcao" class="space-y-4">
+                <input type="hidden" id="snap_id">
+                <input type="hidden" id="snap_mode">
+                <div>
+                    <label id="snap_pass_label" class="block text-[11px] font-bold uppercase text-gray-500 dark:text-gray-400 mb-1">Senha</label>
+                    <input type="password" id="snap_pass_input" required autocomplete="off"
+                        class="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-sm outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button type="button" onclick="fecharModalSnap()" class="px-4 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-xs font-bold">Cancelar</button>
+                    <button type="submit" id="btnSnapSubmit" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold">Confirmar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- LOADING OVERLAY -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-slate-900/80 z-[9999] flex flex-col items-center justify-center text-white backdrop-blur-sm">
+        <i class="ph ph-spinner-gap animate-spin text-5xl text-emerald-400 mb-3"></i>
+        <p id="loadingMsg" class="text-sm font-bold">Processando operação criptografada...</p>
+        <p class="text-xs text-slate-400 mt-1">Não feche esta aba até a conclusão.</p>
+    </div>
+
+    <script>
+        const CSRF_TOKEN = {{ csrf_token|tojson }};
+        let lastRestorePassword = "";
+
+        // Dark mode
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                icon.classList.replace('ph-sun', 'ph-moon');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                icon.classList.replace('ph-moon', 'ph-sun');
+            }
+        }
+        if (localStorage.getItem('theme') === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.getElementById('theme-icon').classList.replace('ph-moon', 'ph-sun');
+        }
+
+        function togglePass(id) {
+            const inp = document.getElementById(id);
+            inp.type = inp.type === 'password' ? 'text' : 'password';
+        }
+
+        function setLoading(show, msg) {
+            const el = document.getElementById('loadingOverlay');
+            if (msg) document.getElementById('loadingMsg').innerText = msg;
+            el.classList.toggle('hidden', !show);
+        }
+
+        function showAlert(type, message) {
+            const box = document.getElementById('alertBox');
+            const styles = {
+                success: 'bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-200 dark:border-emerald-800',
+                error: 'bg-rose-50 text-rose-900 border-rose-200 dark:bg-rose-950/40 dark:text-rose-200 dark:border-rose-800',
+                info: 'bg-blue-50 text-blue-900 border-blue-200 dark:bg-blue-950/40 dark:text-blue-200 dark:border-blue-800',
+            };
+            box.className = `p-4 rounded-2xl text-sm font-semibold flex items-start justify-between gap-3 shadow-sm border ${styles[type] || styles.info}`;
+            box.innerHTML = `<div class="flex items-start gap-2.5"><i class="ph ${type === 'success' ? 'ph-check-circle' : 'ph-warning-circle'} text-xl mt-0.5"></i><span>${escapeHtml(message)}</span></div><button type="button" onclick="this.parentElement.classList.add('hidden')" class="opacity-60 hover:opacity-100"><i class="ph ph-x text-lg"></i></button>`;
+            box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function escapeHtml(str) {
+            const d = document.createElement('div');
+            d.innerText = str || '';
+            return d.innerHTML;
+        }
+
+        // 1. GERAR BACKUP COMPLETO
+        document.getElementById('formGerarBackup').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const pwd = document.getElementById('bkp_pass').value.trim();
+            const pwd2 = document.getElementById('bkp_pass_confirm').value.trim();
+            const obs = document.getElementById('bkp_obs').value.trim();
+            const autoDl = document.getElementById('bkp_auto_download').checked;
+
+            if (pwd.length < 8) {
+                showAlert('error', 'A senha de criptografia do backup deve ter no mínimo 8 caracteres.');
+                return;
+            }
+            if (pwd !== pwd2) {
+                showAlert('error', 'As senhas informadas não coincidem.');
+                return;
+            }
+
+            setLoading(true, 'Exportando todas as tabelas, empacotando mídias e criptografando (AES-256)...');
+            try {
+                const resp = await fetch('/api/backup/gerar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': CSRF_TOKEN
+                    },
+                    body: JSON.stringify({
+                        backup_password: pwd,
+                        backup_password_confirm: pwd2,
+                        observacao: obs
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok || !data.success) {
+                    showAlert('error', data.message || 'Erro ao gerar backup.');
+                    return;
+                }
+
+                const b = data.backup;
+                document.getElementById('linkDownloadGerado').href = b.download_url;
+                document.getElementById('lblResumoGerado').innerText =
+                    `Arquivo: ${b.filename} • ${b.size_fmt} • ${b.totals.tables} tabelas • ${b.totals.records} registros • ${b.totals.media_files} mídias`;
+                document.getElementById('lblShaGerado').innerText = b.sha256;
+                document.getElementById('boxResultadoBackup').classList.remove('hidden');
+
+                document.getElementById('bkp_pass').value = '';
+                document.getElementById('bkp_pass_confirm').value = '';
+                document.getElementById('bkp_obs').value = '';
+
+                showAlert('success', data.message);
+
+                if (autoDl) {
+                    window.location.href = b.download_url;
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    setTimeout(() => window.location.reload(), 2500);
+                }
+            } catch (err) {
+                showAlert('error', 'Falha de comunicação ao gerar backup: ' + err.message);
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // 2. INSPECIONAR BACKUP VIA UPLOAD
+        document.getElementById('formInspecionarBackup').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const fileInput = document.getElementById('restore_file');
+            const pwd = document.getElementById('restore_bkp_pass').value.trim();
+
+            if (!fileInput.files.length) {
+                showAlert('error', 'Selecione um arquivo .g360bkp.');
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append('backup_file', fileInput.files[0]);
+            fd.append('backup_password', pwd);
+            fd.append('csrf_token', CSRF_TOKEN);
+
+            await inspecionarBackupFormData(fd, pwd);
+        });
+
+        async function inspecionarBackupFormData(formData, pwd) {
+            setLoading(true, 'Descriptografando e validando integridade SHA-256 de todas as tabelas e mídias...');
+            try {
+                const resp = await fetch('/api/backup/inspecionar', {
+                    method: 'POST',
+                    headers: { 'X-CSRF-Token': CSRF_TOKEN },
+                    body: formData
+                });
+                const data = await resp.json();
+                if (!resp.ok || !data.success) {
+                    showAlert('error', data.message || 'Falha ao validar arquivo de backup.');
+                    return;
+                }
+
+                lastRestorePassword = pwd;
+                abrirModalPreviewRestore(data);
+            } catch (err) {
+                showAlert('error', 'Erro ao inspecionar backup: ' + err.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function abrirModalPreviewRestore(data) {
+            document.getElementById('restore_staging_token').value = data.staging_token;
+            document.getElementById('restore_admin_pass').value = '';
+            document.getElementById('restore_confirm_phrase').value = '';
+
+            document.getElementById('restorePreviewMeta').innerText =
+                `Arquivo: ${data.filename} (${data.size_fmt}) • Criado em ${data.created_at_br} por ${data.created_by} • Origem: ${data.source_dialect.toUpperCase()} • ${data.totals.records} registros e ${data.totals.media_files} arquivos de mídia.`;
+            document.getElementById('restorePreviewSha').innerText = `SHA-256: ${data.sha256}`;
+
+            const warnBox = document.getElementById('restoreWarningsBox');
+            if (data.warnings && data.warnings.length) {
+                warnBox.innerHTML = '<p class="font-bold">Avisos de Compatibilidade:</p>' +
+                    data.warnings.map(w => `<p>• ${escapeHtml(w)}</p>`).join('');
+                warnBox.classList.remove('hidden');
+            } else {
+                warnBox.classList.add('hidden');
+            }
+
+            const tbody = document.getElementById('restoreComparisonBody');
+            tbody.innerHTML = data.comparison.map(row => `
+                <tr>
+                    <td class="px-4 py-2 font-semibold text-gray-800 dark:text-gray-100">${escapeHtml(row.label)} <span class="text-[10px] font-mono text-gray-400">(${escapeHtml(row.name)})</span></td>
+                    <td class="px-4 py-2 text-right font-mono text-gray-500">${row.current_rows === null ? 'N/A' : row.current_rows}</td>
+                    <td class="px-4 py-2 text-right font-mono font-bold text-indigo-600 dark:text-indigo-400">${row.backup_rows}</td>
+                </tr>
+            `).join('');
+
+            document.getElementById('modalConfirmarRestore').classList.remove('hidden');
+        }
+
+        function fecharModalRestore() {
+            document.getElementById('modalConfirmarRestore').classList.add('hidden');
+        }
+
+        // 3. EXECUTAR RESTAURAÇÃO COMPLETA
+        document.getElementById('formExecutarRestore').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const token = document.getElementById('restore_staging_token').value;
+            const adminPass = document.getElementById('restore_admin_pass').value;
+            const phrase = document.getElementById('restore_confirm_phrase').value.trim().toUpperCase();
+
+            if (phrase !== 'RESTAURAR TUDO') {
+                showAlert('error', 'Digite exatamente a frase RESTAURAR TUDO para confirmar.');
+                return;
+            }
+
+            setLoading(true, 'Criando snapshot de segurança e restaurando banco de dados + mídias...');
+            try {
+                const resp = await fetch('/api/backup/restaurar', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': CSRF_TOKEN
+                    },
+                    body: JSON.stringify({
+                        staging_token: token,
+                        backup_password: lastRestorePassword,
+                        admin_password: adminPass,
+                        confirm_phrase: phrase
+                    })
+                });
+                const data = await resp.json();
+                if (!resp.ok || !data.success) {
+                    showAlert('error', data.message || 'Erro ao restaurar backup.');
+                    return;
+                }
+
+                fecharModalRestore();
+                showAlert('success', data.message + ` (Snapshot pré-restauração salvo: ${data.safety_backup_filename})`);
+
+                setTimeout(() => {
+                    if (data.require_relogin) {
+                        window.location.href = '/login';
+                    } else {
+                        window.location.reload();
+                    }
+                }, 2500);
+            } catch (err) {
+                showAlert('error', 'Erro durante a restauração: ' + err.message);
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // 4. AÇÕES NO HISTÓRICO (VERIFICAR, RESTAURAR DO SERVIDOR, EXCLUIR)
+        function abrirModalVerificar(id, nome) {
+            document.getElementById('snap_id').value = id;
+            document.getElementById('snap_mode').value = 'verificar';
+            document.getElementById('modalSnapTitle').innerText = 'Verificar Integridade do Backup';
+            document.getElementById('modalSnapDesc').innerText = `Informe a senha de criptografia usada no arquivo "${nome}" para validar AES-256-GCM e todos os hashes SHA-256.`;
+            document.getElementById('snap_pass_label').innerText = 'Senha de Criptografia do Backup*';
+            document.getElementById('snap_pass_input').value = '';
+            document.getElementById('btnSnapSubmit').innerText = 'Verificar Agora';
+            document.getElementById('btnSnapSubmit').className = 'px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold';
+            document.getElementById('modalAcaoSnapshot').classList.remove('hidden');
+        }
+
+        function abrirInspecaoServidor(id, nome) {
+            document.getElementById('snap_id').value = id;
+            document.getElementById('snap_mode').value = 'restaurar';
+            document.getElementById('modalSnapTitle').innerText = 'Inspecionar Snapshot para Restauração';
+            document.getElementById('modalSnapDesc').innerText = `Informe a senha de criptografia do arquivo "${nome}" para abrir a prévia de restauração.`;
+            document.getElementById('snap_pass_label').innerText = 'Senha de Criptografia do Backup*';
+            document.getElementById('snap_pass_input').value = '';
+            document.getElementById('btnSnapSubmit').innerText = 'Inspecionar Snapshot';
+            document.getElementById('btnSnapSubmit').className = 'px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold';
+            document.getElementById('modalAcaoSnapshot').classList.remove('hidden');
+        }
+
+        function abrirModalExcluirBackup(id, nome) {
+            document.getElementById('snap_id').value = id;
+            document.getElementById('snap_mode').value = 'excluir';
+            document.getElementById('modalSnapTitle').innerText = 'Remover Arquivo de Backup do Servidor';
+            document.getElementById('modalSnapDesc').innerText = `Isso apagará o arquivo "${nome}" do disco do servidor (o registro histórico permanecerá na auditoria). Informe sua senha de administrador.`;
+            document.getElementById('snap_pass_label').innerText = 'Sua Senha de Administrador*';
+            document.getElementById('snap_pass_input').value = '';
+            document.getElementById('btnSnapSubmit').innerText = 'Remover Arquivo';
+            document.getElementById('btnSnapSubmit').className = 'px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold';
+            document.getElementById('modalAcaoSnapshot').classList.remove('hidden');
+        }
+
+        function fecharModalSnap() {
+            document.getElementById('modalAcaoSnapshot').classList.add('hidden');
+        }
+
+        document.getElementById('formSnapAcao').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            const id = document.getElementById('snap_id').value;
+            const mode = document.getElementById('snap_mode').value;
+            const pass = document.getElementById('snap_pass_input').value;
+
+            fecharModalSnap();
+
+            if (mode === 'verificar') {
+                setLoading(true, 'Verificando criptografia e integridade SHA-256...');
+                try {
+                    const resp = await fetch(`/api/backup/verificar/${id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                        body: JSON.stringify({ backup_password: pass })
+                    });
+                    const data = await resp.json();
+                    showAlert(data.success ? 'success' : 'error', data.message);
+                } finally {
+                    setLoading(false);
+                }
+            } else if (mode === 'restaurar') {
+                const fd = new FormData();
+                fd.append('backup_id', id);
+                fd.append('backup_password', pass);
+                fd.append('csrf_token', CSRF_TOKEN);
+                await inspecionarBackupFormData(fd, pass);
+            } else if (mode === 'excluir') {
+                setLoading(true, 'Removendo arquivo do servidor...');
+                try {
+                    const resp = await fetch(`/api/backup/excluir/${id}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF_TOKEN },
+                        body: JSON.stringify({ admin_password: pass })
+                    });
+                    const data = await resp.json();
+                    showAlert(data.success ? 'success' : 'error', data.message);
+                    if (data.success) setTimeout(() => window.location.reload(), 1200);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/inactivity.js') }}"></script>
+</body>
+</html>

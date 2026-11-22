@@ -308,6 +308,15 @@
                     </div>
                 </button>
 
+                <a href="{{ url_for('admin_backup') }}"
+                    class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 transition-colors dark:text-gray-200 dark:hover:bg-emerald-950/40">
+                    <div class="flex items-center gap-2.5">
+                        <i class="ph ph-database text-base text-emerald-600"></i>
+                        <span>Backup & Restauração</span>
+                    </div>
+                    <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">AES-256</span>
+                </a>
+
                 <button onclick="switchTab('config', this)"
                     class="sidebar-nav-item nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
                     <div class="flex items-center gap-2.5">
