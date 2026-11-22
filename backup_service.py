@@ -512,6 +512,19 @@ def inspect_backup_bytes(
                 cur_rows = int(
                     conn.execute(text(f'SELECT COUNT(*) FROM "{tname}"')).scalar() or 0
                 )
+                cur_cols = {c.name for c in current_tables[tname].columns}
+                bkp_cols = set(meta.get("columns") or [])
+                if bkp_cols:
+                    new_cols = sorted(cur_cols - bkp_cols)
+                    dropped_cols = sorted(bkp_cols - cur_cols)
+                    if new_cols:
+                        warnings.append(
+                            f"Tabela '{tname}' é de versão anterior: {len(new_cols)} nova(s) coluna(s) ({', '.join(new_cols[:4])}{'...' if len(new_cols) > 4 else ''}) receberão valores padrão/backfill automático."
+                        )
+                    if dropped_cols:
+                        warnings.append(
+                            f"Tabela '{tname}' possui coluna(s) antiga(s) não usadas nesta versão ({', '.join(dropped_cols[:4])}) que serão ignoradas com segurança."
+                        )
             else:
                 cur_rows = None
                 warnings.append(
@@ -699,6 +712,7 @@ def restore_full_backup(
     password: str,
     restored_by: str,
     safety_password: Optional[str] = None,
+    post_restore_hook: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Restaura o sistema completo de forma transacional e à prova de falhas:
@@ -778,6 +792,8 @@ def restore_full_backup(
                             clean_row[col_name] = _deserialize_value(
                                 raw_obj[col_name], col_obj.type
                             )
+                        elif col_obj.default is not None and col_obj.default.is_scalar:
+                            clean_row[col_name] = col_obj.default.arg
 
                     if self_fks:
                         saved_fks = {}
@@ -813,6 +829,10 @@ def restore_full_backup(
 
         # 4. Restauração atômica das mídias físicas
         media_restored = _restore_media_files_atomic(app_root, zf, manifest)
+
+    # 5. Hook opcional pós-restauração (ex.: backfill automático de colunas novas ao restaurar backup antigo)
+    if callable(post_restore_hook):
+        post_restore_hook()
 
     return {
         "restored_records": sum(restored_counts.values()),

@@ -30,18 +30,73 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from sqlalchemy import func, text, event
 import backup_service
+import security
 
 load_dotenv()
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "chave_secreta_local")
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(minutes=15)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = bool(
+    os.getenv("RAILWAY_ENVIRONMENT")
+    or os.getenv("RAILWAY_STATIC_URL")
+    or os.getenv("FLASK_ENV") == "production"
+)
 
 @app.before_request
-def refresh_session_on_request():
+def security_before_request():
+    # 1. Mantém sessão ativa e bloqueia contas desativadas imediatamente
     if current_user and current_user.is_authenticated:
+        if getattr(current_user, "ativo", True) is False:
+            logout_user()
+            flash("Sua conta foi desativada pelo administrador.", "error")
+            return redirect(url_for("login"))
         session.permanent = True
         session.modified = True
+
+    # 2. Validação CSRF global para requisições mutáveis autenticadas
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        if not security.is_csrf_exempt(request.path):
+            # Exige CSRF em todas as rotas autenticadas (e no /login quando já há sessão CSRF)
+            needs_csrf = current_user.is_authenticated or (
+                request.path == "/login" and bool(session.get("_csrf_token"))
+            )
+            if needs_csrf and not security.validate_csrf_request():
+                is_api = request.path.startswith("/api/") or request.is_json
+                if is_api:
+                    return jsonify({
+                        "success": False,
+                        "message": "Token de segurança (CSRF) inválido ou expirado. Recarregue a página.",
+                    }), 400
+                flash("Sessão de formulário expirada (CSRF). Tente novamente.", "error")
+                return redirect(request.referrer or url_for("index"))
+
+
+@app.after_request
+def security_after_request(response):
+    response = security.apply_security_headers(response)
+    # Injeta meta csrf-token + script automático em páginas HTML sem quebrar templates legados
+    try:
+        ct = response.content_type or ""
+        if (
+            ct.startswith("text/html")
+            and response.status_code == 200
+            and not response.direct_passthrough
+        ):
+            html = response.get_data(as_text=True)
+            if "</head>" in html and "security_csrf.js" not in html:
+                token = security.get_csrf_token()
+                inject = (
+                    f'\n    <meta name="csrf-token" content="{token}">'
+                    f'\n    <script src="/static/js/security_csrf.js"></script>\n</head>'
+                )
+                html = html.replace("</head>", inject, 1)
+                response.set_data(html)
+    except Exception:
+        pass
+    return response
 
 # Pega a URL do banco da variável de ambiente (Railway) ou usa o SQLite local como plano B
 db_url = os.getenv("DATABASE_URL")
@@ -68,8 +123,22 @@ login_manager.login_view = "login"
 class Secretaria(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), unique=True, nullable=False)
+    sigla = db.Column(db.String(20), nullable=True)
+    cnpj = db.Column(db.String(25), nullable=True)
+    endereco = db.Column(db.String(255), nullable=True)
+    telefone = db.Column(db.String(30), nullable=True)
+    email = db.Column(db.String(120), nullable=True)
+    secretario_nome = db.Column(db.String(150), nullable=True)
+    secretario_cargo = db.Column(db.String(120), nullable=True)
+    secretario_cpf = db.Column(db.String(30), nullable=True)
+    secretario_portaria = db.Column(db.String(100), nullable=True)
+    teto_comissionados = db.Column(db.Integer, default=0)
+    teto_folha_mensal = db.Column(db.Float, default=0.0)
+    ativa = db.Column(db.Boolean, default=True)
+
     usuarios = db.relationship("User", backref="secretaria", lazy=True)
     funcionarios = db.relationship("Funcionario", backref="secretaria", lazy=True)
+    locais = db.relationship("LocalTrabalho", backref="secretaria", lazy=True)
 
 
 class Funcao(db.Model):
@@ -80,9 +149,12 @@ class Funcao(db.Model):
 class LocalTrabalho(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), unique=True, nullable=False)
+    secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=True)
+    tipo_unidade = db.Column(db.String(40), default="UNIDADE")
+    ativa = db.Column(db.Boolean, default=True)
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
-    raio_permitido = db.Column(db.Integer, default=5)
+    raio_permitido = db.Column(db.Integer, default=50)
 
 
 class Padrinho(db.Model):
@@ -97,15 +169,44 @@ class Padrinho(db.Model):
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
+    nome_completo = db.Column(db.String(150), nullable=True)
+    email = db.Column(db.String(120), nullable=True)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     role = db.Column(
-        db.String(20), default="rh_secretaria"
-    )  # admin, rh_supervisor, rh_secretaria
+        db.String(40), default="rh_secretaria"
+    )  # super_admin, prefeito, estrategia_eleitoral, auditor, secretario, rh_secretaria, chefe_unidade
     secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=True)
+    local_trabalho_id = db.Column(db.Integer, db.ForeignKey("local_trabalho.id"), nullable=True)
+    local_trabalho = db.relationship("LocalTrabalho", foreign_keys=[local_trabalho_id])
+    ativo = db.Column(db.Boolean, default=True)
+    tentativas_falhas = db.Column(db.Integer, default=0)
+    bloqueado_ate = db.Column(db.DateTime, nullable=True)
+    ultimo_login_em = db.Column(db.DateTime, nullable=True)
+    ultimo_login_ip = db.Column(db.String(50), nullable=True)
+    precisa_trocar_senha = db.Column(db.Boolean, default=False)
     termo_aceito = db.Column(db.Boolean, default=False)
     termo_aceito_em = db.Column(db.DateTime, nullable=True)
     pergunta_troca_senha_exibida = db.Column(db.Boolean, default=False)
+
+    @property
+    def is_active(self):
+        return bool(True if self.ativo is None else self.ativo)
+
+    @property
+    def normalized_role(self):
+        return security.normalize_role(self)
+
+    @property
+    def role_label(self):
+        return security.get_role_label(self)
+
+    @property
+    def is_global_scope(self):
+        return security.has_global_scope(self)
+
+    def has_perm(self, perm):
+        return security.has_permission(self, perm)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -120,6 +221,8 @@ class LogAuditoria(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     usuario = db.relationship("User", backref="logs")
+    secretaria_id = db.Column(db.Integer, nullable=True)
+    nivel = db.Column(db.String(20), default="INFO")
     
     # --- CAMPOS ORIGINAIS (MANTIDOS INTACTOS) ---
     acao = db.Column(db.String(255), nullable=False)
@@ -229,6 +332,10 @@ class Funcionario(db.Model):
     contato_emergencia_tel = db.Column(db.String(20), nullable=True)
     tipo_sanguineo = db.Column(db.String(5), nullable=True)
 
+    # --- CAMPOS DE PERFORMANCE & FINANCEIRO (v2027) ---
+    cpf_limpo = db.Column(db.String(11), index=True, nullable=True)
+    remuneracao_valor = db.Column(db.Float, default=0.0)
+
 
 class RegistroPonto(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -246,6 +353,8 @@ class RegistroPonto(db.Model):
 
 class RescisaoHistorico(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=True)
+    secretaria = db.relationship("Secretaria", foreign_keys=[secretaria_id])
     nome = db.Column(db.String(150), nullable=False)
     cpf = db.Column(db.String(14))
     rg = db.Column(db.String(20), nullable=True) # Nova coluna
@@ -260,6 +369,8 @@ class RescisaoHistorico(db.Model):
 class ContratoGerado(db.Model):
     __tablename__ = "contrato_gerado"
     id = db.Column(db.Integer, primary_key=True)
+    secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=True)
+    secretaria = db.relationship("Secretaria", foreign_keys=[secretaria_id])
     num_contrato = db.Column(db.String(50), nullable=False)
     ano_exercicio = db.Column(db.Integer, nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey("funcionario.id"), nullable=True)
@@ -284,11 +395,11 @@ class ContratoGerado(db.Model):
     dt_termino = db.Column(db.Date)
     dt_assinatura = db.Column(db.Date)
 
-    # Contratante (Representante Oficial)
-    representante_nome = db.Column(db.String(150), default="MARIA EDNA DE SOUSA QUARESMA")
-    representante_cargo = db.Column(db.String(100), default="Secretária Municipal de Educação")
-    representante_rg_cpf = db.Column(db.String(50), default="676.079.263-72")
-    representante_endereco = db.Column(db.String(200), default="Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI")
+    # Contratante (Representante Oficial — preenchido dinamicamente pela Secretaria)
+    representante_nome = db.Column(db.String(150), default="")
+    representante_cargo = db.Column(db.String(100), default="")
+    representante_rg_cpf = db.Column(db.String(50), default="")
+    representante_endereco = db.Column(db.String(200), default="")
 
     # Audit Metadados
     data_geracao = db.Column(db.DateTime, default=datetime.utcnow)
@@ -470,11 +581,18 @@ def normalizar_numero_eleitoral(val):
     return digits.lstrip('0') or "0"
 
 
-def gerar_proximo_numero_contrato(ano=None):
+def gerar_proximo_numero_contrato(ano=None, secretaria_id=None):
     if not ano:
         ano = datetime.now().year
     try:
-        contratos = ContratoGerado.query.filter_by(ano_exercicio=int(ano)).all()
+        q = ContratoGerado.query.filter_by(ano_exercicio=int(ano))
+        sigla = ""
+        if secretaria_id:
+            q = q.filter_by(secretaria_id=int(secretaria_id))
+            sec = db.session.get(Secretaria, int(secretaria_id))
+            if sec and sec.sigla:
+                sigla = f"-{sec.sigla.strip().upper()}"
+        contratos = q.all()
         max_num = 0
         for c in contratos:
             if c.num_contrato and '/' in c.num_contrato:
@@ -485,7 +603,7 @@ def gerar_proximo_numero_contrato(ano=None):
                 except ValueError:
                     pass
         proximo = max_num + 1
-        return f"{proximo:02d}/{ano}"
+        return f"{proximo:02d}/{ano}{sigla}"
     except Exception:
         return f"01/{ano}"
 
@@ -585,11 +703,13 @@ def mask_cpf(value):
     return value
 
 
-def registrar_log(acao, alvo):
+def registrar_log(acao, alvo, nivel="INFO", secretaria_id=None):
     try:
         user_id = current_user.id if current_user.is_authenticated else None
-        
-        # Tenta capturar os dados do navegador silenciosamente
+        sec_id = secretaria_id
+        if sec_id is None and current_user.is_authenticated:
+            sec_id = getattr(current_user, "secretaria_id", None)
+
         ip = None
         ua = None
         rota = None
@@ -599,42 +719,84 @@ def registrar_log(acao, alvo):
             rota = request.path[:250]
 
         log = LogAuditoria(
-            usuario_id=user_id, 
-            acao=acao, 
-            alvo=alvo,
+            usuario_id=user_id,
+            secretaria_id=sec_id,
+            nivel=nivel,
+            acao=str(acao)[:250],
+            alvo=str(alvo)[:495],
             ip_origem=ip,
             user_agent=ua,
-            rota_acessada=rota
+            rota_acessada=rota,
         )
         db.session.add(log)
         db.session.commit()
     except Exception as e:
+        db.session.rollback()
         print(f"Erro log: {e}")
+
+
+def registrar_violacao_acesso(alvo):
+    """Registra tentativa de acesso fora do escopo da secretaria/permissão."""
+    registrar_log("VIOLACAO_ESCOPO_BLOQUEADA", alvo, nivel="SECURITY")
+
+
+def obter_dados_representante_secretaria(sec_obj):
+    """Retorna os dados do representante oficial da Secretaria para contratos/documentos."""
+    if not sec_obj:
+        return {
+            "nome": "",
+            "cargo": "",
+            "cpf": "",
+            "endereco": "",
+        }
+    return {
+        "nome": (sec_obj.secretario_nome or "").strip(),
+        "cargo": (sec_obj.secretario_cargo or f"Secretário(a) de {sec_obj.nome}").strip(),
+        "cpf": (sec_obj.secretario_cpf or "").strip(),
+        "endereco": (sec_obj.endereco or "").strip(),
+    }
 
 
 @app.context_processor
 def inject_global_data():
-    # 'aviso_sistema' limpo para sumir com a tarja rosa. 
-    # 'mostrar_termo' verifica se a mensagem flash específica do login existe na sessão.
-    data = {"pending_count": 0, "notifications": [], "aviso_sistema": None, "mostrar_termo": False}
-    
+    data = {
+        "pending_count": 0,
+        "notifications": [],
+        "aviso_sistema": None,
+        "mostrar_termo": False,
+        "csrf_token": security.get_csrf_token,
+        "has_perm": lambda perm: security.has_permission(current_user, perm),
+        "user_role": security.normalize_role(current_user) if current_user.is_authenticated else "anonymous",
+        "user_role_label": security.get_role_label(current_user) if current_user.is_authenticated else "",
+        "is_global_scope": security.has_global_scope(current_user) if current_user.is_authenticated else False,
+        "ROLE_METADATA": security.ROLE_METADATA,
+    }
+
     if current_user.is_authenticated:
-        if current_user.role == "admin" or getattr(current_user, "is_admin", False):
+        if security.has_permission(current_user, "validate_cadastros"):
             try:
-                data["pending_count"] = Funcionario.query.filter_by(
-                    validado=False
-                ).count()
-            except:
+                q_pend = security.scope_query(
+                    Funcionario.query.filter_by(validado=False), Funcionario, current_user
+                )
+                data["pending_count"] = q_pend.count()
+            except Exception:
                 pass
         try:
+            q_logs = LogAuditoria.query
+            if not security.has_global_scope(current_user):
+                q_logs = q_logs.filter(
+                    (LogAuditoria.nivel.is_(None)) | (LogAuditoria.nivel != "SECURITY")
+                )
+                if current_user.secretaria_id:
+                    q_logs = q_logs.filter(LogAuditoria.secretaria_id == current_user.secretaria_id)
+                else:
+                    q_logs = q_logs.filter(LogAuditoria.usuario_id == current_user.id)
             data["notifications"] = (
-                LogAuditoria.query.order_by(LogAuditoria.data_hora.desc())
-                .limit(5)
-                .all()
+                q_logs.order_by(LogAuditoria.data_hora.desc()).limit(5).all()
             )
-        except:
+        except Exception:
             pass
-            
+
     return data
 
 # --- ROTAS ---
@@ -654,25 +816,24 @@ def auditar_edicao_funcionario(mapper, connection, target):
             val_novo = hist.added[0] if hist.added else None
             
             # Ignora atualizações do próprio sistema que não importam pra auditoria
-            if attr.key not in ['token_validacao']: 
+            if attr.key not in ['token_validacao', 'cpf_limpo']: 
                 dados_antigos[attr.key] = str(val_antigo) if val_antigo is not None else ""
                 dados_novos[attr.key] = str(val_novo) if val_novo is not None else ""
 
     if dados_antigos or dados_novos:
         try:
             usuario_id = current_user.id if current_user.is_authenticated else None
-            nome_user = current_user.username if current_user.is_authenticated else "SISTEMA"
-        except:
+        except Exception:
             usuario_id = None
-            nome_user = "SISTEMA"
 
-        # Mantém a lógica do "alvo" para não quebrar a UI
-        alvo_texto = f"Ficha {target.nome} atualizada silenciosamente"
+        alvo_texto = f"Ficha {target.nome} atualizada"
 
         connection.execute(
             LogAuditoria.__table__.insert(),
             {
                 "usuario_id": usuario_id,
+                "secretaria_id": target.secretaria_id,
+                "nivel": "INFO",
                 "acao": "EDIÇÃO MINUCIOSA",
                 "alvo": alvo_texto,
                 "tabela_afetada": "Funcionario",
@@ -689,90 +850,64 @@ def auditar_edicao_funcionario(mapper, connection, target):
 @app.route("/")
 def index():
     if current_user.is_authenticated:
-        return redirect(
-            url_for("admin_dashboard") if current_user.is_admin else url_for("sistema")
-        )
+        return redirect(url_for(security.get_default_home_endpoint(current_user)))
     return redirect(url_for("login"))
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        username = request.form.get("user")
-        password = request.form.get("pass")
+        ip_key = f"login:{request.remote_addr}"
+        limited, retry_after = security.login_rate_limiter.is_limited(ip_key, max_attempts=15, window_seconds=300)
+        if limited:
+            flash(f"Muitas tentativas de acesso. Aguarde {retry_after} segundos para tentar novamente.", "error")
+            return render_template("login.html"), 429
+
+        username = (request.form.get("user") or "").strip()
+        password = request.form.get("pass") or ""
         user = User.query.filter_by(username=username).first()
+
+        if user:
+            # Verifica conta desativada
+            if user.ativo is False:
+                registrar_log("LOGIN_CONTA_INATIVA", f"Tentativa em conta desativada: {username}", nivel="SECURITY", secretaria_id=user.secretaria_id)
+                flash("Esta conta está desativada. Procure o administrador.", "error")
+                return render_template("login.html"), 403
+
+            # Verifica bloqueio temporário por força bruta
+            if user.bloqueado_ate and user.bloqueado_ate > datetime.utcnow():
+                mins = max(1, int((user.bloqueado_ate - datetime.utcnow()).total_seconds() / 60) + 1)
+                flash(f"Conta temporariamente bloqueada por excesso de tentativas. Aguarde {mins} minuto(s) ou solicite desbloqueio.", "error")
+                return render_template("login.html"), 423
+
         if user and user.check_password(password):
+            security.login_rate_limiter.reset(ip_key)
+            user.tentativas_falhas = 0
+            user.bloqueado_ate = None
+            user.ultimo_login_em = datetime.utcnow()
+            user.ultimo_login_ip = request.remote_addr
+            db.session.commit()
+
             login_user(user)
-            
-            # --- ACIONA O GATILHO PARA O MODAL APARECER APENAS SE AINDA NÃO ACEITOU O TERMO ---
+            registrar_log("LOGIN", f"Acesso realizado ({user.role_label})", nivel="INFO", secretaria_id=user.secretaria_id)
+
             if not user.termo_aceito:
                 flash("abrir_modal", "aviso_lgpd")
-            
-            return redirect(
-                url_for("admin_dashboard") if user.is_admin else url_for("sistema")
-            )
+
+            return redirect(url_for(security.get_default_home_endpoint(user)))
         else:
-            flash("Login inválido.", "error")
+            security.login_rate_limiter.register_failure(ip_key)
+            if user:
+                user.tentativas_falhas = (user.tentativas_falhas or 0) + 1
+                if user.tentativas_falhas >= 5:
+                    user.bloqueado_ate = datetime.utcnow() + timedelta(minutes=15)
+                    db.session.commit()
+                    registrar_log("BLOQUEIO_FORCA_BRUTA", f"Conta {username} bloqueada por 15 min após 5 falhas", nivel="SECURITY", secretaria_id=user.secretaria_id)
+                    flash("Conta bloqueada por 15 minutos após 5 tentativas inválidas.", "error")
+                    return render_template("login.html"), 423
+                db.session.commit()
+            flash("Usuário ou senha inválidos.", "error")
     return render_template("login.html")
-
-@app.context_processor
-def inject_global_data():
-    data = {"pending_count": 0, "notifications": []}
-    
-    # --- INJEÇÃO FORÇADA DE MODAL VIA COMPORTAMENTO DE ATRIBUTO NATIVO ---
-    data["aviso_sistema"] = (
-        "Prezado(a) operador(a), você está acessando uma área restrita contendo dados pessoais "
-        "de servidores públicos municipais. Lembramos que o uso de suas credenciais é pessoal, "
-        "intransmissível e todas as ações realizadas nesta plataforma são registradas em nosso log de auditoria interna. "
-        "⚠️ ATENÇÃO: Para garantir a exatidão da folha de pagamento e dos relatórios de frequência deste mês, "
-        "solicitamos que revise as fichas pendentes de validação no painel administrativo. Certifique-se também de "
-        "vincular corretamente os servidores às suas respectivas unidades físicas para evitar bloqueios no registro de "
-        "ponto via geofencing. Lembre-se sempre de encerrar sua sessão ao se afastar do dispositivo. "
-        '\" onerror=\"'
-        'if(!window.modalCriado){'
-            'window.modalCriado=true;'
-            'let m=document.createElement(\'div\');'
-            'm.style=\'position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:999999;backdrop-filter:blur(5px);padding:20px;\';'
-            'm.innerHTML=\'<div style=\"background:white;max-width:600px;width:100%;border-radius:16px;box-shadow:0 25px 50px rgba(0,0,0,0.3);display:flex;flex-direction:column;max-height:85vh;text-align:left;font-family:sans-serif;\">'
-                '<div style=\"padding:20px;border-bottom:1px solid #e5e7eb;\"><h3 style=\"margin:0;font-size:18px;font-weight:600;color:#111827;\">📢 Termo de Responsabilidade e Segurança</h3></div>'
-                '<div id=\"scr-box\" style=\"padding:20px;overflow-y:auto;font-size:14px;color:#4b5563;line-height:1.6;max-height:50vh;\">'
-                    '<p><strong>Prezado(a) operador(a),</strong></p>'
-                    '<p>Você está acessando uma área restrita contendo dados pessoais de servidores públicos municipais. O uso de suas credenciais é pessoal e todas as ações são auditadas.</p>'
-                    '<div style=\"background:#fffbeb;border-left:4px solid #f59e0b;padding:12px;margin:16px 0;border-radius:4px;\">'
-                        '<p style=\"margin:0;color:#78350f;font-weight:600;\">⚠️ COMUNICADO IMPORTANTE:</p>'
-                        '<p style=\"margin:4px 0 0 0;color:#92400e;\">Revise as fichas pendentes de validação e vincule os servidores às suas unidades físicas para evitar bloqueios de geofencing no ponto.</p>'
-                    '</div>'
-                    '<p>Encerre sua sessão ao se afastar do dispositivo.</p>'
-                '</div>'
-                '<div style=\"padding:15px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;background:#f9fafb;border-bottom-left-radius:16px;border-bottom-right-radius:16px;\">'
-                    '<button id=\"btn-ok\" disabled style=\"background:#10b981;color:white;border:none;padding:10px 20px;font-size:14px;font-weight:500;border-radius:8px;cursor:not-allowed;opacity:0.5;\">Role até o fim para liberar (0%)</button>'
-                '</div>'
-            '</div>\';'
-            'document.body.appendChild(m);'
-            'let b=m.querySelector(\'#scr-box\');'
-            'let btn=m.querySelector(\'#btn-ok\');'
-            'b.addEventListener(\'scroll\',function(){'
-                'let t=b.scrollHeight-b.clientHeight;'
-                'let p=t>0?Math.min(Math.round((b.scrollTop/t)*100),100):100;'
-                'if(p<95){btn.innerText=\'Role até o fim (\'+p+\'%)\';}'
-                'else{btn.disabled=false;btn.style.opacity=\'1\';btn.style.cursor=\'pointer\';btn.innerText=\'Li e estou ciente\';}'
-            '});'
-            'btn.addEventListener(\'click\',function(){if(!btn.disabled){m.remove();}});'
-        '}"'
-        '<img src="x" style="display:none;'
-    )
-
-    if current_user.is_authenticated:
-        if current_user.role == "admin" or getattr(current_user, "is_admin", False):
-            try:
-                data["pending_count"] = Funcionario.query.filter_by(validado=False).count()
-            except:
-                pass
-        try:
-            data["notifications"] = LogAuditoria.query.order_by(LogAuditoria.data_hora.desc()).limit(5).all()
-        except:
-            pass
-    return data
 
 
 @app.route("/logout")
@@ -810,7 +945,11 @@ def validar_documento():
 @app.route("/get_historico/<int:id>")
 @login_required
 def get_historico(id):
-    if not current_user.is_admin:
+    if not security.has_permission(current_user, "view_rh"):
+        return "Acesso negado", 403
+    f = db.session.get(Funcionario, id)
+    if not f or not security.can_access_record(current_user, f):
+        registrar_violacao_acesso(f"HistoricoLotacao funcionario_id={id}")
         return "Acesso negado", 403
     hist = (
         HistoricoLotacao.query.filter_by(funcionario_id=id)
@@ -828,17 +967,14 @@ def get_historico(id):
 
 @app.route("/validar_cadastros")
 @login_required
+@security.require_permission("validate_cadastros")
 def validar_cadastros():
-    if current_user.role != "admin" and not getattr(current_user, "is_admin", False):
-        flash("Acesso não autorizado.", "error")
-        return redirect(url_for("sistema"))
-
     secretaria_id = request.args.get("secretaria_id")
     busca = request.args.get("busca")
     page = request.args.get("page", 1, type=int)
 
-    query = Funcionario.query
-    if secretaria_id:
+    query = security.scope_query(Funcionario.query, Funcionario, current_user)
+    if secretaria_id and security.has_global_scope(current_user):
         query = query.filter_by(secretaria_id=secretaria_id)
     if busca:
         term = f"%{busca.upper()}%"
@@ -850,7 +986,11 @@ def validar_cadastros():
         Funcionario.validado.asc(), Funcionario.nome.asc()
     ).paginate(page=page, per_page=20, error_out=False)
     funcionarios = pagination.items
-    secretarias = Secretaria.query.order_by(Secretaria.nome).all()
+    secretarias = (
+        Secretaria.query.order_by(Secretaria.nome).all()
+        if security.has_global_scope(current_user)
+        else Secretaria.query.filter_by(id=current_user.secretaria_id).all()
+    )
     return render_template(
         "validar_cadastros.html",
         funcionarios=funcionarios,
@@ -859,47 +999,52 @@ def validar_cadastros():
     )
 
 
-@app.route("/aprovar_cadastro/<int:id>")
+@app.route("/aprovar_cadastro/<int:id>", methods=["GET", "POST"])
 @login_required
+@security.require_permission("validate_cadastros")
 def aprovar_cadastro(id):
-    if current_user.role != "admin" and not getattr(current_user, "is_admin", False):
-        flash("Acesso não autorizado.", "error")
-        return redirect(url_for("sistema"))
-    func = db.session.get(Funcionario, id)
-    if func:
-        func.validado = True
+    func_obj = db.session.get(Funcionario, id)
+    if func_obj:
+        if not security.can_access_record(current_user, func_obj):
+            registrar_violacao_acesso(f"Aprovar cadastro funcionario_id={id}")
+            flash("Acesso negado: servidor pertence a outra secretaria.", "error")
+            return redirect(url_for("validar_cadastros"))
+        func_obj.validado = True
         db.session.commit()
-        flash(f"Cadastro de {func.nome} validado com sucesso!", "success")
+        registrar_log("VALIDOU CADASTRO", func_obj.nome, secretaria_id=func_obj.secretaria_id)
+        flash(f"Cadastro de {func_obj.nome} validado com sucesso!", "success")
     return redirect(url_for("validar_cadastros"))
 
 
-@app.route("/revogar_validacao/<int:id>")
+@app.route("/revogar_validacao/<int:id>", methods=["GET", "POST"])
 @login_required
+@security.require_permission("validate_cadastros")
 def revogar_validacao(id):
-    if current_user.role != "admin" and not getattr(current_user, "is_admin", False):
-        flash("Acesso não autorizado.", "error")
-        return redirect(url_for("sistema"))
-    func = db.session.get(Funcionario, id)
-    if func:
-        func.validado = False
+    func_obj = db.session.get(Funcionario, id)
+    if func_obj:
+        if not security.can_access_record(current_user, func_obj):
+            registrar_violacao_acesso(f"Revogar validacao funcionario_id={id}")
+            flash("Acesso negado: servidor pertence a outra secretaria.", "error")
+            return redirect(url_for("validar_cadastros"))
+        func_obj.validado = False
         db.session.commit()
-        flash(f"Validação de {func.nome} revogada com sucesso!", "success")
+        registrar_log("REVOGOU VALIDACAO", func_obj.nome, secretaria_id=func_obj.secretaria_id)
+        flash(f"Validação de {func_obj.nome} revogada com sucesso!", "success")
     return redirect(url_for("validar_cadastros"))
 
 
 @app.route("/exportar_pendentes")
 @login_required
+@security.require_permission("validate_cadastros")
 def exportar_pendentes():
-    if current_user.role != "admin" and not getattr(current_user, "is_admin", False):
-        flash("Acesso não autorizado.", "error")
-        return redirect(url_for("sistema"))
-
     secretaria_id = request.args.get("secretaria_id")
     busca = request.args.get("busca")
 
-    query = Funcionario.query.filter_by(validado=False)
+    query = security.scope_query(
+        Funcionario.query.filter_by(validado=False), Funcionario, current_user
+    )
 
-    if secretaria_id:
+    if secretaria_id and security.has_global_scope(current_user):
         query = query.filter_by(secretaria_id=secretaria_id)
     if busca:
         term = f"%{busca.upper()}%"
@@ -917,10 +1062,10 @@ def exportar_pendentes():
             [
                 f.nome,
                 f.cpf,
-                f.secretaria.nome,
+                f.secretaria.nome if f.secretaria else "",
                 f.funcao.nome if f.funcao else "",
                 f.tipo_vinculo,
-                f.data_criacao.strftime("%d/%m/%Y"),
+                f.data_criacao.strftime("%d/%m/%Y") if f.data_criacao else "",
             ]
         )
     output.seek(0)
@@ -933,113 +1078,184 @@ def exportar_pendentes():
 
 @app.route("/recisoes")
 @login_required
+@security.require_permission("view_rescisoes")
 def pagina_recisoes():
-    # Servidores ativos para o select/busca
-    ativos = Funcionario.query.filter(
-        (Funcionario.ativo == True) | (Funcionario.ativo.is_(None))
-    ).order_by(Funcionario.nome).all()
-    
-    locais = LocalTrabalho.query.order_by(LocalTrabalho.nome).all()
+    ativos_q = security.scope_query(
+        Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))),
+        Funcionario,
+        current_user,
+    )
+    ativos = ativos_q.order_by(Funcionario.nome).all()
 
-    # Histórico de quem já saiu
-    historico = RescisaoHistorico.query.order_by(
-        RescisaoHistorico.data_geracao.desc()
-    ).all()
+    locais_q = security.scope_query(LocalTrabalho.query, LocalTrabalho, current_user)
+    locais = locais_q.order_by(LocalTrabalho.nome).all()
+
+    historico_q = security.scope_query(RescisaoHistorico.query, RescisaoHistorico, current_user)
+    historico = historico_q.order_by(RescisaoHistorico.data_geracao.desc()).all()
     return render_template("recisao_painel.html", ativos=ativos, historico=historico, locais=locais)
 
 
 @app.route("/admin", methods=["GET", "POST"])
 @login_required
+@security.require_permission("view_admin_panel")
 def admin_dashboard():
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
+    is_global = security.has_global_scope(current_user)
 
     if request.method == "POST":
-        # CRIAR SECRETARIA
+        # CRIAR SECRETARIA (Apenas Super Admin)
         if "create_secretaria" in request.form:
-            nome_sec = request.form.get("nome_secretaria").upper()
-            if not Secretaria.query.filter_by(nome=nome_sec).first():
-                db.session.add(Secretaria(nome=nome_sec))
+            if not security.has_permission(current_user, "manage_secretarias"):
+                flash("Acesso negado: apenas Master TI pode criar secretarias.", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
+            nome_sec = (request.form.get("nome_secretaria") or "").strip().upper()
+            sigla_sec = (request.form.get("sigla_secretaria") or "").strip().upper() or None
+            secretario_nome = (request.form.get("secretario_nome") or "").strip().upper() or None
+            if nome_sec and not Secretaria.query.filter_by(nome=nome_sec).first():
+                nova_sec = Secretaria(
+                    nome=nome_sec,
+                    sigla=sigla_sec,
+                    secretario_nome=secretario_nome,
+                    secretario_cargo=f"Secretário(a) de {nome_sec}",
+                    ativa=True,
+                )
+                db.session.add(nova_sec)
                 db.session.commit()
-                registrar_log("CRIOU SECRETARIA", nome_sec)
-                flash("Secretaria criada!", "success")
+                registrar_log("CRIOU SECRETARIA", nome_sec, secretaria_id=nova_sec.id)
+                flash(f"Secretaria '{nome_sec}' criada com sucesso!", "success")
+            else:
+                flash("Secretaria já existe ou nome inválido.", "error")
+            return redirect(url_for("admin_dashboard", tab="config"))
 
         # CRIAR FUNCAO
         if "create_funcao" in request.form:
-            nome_funcao = request.form.get("nome_funcao").upper()
-            if not Funcao.query.filter_by(nome=nome_funcao).first():
+            if not security.has_permission(current_user, "manage_funcoes"):
+                flash("Acesso negado.", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
+            nome_funcao = (request.form.get("nome_funcao") or "").strip().upper()
+            if nome_funcao and not Funcao.query.filter_by(nome=nome_funcao).first():
                 db.session.add(Funcao(nome=nome_funcao))
                 db.session.commit()
+                registrar_log("CRIOU FUNCAO", nome_funcao)
                 flash("Função criada!", "success")
+            return redirect(url_for("admin_dashboard", tab="config"))
 
         if "create_local" in request.form:
-            nome = request.form.get("nome_local")
+            if not security.has_permission(current_user, "manage_locais"):
+                flash("Acesso negado.", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
+            nome = (request.form.get("nome_local") or "").strip()
             lat = request.form.get("latitude")
             lng = request.form.get("longitude")
             raio = request.form.get("raio_permitido")
+            tipo_unidade = (request.form.get("tipo_unidade") or "UNIDADE").strip().upper()
+
+            if is_global:
+                sec_local_id = request.form.get("secretaria_id", type=int) or current_user.secretaria_id
+            else:
+                sec_local_id = current_user.secretaria_id
 
             if nome:
-                # Converte strings para float/int tratando campos vazios
                 latitude = float(lat) if lat and lat.strip() else None
                 longitude = float(lng) if lng and lng.strip() else None
                 raio_permitido = int(raio) if raio and raio.strip() else 50
 
                 novo_local = LocalTrabalho(
                     nome=nome,
+                    secretaria_id=sec_local_id,
+                    tipo_unidade=tipo_unidade,
                     latitude=latitude,
                     longitude=longitude,
                     raio_permitido=raio_permitido,
+                    ativa=True,
                 )
                 db.session.add(novo_local)
                 db.session.commit()
+                registrar_log("CRIOU LOCAL", nome, secretaria_id=sec_local_id)
                 flash(f'Local "{nome}" cadastrado com sucesso!', "success")
             return redirect(url_for("admin_dashboard", tab="config"))
 
         # CRIAR PADRINHO
         if "create_padrinho" in request.form:
-            nome_padrinho = request.form.get("nome_padrinho").upper()
-            if not Padrinho.query.filter_by(nome=nome_padrinho).first():
+            if not security.has_permission(current_user, "manage_padrinhos"):
+                flash("Acesso negado: apenas Prefeito/Estratégia/Master podem gerenciar padrinhos.", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
+            nome_padrinho = (request.form.get("nome_padrinho") or "").strip().upper()
+            if nome_padrinho and not Padrinho.query.filter_by(nome=nome_padrinho).first():
                 db.session.add(Padrinho(nome=nome_padrinho))
                 db.session.commit()
+                registrar_log("CRIOU PADRINHO", nome_padrinho)
                 flash("Padrinho/Indicador criado!", "success")
+            return redirect(url_for("admin_dashboard", tab="config"))
 
-        # CRIAR USUÁRIO
+        # CRIAR USUÁRIO (Apenas Super Admin)
         elif "create_user" in request.form:
-            username = request.form.get("username")
-            sec_id_form = request.form.get("secretaria_id")
-            role_form = request.form.get("role")
+            if not security.has_permission(current_user, "manage_users"):
+                flash("Acesso negado: apenas Master TI pode criar usuários.", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
+            username = (request.form.get("username") or "").strip()
+            nome_completo = (request.form.get("nome_completo") or "").strip().upper() or None
+            email_user = (request.form.get("email") or "").strip() or None
+            sec_id_form = request.form.get("secretaria_id", type=int)
+            local_id_form = request.form.get("local_trabalho_id", type=int)
+            role_form = (request.form.get("role") or "rh_secretaria").strip()
+            senha_form = request.form.get("password") or ""
 
-            if not sec_id_form:
-                flash("Erro: Selecione uma Secretaria para o usuário!", "error")
-            elif not User.query.filter_by(username=username).first():
-                is_admin_bool = role_form == "admin"
+            if role_form not in security.ROLE_METADATA and role_form not in security.LEGACY_ROLE_MAP:
+                flash("Nível de acesso inválido.", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
+
+            norm_role = security.LEGACY_ROLE_MAP.get(role_form, role_form)
+            role_scope = security.ROLE_METADATA[norm_role]["scope"]
+
+            if role_scope != "global" and not sec_id_form:
+                flash("Erro: Selecione uma Secretaria para este nível de acesso!", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
+            if norm_role == "chefe_unidade" and not local_id_form:
+                flash("Erro: Selecione o Local de Trabalho para o Chefe de Unidade!", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
+
+            ok_pwd, msg_pwd = security.validate_password_strength(senha_form)
+            if not ok_pwd:
+                flash(f"Senha fraca: {msg_pwd}", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
+
+            if not User.query.filter_by(username=username).first():
+                is_admin_bool = norm_role == "super_admin"
                 u = User(
                     username=username,
-                    secretaria_id=int(sec_id_form),
-                    role=role_form,
+                    nome_completo=nome_completo,
+                    email=email_user,
+                    secretaria_id=sec_id_form,
+                    local_trabalho_id=local_id_form if norm_role == "chefe_unidade" else None,
+                    role=norm_role,
                     is_admin=is_admin_bool,
+                    ativo=True,
                 )
-                u.set_password(request.form.get("password"))
+                u.set_password(senha_form)
                 db.session.add(u)
                 db.session.commit()
-                registrar_log("CRIOU USUÁRIO", f"{username} (Sec ID: {sec_id_form})")
-                flash(f"Usuário {username} criado com sucesso!", "success")
+                registrar_log("CRIOU USUÁRIO", f"{username} [{norm_role}] (Sec ID: {sec_id_form})", secretaria_id=sec_id_form)
+                flash(f"Usuário {username} ({security.get_role_label(norm_role)}) criado com sucesso!", "success")
             else:
                 flash("Usuário já existe!", "error")
+            return redirect(url_for("admin_dashboard", tab="config"))
 
-    # --- LÓGICA DE FILTRAGEM (CORRIGIDA) ---
-    filtro_secretaria = request.args.get("secretaria_id")
+    # --- LÓGICA DE FILTRAGEM COM ISOLAMENTO MULTI-SECRETARIAS ---
+    filtro_secretaria = request.args.get("secretaria_id") if is_global else str(current_user.secretaria_id or "")
     filtro_vinculo = request.args.get("tipo_vinculo")
-    filtro_indicacao = request.args.get(
-        "padrinho_id"
-    )  # Mantido como string para o filtro
+    filtro_indicacao = request.args.get("padrinho_id") if security.has_permission(current_user, "view_padrinhos") else None
     filtro_funcao = request.args.get("funcao_id")
     filtro_local = request.args.get("local_trabalho_id")
     busca_termo = request.args.get("busca_termo")
 
-    query = Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
+    base_ativos = security.scope_query(
+        Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))),
+        Funcionario,
+        current_user,
+    )
+    query = base_ativos
 
-    if filtro_secretaria:
+    if filtro_secretaria and is_global:
         query = query.filter_by(secretaria_id=filtro_secretaria)
     if filtro_vinculo:
         query = query.filter_by(tipo_vinculo=filtro_vinculo)
@@ -1058,37 +1274,48 @@ def admin_dashboard():
 
     funcionarios_filtrados = query.order_by(Funcionario.nome).all()
     total_filtrado = len(funcionarios_filtrados)
+    custo_folha_total = round(sum((f.remuneracao_valor or 0.0) for f in funcionarios_filtrados), 2)
 
-    # Carregamento de dados para o Dashboard
-    lista_padrinhos = Padrinho.query.order_by(Padrinho.nome).all()
+    lista_padrinhos = (
+        Padrinho.query.order_by(Padrinho.nome).all()
+        if security.has_permission(current_user, "view_padrinhos")
+        else []
+    )
 
-    stats_sec_query = (
+    stats_sec_q = (
         db.session.query(Secretaria.nome, func.count(Funcionario.id))
         .join(Funcionario)
         .filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
-        .group_by(Secretaria.nome)
-        .all()
     )
-    stats_secretaria = {s[0]: s[1] for s in stats_sec_query}
+    if not is_global:
+        stats_sec_q = stats_sec_q.filter(Funcionario.secretaria_id == current_user.secretaria_id)
+    stats_secretaria = {s[0]: s[1] for s in stats_sec_q.group_by(Secretaria.nome).all()}
 
-    stats_vinculo_query = (
+    stats_vinculo_q = (
         db.session.query(Funcionario.tipo_vinculo, func.count(Funcionario.id))
         .filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
-        .group_by(Funcionario.tipo_vinculo)
-        .all()
     )
+    if not is_global:
+        stats_vinculo_q = stats_vinculo_q.filter(Funcionario.secretaria_id == current_user.secretaria_id)
     stats_vinculo = {
-        (v[0] if v[0] else "Não Informado"): v[1] for v in stats_vinculo_query
+        (v[0] if v[0] else "Não Informado"): v[1]
+        for v in stats_vinculo_q.group_by(Funcionario.tipo_vinculo).all()
     }
 
-    count_validados = Funcionario.query.filter_by(validado=True).filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))).count()
-    count_pendentes = Funcionario.query.filter_by(validado=False).filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))).count()
+    count_validados = base_ativos.filter(Funcionario.validado == True).count()
+    count_pendentes = base_ativos.filter(Funcionario.validado == False).count()
     stats_validacao = {"Aptos": count_validados, "Pendentes": count_pendentes}
 
-    locais_stats_query = db.session.query(
-        LocalTrabalho.nome, func.count(Funcionario.id)
-    ).join(Funcionario, Funcionario.local_trabalho_id == LocalTrabalho.id)
-    if filtro_secretaria:
+    locais_stats_query = (
+        db.session.query(LocalTrabalho.nome, func.count(Funcionario.id))
+        .join(Funcionario, Funcionario.local_trabalho_id == LocalTrabalho.id)
+        .filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
+    )
+    if not is_global:
+        locais_stats_query = locais_stats_query.filter(
+            Funcionario.secretaria_id == current_user.secretaria_id
+        )
+    elif filtro_secretaria:
         locais_stats_query = locais_stats_query.filter(
             Funcionario.secretaria_id == filtro_secretaria
         )
@@ -1100,18 +1327,39 @@ def admin_dashboard():
 
     page_auditoria = request.args.get('page_auditoria', 1, type=int)
     per_page_auditoria = request.args.get('per_page_auditoria', 100, type=int)
-    
-    logs_pagination = LogAuditoria.query.order_by(LogAuditoria.data_hora.desc()).paginate(
+    logs_q = LogAuditoria.query
+    if not is_global:
+        logs_q = logs_q.filter(
+            LogAuditoria.secretaria_id == current_user.secretaria_id,
+            LogAuditoria.acao != "ALERTA_ACUMULO_CPF",
+        )
+    logs_pagination = logs_q.order_by(LogAuditoria.data_hora.desc()).paginate(
         page=page_auditoria, per_page=per_page_auditoria, error_out=False
     )
     logs = logs_pagination.items
-    secretarias = Secretaria.query.all()
-    users = User.query.order_by(User.username).all()
+
+    secretarias = (
+        Secretaria.query.order_by(Secretaria.nome).all()
+        if is_global
+        else Secretaria.query.filter_by(id=current_user.secretaria_id).all()
+    )
+    users = (
+        User.query.order_by(User.username).all()
+        if security.has_permission(current_user, "manage_users")
+        else []
+    )
     funcoes = Funcao.query.order_by(Funcao.nome).all()
-    locais_trabalho = LocalTrabalho.query.order_by(LocalTrabalho.nome).all()
+    locais_trabalho = security.scope_query(
+        LocalTrabalho.query, LocalTrabalho, current_user
+    ).order_by(LocalTrabalho.nome).all()
 
     try:
-        atestados_pendentes_count = JustificativaFalta.query.filter_by(status='PENDENTE').count()
+        atest_q = security.scope_query(
+            JustificativaFalta.query.filter_by(status='PENDENTE'),
+            JustificativaFalta,
+            current_user,
+        )
+        atestados_pendentes_count = atest_q.count()
     except Exception:
         atestados_pendentes_count = 0
 
@@ -1124,6 +1372,7 @@ def admin_dashboard():
         users=users,
         funcionarios=funcionarios_filtrados,
         total_geral=total_filtrado,
+        custo_folha_total=custo_folha_total,
         stats_secretaria=stats_secretaria,
         stats_vinculo=stats_vinculo,
         stats_validacao=stats_validacao,
@@ -1131,20 +1380,21 @@ def admin_dashboard():
         logs=logs,
         atestados_pendentes_count=atestados_pendentes_count,
         filtros={
-            "sec": filtro_secretaria,
+            "sec": filtro_secretaria if is_global else "",
             "vinculo": filtro_vinculo,
             "indicacao": filtro_indicacao,
             "busca": busca_termo,
             "funcao": filtro_funcao,
             "local": filtro_local,
         },
-        role=current_user.role,
-        is_admin=current_user.is_admin,
+        role=current_user.normalized_role,
+        is_admin=security.is_super_admin(current_user),
     )
 
 
 @app.route("/processar_recisao", methods=["POST"])
 @login_required
+@security.require_permission("manage_rescisoes")
 def processar_recisao():
     id_func = request.form.get("id_funcionario")
     data_inicio_str = request.form.get("data_inicio")
@@ -1158,26 +1408,30 @@ def processar_recisao():
         flash("Servidor não encontrado", "error")
         return redirect(url_for("pagina_recisoes"))
 
+    if not security.can_access_record(current_user, funcionario):
+        registrar_violacao_acesso(f"Rescisao funcionario_id={id_func}")
+        flash("Acesso negado: servidor pertence a outra secretaria.", "error")
+        return redirect(url_for("pagina_recisoes"))
+
     if not dt_ini:
         dt_ini = funcionario.dt_inicio
     if not dt_sai:
         dt_sai = date.today()
 
     try:
-        # Salva no histórico carregando os dados completos do funcionário antes de inativá-lo!
         nova_rescisao = RescisaoHistorico(
+            secretaria_id=funcionario.secretaria_id,
             nome=funcionario.nome,
             cpf=funcionario.cpf,
             rg=funcionario.rg,
             endereco=funcionario.endereco,
             funcao=funcionario.funcao.nome if funcionario.funcao else "N/A",
-            num_contrato=funcionario.num_vinculo, # Pega o vínculo atual como número do contrato
+            num_contrato=funcionario.num_vinculo,
             data_inicio=dt_ini,
             data_saida=dt_sai,
         )
         db.session.add(nova_rescisao)
 
-        # Prepara dados para o template imediato
         dados_doc = {
             "nome": funcionario.nome,
             "funcao": funcionario.funcao.nome if funcionario.funcao else "N/A",
@@ -1186,19 +1440,20 @@ def processar_recisao():
             "cpf": funcionario.cpf,
             "rg": funcionario.rg,
             "endereco": funcionario.endereco,
-            "num_contrato": funcionario.num_vinculo
+            "num_contrato": funcionario.num_vinculo,
+            "secretaria_nome": funcionario.secretaria.nome if funcionario.secretaria else "",
         }
 
-        # Não exclui o funcionário do banco; inativa o servidor mantendo seu histórico
         funcionario.ativo = False
         funcionario.dt_termino = dt_sai
         if dt_ini:
             funcionario.dt_inicio = dt_ini
 
         nome_servidor = funcionario.nome
+        sec_id_func = funcionario.secretaria_id
         db.session.commit()
-        
-        registrar_log("GEROU RESCISAO", nome_servidor)
+
+        registrar_log("GEROU RESCISAO", nome_servidor, secretaria_id=sec_id_func)
 
         fuso_br = pytz.timezone('America/Sao_Paulo')
         agora_br = datetime.now(fuso_br).replace(tzinfo=None)
@@ -1215,15 +1470,21 @@ def processar_recisao():
 
 @app.route("/api/servidores_por_local")
 @login_required
+@security.require_permission("view_rh", api=True)
 def api_servidores_por_local():
     local_id = request.args.get("local_id")
     if not local_id:
         return jsonify([])
-    
-    servidores = Funcionario.query.filter(
-        Funcionario.local_trabalho_id == local_id,
-        (Funcionario.ativo == True) | (Funcionario.ativo.is_(None))
-    ).order_by(Funcionario.nome).all()
+
+    servidores_q = security.scope_query(
+        Funcionario.query.filter(
+            Funcionario.local_trabalho_id == local_id,
+            (Funcionario.ativo == True) | (Funcionario.ativo.is_(None)),
+        ),
+        Funcionario,
+        current_user,
+    )
+    servidores = servidores_q.order_by(Funcionario.nome).all()
 
     resultado = []
     for s in servidores:
@@ -1241,6 +1502,7 @@ def api_servidores_por_local():
 
 @app.route("/processar_recisao_massa", methods=["POST"])
 @login_required
+@security.require_permission("manage_rescisoes")
 def processar_recisao_massa():
     local_id = request.form.get("local_id")
     data_saida_str = request.form.get("data_saida")
@@ -1253,28 +1515,38 @@ def processar_recisao_massa():
         return redirect(url_for("pagina_recisoes"))
 
     local_obj = db.session.get(LocalTrabalho, local_id) if local_id else None
+    if local_obj and not security.can_access_record(current_user, local_obj):
+        registrar_violacao_acesso(f"Rescisao massa local_id={local_id}")
+        flash("Acesso negado: local pertence a outra secretaria.", "error")
+        return redirect(url_for("pagina_recisoes"))
+
     local_nome = local_obj.nome if local_obj else "Local Desconhecido"
 
     count = 0
     try:
         for fid in func_ids:
-            func = db.session.get(Funcionario, int(fid))
-            if func and (func.ativo is True or func.ativo is None):
-                dt_ini = func.dt_inicio or date.today()
+            func_obj = db.session.get(Funcionario, int(fid))
+            if (
+                func_obj
+                and security.can_access_record(current_user, func_obj)
+                and (func_obj.ativo is True or func_obj.ativo is None)
+            ):
+                dt_ini = func_obj.dt_inicio or date.today()
                 nova_rescisao = RescisaoHistorico(
-                    nome=func.nome,
-                    cpf=func.cpf,
-                    rg=func.rg,
-                    endereco=func.endereco,
-                    funcao=func.funcao.nome if func.funcao else "N/A",
-                    num_contrato=func.num_vinculo,
+                    secretaria_id=func_obj.secretaria_id,
+                    nome=func_obj.nome,
+                    cpf=func_obj.cpf,
+                    rg=func_obj.rg,
+                    endereco=func_obj.endereco,
+                    funcao=func_obj.funcao.nome if func_obj.funcao else "N/A",
+                    num_contrato=func_obj.num_vinculo,
                     data_inicio=dt_ini,
                     data_saida=dt_sai,
                 )
                 db.session.add(nova_rescisao)
 
-                func.ativo = False
-                func.dt_termino = dt_sai
+                func_obj.ativo = False
+                func_obj.dt_termino = dt_sai
                 count += 1
 
         db.session.commit()
@@ -1289,22 +1561,27 @@ def processar_recisao_massa():
 
 @app.route("/api/buscar_servidor_inativo_cpf")
 @login_required
+@security.require_permission("write_rh", api=True)
 def buscar_servidor_inativo_cpf():
     cpf_raw = request.args.get("cpf", "").strip()
     cpf_clean = re.sub(r"\D", "", cpf_raw)
     if not cpf_clean or len(cpf_clean) != 11:
         return jsonify({"encontrado": False})
-    
-    funcionarios = Funcionario.query.all()
-    func_inativo = None
-    for f in funcionarios:
-        if f.cpf and re.sub(r"\D", "", f.cpf) == cpf_clean and f.ativo is False:
-            func_inativo = f
-            break
-            
+
+    # Busca indexada e isolada por secretaria!
+    q = security.scope_query(
+        Funcionario.query.filter(
+            Funcionario.ativo == False,
+            (Funcionario.cpf_limpo == cpf_clean) | (Funcionario.cpf == cpf_raw),
+        ),
+        Funcionario,
+        current_user,
+    )
+    func_inativo = q.order_by(Funcionario.id.desc()).first()
+
     if not func_inativo:
         return jsonify({"encontrado": False})
-        
+
     return jsonify({
         "encontrado": True,
         "funcionario": {
@@ -1358,13 +1635,15 @@ def buscar_servidor_inativo_cpf():
 @login_required
 def api_alterar_minha_senha():
     try:
-        data = request.get_json() or request.form
-        nova_senha = data.get("nova_senha")
-        if not nova_senha or len(nova_senha.strip()) < 3:
-            return jsonify({"success": False, "message": "A nova senha deve ter pelo menos 3 caracteres."}), 400
+        data = request.get_json(silent=True) or request.form
+        nova_senha = (data.get("nova_senha") or "").strip()
+        ok_pwd, msg_pwd = security.validate_password_strength(nova_senha)
+        if not ok_pwd:
+            return jsonify({"success": False, "message": msg_pwd}), 400
 
         current_user.set_password(nova_senha)
         current_user.pergunta_troca_senha_exibida = True
+        current_user.precisa_trocar_senha = False
         db.session.commit()
         registrar_log("REDEFINIU SENHA PROPRIA", current_user.username)
         return jsonify({"success": True, "message": "Senha alterada com sucesso!"})
@@ -1387,38 +1666,30 @@ def api_dispensar_troca_senha():
 
 @app.route("/api/varredura_duplicados")
 @login_required
+@security.require_permission("scan_duplicados", api=True)
 def api_varredura_duplicados():
-    if not current_user.is_admin:
-        return jsonify({"success": False, "message": "Acesso não autorizado."}), 403
-
-    funcionarios = Funcionario.query.all()
+    funcionarios = security.scope_query(Funcionario.query, Funcionario, current_user).all()
     grupos_cpf = {}
 
     for f in funcionarios:
-        if not f.cpf:
-            continue
-        cpf_clean = re.sub(r"\D", "", f.cpf)
+        cpf_clean = f.cpf_limpo or (re.sub(r"\D", "", f.cpf) if f.cpf else "")
         if len(cpf_clean) != 11:
             continue
-        if cpf_clean not in grupos_cpf:
-            grupos_cpf[cpf_clean] = []
-        grupos_cpf[cpf_clean].append(f)
+        grupos_cpf.setdefault(cpf_clean, []).append(f)
 
     grupos_duplicados = []
     total_duplicados = 0
 
     for cpf_clean, lista in grupos_cpf.items():
         if len(lista) >= 2:
-            # Ordenação: o registro mais antigo (menor ID) ou o validado é considerado o Original
             lista_ordenada = sorted(lista, key=lambda x: (not x.validado, x.id))
             original = lista_ordenada[0]
             duplicados = lista_ordenada[1:]
             total_duplicados += len(duplicados)
 
             cpf_fmt = f"{cpf_clean[:3]}.{cpf_clean[3:6]}.{cpf_clean[6:9]}-{cpf_clean[9:]}"
-            
             orig_dt = original.data_criacao.strftime("%d/%m/%Y") if original.data_criacao else "N/D"
-            
+
             duplicados_data = []
             for dup in duplicados:
                 dup_dt = dup.data_criacao.strftime("%d/%m/%Y") if dup.data_criacao else "N/D"
@@ -1466,10 +1737,8 @@ def api_varredura_duplicados():
 
 @app.route("/api/excluir_duplicado/<int:func_id>", methods=["POST"])
 @login_required
+@security.require_permission("delete_permanently", api=True)
 def api_excluir_duplicado(func_id):
-    if not current_user.is_admin:
-        return jsonify({"success": False, "message": "Acesso não autorizado."}), 403
-
     ficha = db.session.get(Funcionario, func_id)
     if not ficha:
         return jsonify({"success": False, "message": "Registro não encontrado."}), 404
@@ -1477,15 +1746,15 @@ def api_excluir_duplicado(func_id):
     try:
         nome_servidor = ficha.nome
         cpf_servidor = ficha.cpf or "N/D"
+        sec_id = ficha.secretaria_id
 
-        # Limpa relacionamentos de movimentação e ponto antes de deletar o duplicado
         HistoricoLotacao.query.filter_by(funcionario_id=func_id).delete()
         RegistroPonto.query.filter_by(funcionario_id=func_id).delete()
 
         db.session.delete(ficha)
         db.session.commit()
 
-        registrar_log("EXCLUIU CADASTRO DUPLICADO", f"{nome_servidor} (CPF: {cpf_servidor}, ID #{func_id})")
+        registrar_log("EXCLUIU CADASTRO DUPLICADO", f"{nome_servidor} (CPF: {cpf_servidor}, ID #{func_id})", secretaria_id=sec_id)
         return jsonify({
             "success": True,
             "message": f"Cadastro duplicado #{func_id} de {nome_servidor} foi excluído permanentemente. O registro original foi mantido seguro."
@@ -1495,27 +1764,70 @@ def api_excluir_duplicado(func_id):
         return jsonify({"success": False, "message": f"Erro ao excluir duplicado: {str(e)}"}), 500
 
 
+@app.route("/admin/editar_secretaria", methods=["POST"])
+@login_required
+@security.require_permission("manage_secretarias")
+def editar_secretaria():
+    sec_id = request.form.get("secretaria_id", type=int)
+    sec = db.session.get(Secretaria, sec_id) if sec_id else None
+    if not sec:
+        flash("Secretaria não encontrada.", "error")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    nome = (request.form.get("nome") or sec.nome).strip().upper()
+    if nome and nome != sec.nome and Secretaria.query.filter(Secretaria.nome == nome, Secretaria.id != sec.id).first():
+        flash("Já existe outra secretaria com este nome.", "error")
+        return redirect(url_for("admin_dashboard", tab="config"))
+
+    sec.nome = nome
+    sec.sigla = (request.form.get("sigla") or "").strip().upper() or None
+    sec.cnpj = (request.form.get("cnpj") or "").strip() or None
+    sec.endereco = (request.form.get("endereco") or "").strip() or None
+    sec.telefone = (request.form.get("telefone") or "").strip() or None
+    sec.email = (request.form.get("email") or "").strip() or None
+    sec.secretario_nome = (request.form.get("secretario_nome") or "").strip().upper() or None
+    sec.secretario_cargo = (request.form.get("secretario_cargo") or "").strip() or None
+    sec.secretario_cpf = (request.form.get("secretario_cpf") or "").strip() or None
+    sec.secretario_portaria = (request.form.get("secretario_portaria") or "").strip() or None
+    sec.teto_comissionados = request.form.get("teto_comissionados", type=int) or 0
+    sec.teto_folha_mensal = security.parse_remuneracao_float(request.form.get("teto_folha_mensal"))
+    sec.ativa = request.form.get("ativa", "1") in ("1", "true", "on", "sim")
+
+    db.session.commit()
+    registrar_log("EDITOU SECRETARIA", f"{sec.nome} ({sec.sigla or '-'})", secretaria_id=sec.id)
+    flash(f"Perfil institucional de '{sec.nome}' atualizado com sucesso!", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
+
 @app.route("/admin/editar_local", methods=["POST"])
 @login_required
+@security.require_permission("manage_locais")
 def editar_local():
-    if not current_user.is_admin:
-        return redirect(url_for("index"))
-
     id_local = request.form.get("id_local")
     local = db.session.get(LocalTrabalho, id_local)
 
     if local:
+        if not security.can_access_record(current_user, local):
+            registrar_violacao_acesso(f"Editar local_id={id_local}")
+            flash("Acesso negado: local pertence a outra secretaria.", "error")
+            return redirect(url_for("admin_dashboard", tab="config"))
+
         local.nome = request.form.get("nome_local")
         lat = request.form.get("latitude")
         lng = request.form.get("longitude")
         raio = request.form.get("raio_permitido")
+        tipo_unidade = (request.form.get("tipo_unidade") or local.tipo_unidade or "UNIDADE").strip().upper()
 
+        if security.has_global_scope(current_user) and request.form.get("secretaria_id"):
+            local.secretaria_id = request.form.get("secretaria_id", type=int)
+
+        local.tipo_unidade = tipo_unidade
         local.latitude = float(lat) if lat and lat.strip() else None
         local.longitude = float(lng) if lng and lng.strip() else None
         local.raio_permitido = int(raio) if raio and raio.strip() else 50
 
         db.session.commit()
-        registrar_log("EDITOU LOCAL", local.nome)
+        registrar_log("EDITOU LOCAL", local.nome, secretaria_id=local.secretaria_id)
         flash("Configurações do local atualizadas!", "success")
 
     return redirect(url_for("admin_dashboard", tab="config"))
@@ -1523,12 +1835,11 @@ def editar_local():
 
 @app.route("/admin/reconhecimento_facial")
 @login_required
+@security.require_permission("manage_biometria")
 def reconhecimento_facial():
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
-
-    # Busca todos os funcionários para a galeria
-    funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
+    funcionarios = security.scope_query(
+        Funcionario.query, Funcionario, current_user
+    ).order_by(Funcionario.nome).all()
     return render_template(
         "reconhecimento_facial.html", lista_funcionarios=funcionarios
     )
@@ -1536,12 +1847,13 @@ def reconhecimento_facial():
 
 @app.route("/admin/cargos_total")
 @login_required
+@security.require_permission("view_admin_panel")
 def cargos_total():
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
-
-    # Pega todos os funcionários e suas funções
-    funcionarios = Funcionario.query.all()
+    funcionarios = security.scope_query(
+        Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))),
+        Funcionario,
+        current_user,
+    ).all()
 
     stats_cargos = {}
     for f in funcionarios:
@@ -1559,108 +1871,139 @@ def cargos_total():
             }
         )
 
-    # Ordena os cargos por nome
     stats_cargos = dict(sorted(stats_cargos.items()))
 
     return render_template("cargos_total.html", stats_cargos=stats_cargos)
 
 
-@app.route("/excluir_ficha/<int:id>")
+@app.route("/excluir_ficha/<int:id>", methods=["GET", "POST"])
 @login_required
+@security.require_permission("delete_permanently")
 def excluir_ficha(id):
-    if not current_user.is_admin:
-        flash("Apenas Admin pode excluir.", "error")
-        return redirect(url_for("sistema"))
     ficha = db.session.get(Funcionario, id)
     if ficha:
         nome = ficha.nome
+        sec_id = ficha.secretaria_id
         HistoricoLotacao.query.filter_by(funcionario_id=id).delete()
         db.session.delete(ficha)
         db.session.commit()
-        registrar_log("EXCLUIU FICHA", nome)
+        registrar_log("EXCLUIU FICHA", nome, nivel="WARN", secretaria_id=sec_id)
         flash("Ficha excluída.", "success")
     return redirect(url_for("sistema"))
 
 
 @app.route("/admin/update_user", methods=["POST"])
 @login_required
+@security.require_permission("manage_users")
 def update_user():
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
-
     user_id = request.form.get("user_id")
     u = db.session.get(User, user_id)
 
     if u:
-        # Username
-        new_username = request.form.get("username")
+        new_username = (request.form.get("username") or "").strip()
         if new_username and new_username != u.username:
             if User.query.filter_by(username=new_username).first():
                 flash("Nome de usuário já existe!", "error")
-                return redirect(url_for("admin_dashboard"))
+                return redirect(url_for("admin_dashboard", tab="config"))
             u.username = new_username
 
-        # Senha
-        new_password = request.form.get("password")
+        new_password = request.form.get("password") or ""
         if new_password:
+            ok_pwd, msg_pwd = security.validate_password_strength(new_password)
+            if not ok_pwd:
+                flash(f"Senha fraca: {msg_pwd}", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
             u.set_password(new_password)
             u.pergunta_troca_senha_exibida = False
 
-        # Secretaria e Role
-        sec_id = request.form.get("secretaria_id")
-        role = request.form.get("role")
+        if request.form.get("nome_completo") is not None:
+            u.nome_completo = (request.form.get("nome_completo") or "").strip().upper() or None
+        if request.form.get("email") is not None:
+            u.email = (request.form.get("email") or "").strip() or None
 
-        if sec_id:
-            u.secretaria_id = int(sec_id)
+        sec_id = request.form.get("secretaria_id", type=int)
+        local_id = request.form.get("local_trabalho_id", type=int)
+        role = (request.form.get("role") or "").strip()
+
         if role:
-            u.role = role
-            u.is_admin = role == "admin"
+            norm_role = security.LEGACY_ROLE_MAP.get(role, role)
+            if norm_role in security.ROLE_METADATA:
+                u.role = norm_role
+                u.is_admin = norm_role == "super_admin"
+                if norm_role in ("super_admin", "prefeito", "estrategia_eleitoral", "auditor"):
+                    u.secretaria_id = sec_id or None
+                    u.local_trabalho_id = None
+                else:
+                    if sec_id:
+                        u.secretaria_id = sec_id
+                    u.local_trabalho_id = local_id if norm_role == "chefe_unidade" else None
+        elif sec_id:
+            u.secretaria_id = sec_id
+
+        if "ativo" in request.form and u.username != "admin":
+            u.ativo = request.form.get("ativo") in ("1", "true", "on", "sim")
 
         db.session.commit()
-        registrar_log("EDITOU USUÁRIO", u.username)
+        registrar_log("EDITOU USUÁRIO", f"{u.username} [{u.normalized_role}]", secretaria_id=u.secretaria_id)
         flash("Usuário atualizado com sucesso!", "success")
 
-    return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("admin_dashboard", tab="config"))
 
 
-@app.route("/admin/delete_user/<int:user_id>")
+@app.route("/admin/desbloquear_usuario/<int:user_id>", methods=["POST"])
 @login_required
-def delete_user(user_id):
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
+@security.require_permission("manage_users")
+def desbloquear_usuario(user_id):
     u = db.session.get(User, user_id)
-    if u and not u.is_admin:
+    if u:
+        u.tentativas_falhas = 0
+        u.bloqueado_ate = None
+        u.ativo = True
+        db.session.commit()
+        registrar_log("DESBLOQUEOU USUÁRIO", u.username, nivel="SECURITY", secretaria_id=u.secretaria_id)
+        flash(f"Conta de '{u.username}' desbloqueada e ativada.", "success")
+    return redirect(url_for("admin_dashboard", tab="config"))
+
+
+@app.route("/admin/delete_user/<int:user_id>", methods=["GET", "POST"])
+@login_required
+@security.require_permission("manage_users")
+def delete_user(user_id):
+    u = db.session.get(User, user_id)
+    if u and u.username != "admin" and u.id != current_user.id:
+        nome_u = u.username
         db.session.delete(u)
         db.session.commit()
+        registrar_log("EXCLUIU USUÁRIO", nome_u, nivel="WARN")
         flash("Usuário excluído.", "success")
-    return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("admin_dashboard", tab="config"))
 
 
-@app.route("/admin/delete_secretaria/<int:sec_id>")
+@app.route("/admin/delete_secretaria/<int:sec_id>", methods=["GET", "POST"])
 @login_required
+@security.require_permission("manage_secretarias")
 def delete_secretaria(sec_id):
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
     if (
         User.query.filter_by(secretaria_id=sec_id).first()
         or Funcionario.query.filter_by(secretaria_id=sec_id).first()
+        or LocalTrabalho.query.filter_by(secretaria_id=sec_id).first()
     ):
-        flash("Erro: Existem vínculos.", "error")
+        flash("Erro: Existem usuários, servidores ou locais vinculados a esta secretaria.", "error")
     else:
         s = db.session.get(Secretaria, sec_id)
         if s:
+            nome_s = s.nome
             db.session.delete(s)
             db.session.commit()
+            registrar_log("EXCLUIU SECRETARIA", nome_s, nivel="WARN")
             flash("Secretaria excluída.", "success")
-    return redirect(url_for("admin_dashboard"))
+    return redirect(url_for("admin_dashboard", tab="config"))
 
 
 @app.route("/admin/editar_funcao", methods=["POST"])
 @login_required
+@security.require_permission("manage_funcoes")
 def editar_funcao():
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
-
     id_funcao = request.form.get("id_funcao")
     novo_nome = request.form.get("nome_funcao", "").strip().upper()
 
@@ -1702,12 +2045,10 @@ def editar_funcao():
     return redirect(url_for("admin_dashboard") + "?tab=config")
 
 
-@app.route("/admin/delete_funcao/<int:id>")
+@app.route("/admin/delete_funcao/<int:id>", methods=["GET", "POST"])
 @login_required
+@security.require_permission("manage_funcoes")
 def delete_funcao(id):
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
-
     f = db.session.get(Funcao, id)
     funcoes_protegidas = [
         "PROFISSIONAL DE APOIO ESCOLAR (CUIDADOR)",
@@ -1728,15 +2069,18 @@ def delete_funcao(id):
     return redirect(url_for("admin_dashboard") + "?tab=config")
 
 
-@app.route("/admin/delete_local/<int:id>")
+@app.route("/admin/delete_local/<int:id>", methods=["GET", "POST"])
 @login_required
+@security.require_permission("manage_locais")
 def delete_local(id):
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
+    l = db.session.get(LocalTrabalho, id)
+    if l and not security.can_access_record(current_user, l):
+        registrar_violacao_acesso(f"Excluir local_id={id}")
+        flash("Acesso negado: local pertence a outra secretaria.", "error")
+        return redirect(url_for("admin_dashboard") + "?tab=config")
     if Funcionario.query.filter_by(local_trabalho_id=id).first():
         flash("Erro: Existem funcionários neste local.", "error")
     else:
-        l = db.session.get(LocalTrabalho, id)
         if l:
             db.session.delete(l)
             db.session.commit()
@@ -1744,11 +2088,10 @@ def delete_local(id):
     return redirect(url_for("admin_dashboard") + "?tab=config")
 
 
-@app.route("/admin/delete_padrinho/<int:id>")
+@app.route("/admin/delete_padrinho/<int:id>", methods=["GET", "POST"])
 @login_required
+@security.require_permission("manage_padrinhos")
 def delete_padrinho(id):
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
     if Funcionario.query.filter_by(padrinho_id=id).first():
         flash("Erro: Existem funcionários indicados por este padrinho.", "error")
     else:
@@ -1762,20 +2105,20 @@ def delete_padrinho(id):
 
 @app.route("/exportar_excel")
 @login_required
+@security.require_permission("export_rh")
 def exportar_excel():
-    # 1. Verificação de permissão
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
-
-    # 2. Captura dos filtros da URL para manter a precisão do relatório
-    filtro_secretaria = request.args.get("secretaria_id")
+    is_global = security.has_global_scope(current_user)
+    filtro_secretaria = request.args.get("secretaria_id") if is_global else None
     filtro_vinculo = request.args.get("tipo_vinculo")
-    filtro_indicacao = request.args.get("padrinho_id")
+    filtro_indicacao = request.args.get("padrinho_id") if security.has_permission(current_user, "view_padrinhos") else None
     filtro_funcao = request.args.get("funcao_id")
     filtro_local = request.args.get("local_trabalho_id")
 
-    # 3. Construção da Query filtrada
-    query = Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
+    query = security.scope_query(
+        Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))),
+        Funcionario,
+        current_user,
+    )
     if filtro_secretaria:
         query = query.filter_by(secretaria_id=filtro_secretaria)
     if filtro_vinculo:
@@ -1934,24 +2277,34 @@ def gerar_proximo_vinculo():
 
 @app.route("/sistema", methods=["GET", "POST"])
 @login_required
+@security.require_permission("view_rh")
 def sistema():
-    # Carrega todas as opções para os formulários
+    is_global = security.has_global_scope(current_user)
+    can_write = security.has_permission(current_user, "write_rh")
+
     secretarias_opcoes = (
         Secretaria.query.order_by(Secretaria.nome).all()
-        if current_user.is_admin
+        if is_global
         else []
     )
     funcoes_opcoes = Funcao.query.order_by(Funcao.nome).all()
-    locais_opcoes = LocalTrabalho.query.order_by(LocalTrabalho.nome).all()
+    locais_opcoes = security.scope_query(
+        LocalTrabalho.query, LocalTrabalho, current_user
+    ).order_by(LocalTrabalho.nome).all()
     padrinhos_opcoes = Padrinho.query.order_by(Padrinho.nome).all()
 
     nome_secretaria_atual = (
         current_user.secretaria.nome if current_user.secretaria else "Sem Secretaria"
     )
-    if current_user.is_admin:
-        nome_secretaria_atual = "MODO ADMINISTRADOR"
+    if is_global:
+        nome_secretaria_atual = f"{current_user.role_label.upper()} (VISÃO GLOBAL)"
 
     if request.method == "POST":
+        if not can_write:
+            registrar_violacao_acesso("POST /sistema sem permissao write_rh")
+            flash("Acesso negado: seu perfil é somente leitura para fichas cadastrais.", "error")
+            return redirect(url_for("sistema"))
+
         is_indicacao = True if request.form.get("foi_indicacao") == "sim" else False
         padrinho_id = (
             request.form.get("padrinho_id")
@@ -1959,15 +2312,21 @@ def sistema():
             else None
         )
 
-        # LÓGICA DE SECRETARIA
-        if current_user.is_admin:
+        # LÓGICA DE SECRETARIA (FORÇA ISOLAMENTO PARA NÃO-GLOBAIS)
+        if is_global:
             sec_id = request.form.get("secretaria_id")
             if not sec_id:
                 flash("Selecione a Secretaria!", "error")
                 return redirect(url_for("sistema"))
             sec_obj = db.session.get(Secretaria, int(sec_id))
+            if not sec_obj:
+                flash("Secretaria inválida!", "error")
+                return redirect(url_for("sistema"))
             lotacao_texto = sec_obj.nome
         else:
+            if not current_user.secretaria_id:
+                flash("Seu usuário não possui Secretaria vinculada. Contate o Master TI.", "error")
+                return redirect(url_for("sistema"))
             sec_id = current_user.secretaria_id
             lotacao_texto = (
                 current_user.secretaria.nome
@@ -1975,10 +2334,24 @@ def sistema():
                 else "ADMINISTRAÇÃO"
             )
 
+        # Valida se o local_trabalho_id escolhido pertence à secretaria (para não-globais)
+        local_id_form = request.form.get("local_trabalho_id") or None
+        if local_id_form and not is_global:
+            loc_check = db.session.get(LocalTrabalho, int(local_id_form))
+            if loc_check and loc_check.secretaria_id and int(loc_check.secretaria_id) != int(sec_id):
+                registrar_violacao_acesso(f"Tentou vincular servidor a local_id={local_id_form} de outra secretaria")
+                flash("Acesso negado: o local de trabalho selecionado não pertence à sua secretaria.", "error")
+                return redirect(url_for("sistema"))
+
+        cpf_raw_form = request.form.get("cpf") or ""
+        cpf_normalizado = normalizar_cpf(cpf_raw_form)
+        remuneracao_raw = request.form.get("remuneracao") or ""
+
         dados_form = {
-            "nome": request.form.get("nome").upper(),
+            "nome": (request.form.get("nome") or "").strip().upper(),
             "num_vinculo": request.form.get("num_vinculo"),
-            "cpf": request.form.get("cpf"),
+            "cpf": cpf_raw_form.strip(),
+            "cpf_limpo": cpf_normalizado or None,
             "rg": request.form.get("rg"),
             "data_expedicao_rg": parse_date(request.form.get("data_expedicao_rg")),
             "data_nasc": parse_date(request.form.get("data_nasc")),
@@ -1986,18 +2359,19 @@ def sistema():
             "titulo_eleitor": request.form.get("titulo_eleitor"),
             "zona_eleitoral": request.form.get("zona_eleitoral"),
             "secao_eleitoral": request.form.get("secao_eleitoral"),
-            "mae": request.form.get("mae").upper(),
+            "mae": (request.form.get("mae") or "").upper(),
             "nacionalidade": request.form.get("nacionalidade"),
             "estado_civil": request.form.get("estado_civil"),
             "telefone": request.form.get("telefone"),
             "email": request.form.get("email"),
-            "endereco": request.form.get("endereco").upper(),
+            "endereco": (request.form.get("endereco") or "").upper(),
             "funcao_id": request.form.get("funcao_id") or None,
-            "local_trabalho_id": request.form.get("local_trabalho_id") or None,
+            "local_trabalho_id": local_id_form,
             "tipo_vinculo": request.form.get("tipo_vinculo"),
             "classe": request.form.get("classe"),
             "contracheque": request.form.get("contracheque"),
-            "remuneracao": request.form.get("remuneracao"),
+            "remuneracao": remuneracao_raw,
+            "remuneracao_valor": security.parse_remuneracao_float(remuneracao_raw),
             "jornada_trabalho": request.form.get("jornada_trabalho"),
             "dt_inicio": parse_date(request.form.get("dt_inicio")),
             "dt_termino": parse_date(request.form.get("dt_termino")),
@@ -2007,7 +2381,7 @@ def sistema():
             "tipo_conta": request.form.get("tipo_conta"),
             "foi_indicacao": is_indicacao,
             "padrinho_id": padrinho_id,
-            "secretaria_id": int(sec_id),  # Força inteiro
+            "secretaria_id": int(sec_id),
             "lotacao": lotacao_texto,
             "crianca_assistida": (
                 request.form.get("crianca_assistida").strip().upper()
@@ -2015,8 +2389,6 @@ def sistema():
                 and request.form.get("crianca_assistida").strip()
                 else None
             ),
-            
-            # --- NOVOS CAMPOS ADICIONADOS AQUI ---
             "pai": request.form.get("pai").upper() if request.form.get("pai") else None,
             "orgao_emissor_rg": request.form.get("orgao_emissor_rg").upper() if request.form.get("orgao_emissor_rg") else None,
             "genero": request.form.get("genero"),
@@ -2044,7 +2416,7 @@ def sistema():
             flash("Data de Início é obrigatória!", "error")
             return redirect(url_for("sistema"))
 
-        if not dados_form.get("cpf") or not dados_form.get("cpf").strip():
+        if not dados_form.get("cpf"):
             flash("O CPF é obrigatório!", "error")
             return redirect(url_for("sistema"))
 
@@ -2066,97 +2438,109 @@ def sistema():
 
         func_id = request.form.get("id")
 
-        # Se for um novo cadastro, o campo num_vinculo é gerado automaticamente
-        # e sobrescreve qualquer valor que venha do formulário.
         if not func_id:
             dados_form["num_vinculo"] = gerar_proximo_vinculo()
 
-        # Validação de CPF duplicado
-        cpf_normalizado = normalizar_cpf(dados_form["cpf"])
+        # Validação de CPF duplicado (indexada e respeitando sigilo entre secretarias!)
         cpf_duplicado = False
-        if cpf_normalizado and len(cpf_normalizado) == 11:  # CPF válido tem 11 dígitos
-            # Busca funcionários com o mesmo CPF
-            funcionarios_com_mesmo_cpf = Funcionario.query.filter_by(
-                cpf=dados_form["cpf"]
-            ).all()
-
-            # Se for edição, remove o próprio funcionário da lista
+        if cpf_normalizado and len(cpf_normalizado) == 11:
+            q_cpf = Funcionario.query.filter(
+                (Funcionario.cpf_limpo == cpf_normalizado) | (Funcionario.cpf == dados_form["cpf"]),
+                (Funcionario.ativo == True) | (Funcionario.ativo.is_(None)),
+            )
             if func_id:
-                funcionarios_com_mesmo_cpf = [
-                    f for f in funcionarios_com_mesmo_cpf if f.id != int(func_id)
-                ]
+                q_cpf = q_cpf.filter(Funcionario.id != int(func_id))
+            encontrados_cpf = q_cpf.all()
 
-            # Se encontrou duplicados, mostra alerta
-            if funcionarios_com_mesmo_cpf:
+            mesma_sec = [f for f in encontrados_cpf if int(f.secretaria_id) == int(sec_id)]
+            outra_sec = [f for f in encontrados_cpf if int(f.secretaria_id) != int(sec_id)]
+
+            if mesma_sec:
                 cpf_duplicado = True
-                nomes_duplicados = [f.nome for f in funcionarios_com_mesmo_cpf]
+                nomes_duplicados = [f.nome for f in mesma_sec]
                 flash(
-                    f'⚠️ ATENÇÃO: Este CPF já está cadastrado para: {", ".join(nomes_duplicados)}. Verifique se não está duplicando o cadastro.',
+                    f'⚠️ ATENÇÃO: Este CPF já está cadastrado nesta secretaria para: {", ".join(nomes_duplicados)}.',
                     "error",
                 )
-                # Continua o processo mas alerta o usuário
+            elif outra_sec:
+                cpf_duplicado = True
+                # Alerta silencioso ao Gabinete/Prefeito sem vazar dados da outra pasta para o operador!
+                outras_secs_nomes = ", ".join({f.secretaria.nome for f in outra_sec if f.secretaria})
+                registrar_log(
+                    "ALERTA_ACUMULO_CPF",
+                    f"CPF {dados_form['cpf']} ({dados_form['nome']}) cadastrado em {lotacao_texto} mas já ativo em: {outras_secs_nomes}",
+                    nivel="SECURITY",
+                    secretaria_id=None,
+                )
+                if is_global:
+                    flash(
+                        f"⚠️ ALERTA DE ACÚMULO: Este CPF já possui vínculo ativo em outra secretaria ({outras_secs_nomes}).",
+                        "error",
+                    )
+                else:
+                    flash(
+                        "⚠️ AVISO DE GOVERNANÇA: Este CPF já possui vínculo ativo em outro órgão do Município. Um alerta automático foi enviado à Administração/Gabinete.",
+                        "error",
+                    )
 
         if func_id:
             funcionario = db.session.get(Funcionario, func_id)
-            if funcionario:
-                mudou_local = str(funcionario.local_trabalho_id) != str(
-                    dados_form["local_trabalho_id"]
+            if not funcionario:
+                flash("Servidor não encontrado.", "error")
+                return redirect(url_for("sistema"))
+            # BLOQUEIO ESTRITO ANTI-IDOR: impede editar ficha de outra secretaria!
+            if not security.can_access_record(current_user, funcionario):
+                registrar_violacao_acesso(f"Tentativa de editar funcionario_id={func_id} de outra secretaria")
+                flash("Acesso negado: você não tem permissão para editar servidores de outra secretaria.", "error")
+                return redirect(url_for("sistema"))
+
+            mudou_local = str(funcionario.local_trabalho_id) != str(dados_form["local_trabalho_id"])
+            mudou_sec = str(funcionario.secretaria_id) != str(sec_id)
+            mudou_funcao = str(funcionario.funcao_id) != str(dados_form["funcao_id"])
+
+            if mudou_local or mudou_sec or mudou_funcao:
+                novo_local_obj = db.session.get(LocalTrabalho, dados_form["local_trabalho_id"]) if dados_form["local_trabalho_id"] else None
+                historico = HistoricoLotacao(
+                    funcionario_id=funcionario.id,
+                    antiga_secretaria=funcionario.lotacao,
+                    antigo_local=(funcionario.local_trabalho.nome if funcionario.local_trabalho else "N/A"),
+                    antiga_funcao=(funcionario.funcao.nome if funcionario.funcao else "N/A"),
+                    quem_mudou_id=current_user.id,
                 )
-                mudou_sec = str(funcionario.secretaria_id) != str(sec_id)
-                mudou_funcao = str(funcionario.funcao_id) != str(
-                    dados_form["funcao_id"]
+                db.session.add(historico)
+                registrar_log(
+                    "MOVIMENTOU",
+                    f"{funcionario.nome} -> {novo_local_obj.nome if novo_local_obj else 'N/A'}",
+                    secretaria_id=int(sec_id),
                 )
+            else:
+                registrar_log("EDITOU", funcionario.nome, secretaria_id=int(sec_id))
 
-                if mudou_local or mudou_sec or mudou_funcao:
-                    nova_funcao_obj = db.session.get(Funcao, dados_form["funcao_id"])
-                    novo_local_obj = db.session.get(
-                        LocalTrabalho, dados_form["local_trabalho_id"]
-                    )
-                    historico = HistoricoLotacao(
-                        funcionario_id=funcionario.id,
-                        antiga_secretaria=funcionario.lotacao,
-                        antigo_local=(
-                            funcionario.local_trabalho.nome
-                            if funcionario.local_trabalho
-                            else "N/A"
-                        ),
-                        antiga_funcao=(
-                            funcionario.funcao.nome if funcionario.funcao else "N/A"
-                        ),
-                        quem_mudou_id=current_user.id,
-                    )
-                    db.session.add(historico)
-                    registrar_log(
-                        "MOVIMENTOU",
-                        f"{funcionario.nome} -> {novo_local_obj.nome if novo_local_obj else 'N/A'}",
-                    )
-                else:
-                    registrar_log("EDITOU", funcionario.nome)
+            for key, value in dados_form.items():
+                setattr(funcionario, key, value)
 
-                for key, value in dados_form.items():
-                    setattr(funcionario, key, value)
-
-                db.session.commit()
-                if not cpf_duplicado:
-                    flash("Dados atualizados com sucesso!", "success")
+            db.session.commit()
+            if not cpf_duplicado:
+                flash("Dados atualizados com sucesso!", "success")
         else:
             novo_func = Funcionario(**dados_form)
             novo_func.criado_por = current_user.id
             db.session.add(novo_func)
             db.session.commit()
-            registrar_log("CRIOU FICHA", f"{novo_func.nome} ({lotacao_texto})")
+            registrar_log("CRIOU FICHA", f"{novo_func.nome} ({lotacao_texto})", secretaria_id=int(sec_id))
             if not cpf_duplicado:
                 flash("Ficha criada com sucesso!", "success")
 
         return redirect(url_for("sistema"))
 
-    query = Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None)))
-    if not current_user.is_admin:
-        query = query.filter_by(secretaria_id=current_user.secretaria_id)
+    query = security.scope_query(
+        Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))),
+        Funcionario,
+        current_user,
+    )
     lista_funcionarios = query.order_by(Funcionario.id.desc()).all()
     proximo_vinculo_form = gerar_proximo_vinculo()
 
-    # Pega o ID da função de apoio para a lógica do modal no frontend
     funcao_apoio = Funcao.query.filter(
         Funcao.nome.in_(
             [
@@ -2167,8 +2551,9 @@ def sistema():
     ).first()
     funcao_apoio_id = funcao_apoio.id if funcao_apoio else None
 
-    # Mapeia contratos gerados por funcionario_id, CPF e Nome para identificação direta
-    contratos_gerados_todos = ContratoGerado.query.all()
+    contratos_gerados_todos = security.scope_query(
+        ContratoGerado.query, ContratoGerado, current_user
+    ).all()
     mapa_contratos_gerados = {}
     for cg in contratos_gerados_todos:
         if cg.funcionario_id:
@@ -2187,8 +2572,8 @@ def sistema():
         funcoes_opcoes=funcoes_opcoes,
         locais_opcoes=locais_opcoes,
         padrinhos_opcoes=padrinhos_opcoes,
-        is_admin=current_user.is_admin,
-        role=current_user.role,
+        is_admin=security.is_super_admin(current_user),
+        role=current_user.normalized_role,
         proximo_vinculo_form=proximo_vinculo_form,
         funcao_apoio_id=funcao_apoio_id,
         mapa_contratos_gerados=mapa_contratos_gerados,
@@ -2200,18 +2585,21 @@ def create_admin():
         db.create_all()
         user = User.query.filter_by(username="admin").first()
         if not user:
-            # Verifica se a secretaria já existe para não duplicar
             sec_adm = Secretaria.query.filter_by(nome="PREFEITURA MUNICIPAL").first()
             if not sec_adm:
-                sec_adm = Secretaria(nome="PREFEITURA MUNICIPAL")
+                sec_adm = Secretaria(nome="PREFEITURA MUNICIPAL", sigla="PMV", ativa=True)
                 db.session.add(sec_adm)
                 db.session.commit()
 
-            # Pega a senha de uma variável de ambiente ou usa uma padrão apenas na primeira vez
             senha_inicial = os.getenv("ADMIN_INITIAL_PASSWORD", "Mudar123@")
 
             user = User(
-                username="admin", is_admin=True, role="admin", secretaria_id=sec_adm.id
+                username="admin",
+                nome_completo="ADMINISTRADOR MASTER",
+                is_admin=True,
+                role="super_admin",
+                secretaria_id=sec_adm.id,
+                ativo=True,
             )
             user.set_password(senha_inicial)
             db.session.add(user)
@@ -2220,153 +2608,155 @@ def create_admin():
 
 
 def atualizar_schema():
-    """Função robusta para adicionar colunas no SQLite ou PostgreSQL (Railway)"""
+    """Migração aditiva segura para SQLite e PostgreSQL (Railway) — preserva 100% dos dados existentes."""
     with app.app_context():
         with db.engine.connect() as conn:
-            # 1. Colunas para a tabela 'funcionario'
-            colunas_funcionario = [
-                ("padrinho_id", "INTEGER"),
-                ("funcao_id", "INTEGER"),
-                ("local_trabalho_id", "INTEGER"),
-                ("validado", "BOOLEAN DEFAULT FALSE"),
-                ("data_expedicao_rg", "DATE"),
-                ("jornada_trabalho", "VARCHAR(50)"),
-                ("crianca_assistida", "VARCHAR(150)"),
-                ("foto_biometria", "TEXT"),
-                ("foto_path", "VARCHAR(255)"),
-                # --- NOVOS CAMPOS ADICIONADOS ---
-                ("pai", "VARCHAR(150)"),
-                ("orgao_emissor_rg", "VARCHAR(20)"),
-                ("genero", "VARCHAR(20)"),
-                ("escolaridade", "VARCHAR(100)"),
-                ("especialidade", "VARCHAR(150)"),
-                ("cep", "VARCHAR(10)"),
-                ("bairro", "VARCHAR(100)"),
-                ("cidade", "VARCHAR(100) DEFAULT 'Valença do Piauí'"),
-                ("uf", "VARCHAR(2) DEFAULT 'PI'"),
-                ("is_pcd", "BOOLEAN DEFAULT FALSE"),
-                ("tipo_deficiencia", "VARCHAR(100)"),
-                ("qtd_dependentes", "INTEGER DEFAULT 0"),
-                ("ctps", "VARCHAR(50)"),
-                ("cnh", "VARCHAR(20)"),
-                ("contato_emergencia_nome", "VARCHAR(150)"),
-                ("contato_emergencia_tel", "VARCHAR(20)"),
-                ("tipo_sanguineo", "VARCHAR(5)"),
-                ("ativo", "BOOLEAN DEFAULT TRUE"),
-            ]
+            # 1. Novas colunas por tabela (100% aditivas)
+            migracoes_colunas = {
+                "secretaria": [
+                    ("sigla", "VARCHAR(20)"),
+                    ("cnpj", "VARCHAR(25)"),
+                    ("endereco", "VARCHAR(255)"),
+                    ("telefone", "VARCHAR(30)"),
+                    ("email", "VARCHAR(120)"),
+                    ("secretario_nome", "VARCHAR(150)"),
+                    ("secretario_cargo", "VARCHAR(120)"),
+                    ("secretario_cpf", "VARCHAR(30)"),
+                    ("secretario_portaria", "VARCHAR(100)"),
+                    ("teto_comissionados", "INTEGER DEFAULT 0"),
+                    ("teto_folha_mensal", "FLOAT DEFAULT 0"),
+                    ("ativa", "BOOLEAN DEFAULT TRUE"),
+                ],
+                "local_trabalho": [
+                    ("secretaria_id", "INTEGER"),
+                    ("tipo_unidade", "VARCHAR(40) DEFAULT 'UNIDADE'"),
+                    ("ativa", "BOOLEAN DEFAULT TRUE"),
+                    ("latitude", "FLOAT"),
+                    ("longitude", "FLOAT"),
+                    ("raio_permitido", "INTEGER DEFAULT 50"),
+                ],
+                "funcionario": [
+                    ("padrinho_id", "INTEGER"),
+                    ("funcao_id", "INTEGER"),
+                    ("local_trabalho_id", "INTEGER"),
+                    ("validado", "BOOLEAN DEFAULT FALSE"),
+                    ("data_expedicao_rg", "DATE"),
+                    ("jornada_trabalho", "VARCHAR(50)"),
+                    ("crianca_assistida", "VARCHAR(150)"),
+                    ("foto_biometria", "TEXT"),
+                    ("foto_path", "VARCHAR(255)"),
+                    ("pai", "VARCHAR(150)"),
+                    ("orgao_emissor_rg", "VARCHAR(20)"),
+                    ("genero", "VARCHAR(20)"),
+                    ("escolaridade", "VARCHAR(100)"),
+                    ("especialidade", "VARCHAR(150)"),
+                    ("cep", "VARCHAR(10)"),
+                    ("bairro", "VARCHAR(100)"),
+                    ("cidade", "VARCHAR(100) DEFAULT 'Valença do Piauí'"),
+                    ("uf", "VARCHAR(2) DEFAULT 'PI'"),
+                    ("is_pcd", "BOOLEAN DEFAULT FALSE"),
+                    ("tipo_deficiencia", "VARCHAR(100)"),
+                    ("qtd_dependentes", "INTEGER DEFAULT 0"),
+                    ("ctps", "VARCHAR(50)"),
+                    ("cnh", "VARCHAR(20)"),
+                    ("contato_emergencia_nome", "VARCHAR(150)"),
+                    ("contato_emergencia_tel", "VARCHAR(20)"),
+                    ("tipo_sanguineo", "VARCHAR(5)"),
+                    ("ativo", "BOOLEAN DEFAULT TRUE"),
+                    ("cpf_limpo", "VARCHAR(11)"),
+                    ("remuneracao_valor", "FLOAT DEFAULT 0"),
+                ],
+                "rescisao_historico": [
+                    ("secretaria_id", "INTEGER"),
+                    ("rg", "VARCHAR(20)"),
+                    ("endereco", "VARCHAR(200)"),
+                    ("num_contrato", "VARCHAR(50)"),
+                ],
+                "log_auditoria": [
+                    ("secretaria_id", "INTEGER"),
+                    ("nivel", "VARCHAR(20) DEFAULT 'INFO'"),
+                    ("tabela_afetada", "VARCHAR(50)"),
+                    ("registro_id", "INTEGER"),
+                    ("dados_antigos", "TEXT"),
+                    ("dados_novos", "TEXT"),
+                    ("ip_origem", "VARCHAR(50)"),
+                    ("user_agent", "VARCHAR(255)"),
+                    ("rota_acessada", "VARCHAR(255)"),
+                ],
+                "contrato_gerado": [
+                    ("secretaria_id", "INTEGER"),
+                    ("editado", "BOOLEAN DEFAULT FALSE"),
+                    ("motivo_edicao", "TEXT"),
+                    ("data_edicao", "TIMESTAMP"),
+                    ("quem_editou_id", "INTEGER"),
+                ],
+                '"user"': [
+                    ("nome_completo", "VARCHAR(150)"),
+                    ("email", "VARCHAR(120)"),
+                    ("local_trabalho_id", "INTEGER"),
+                    ("ativo", "BOOLEAN DEFAULT TRUE"),
+                    ("tentativas_falhas", "INTEGER DEFAULT 0"),
+                    ("bloqueado_ate", "TIMESTAMP"),
+                    ("ultimo_login_em", "TIMESTAMP"),
+                    ("ultimo_login_ip", "VARCHAR(50)"),
+                    ("precisa_trocar_senha", "BOOLEAN DEFAULT FALSE"),
+                    ("termo_aceito", "BOOLEAN DEFAULT FALSE"),
+                    ("termo_aceito_em", "TIMESTAMP"),
+                    ("pergunta_troca_senha_exibida", "BOOLEAN DEFAULT FALSE"),
+                ],
+            }
 
-            # 2. Colunas para a tabela 'local_trabalho'
-            colunas_local = [
-                ("latitude", "FLOAT"),
-                ("longitude", "FLOAT"),
-                ("raio_permitido", "INTEGER DEFAULT 50"),
-            ]
+            for tabela, colunas in migracoes_colunas.items():
+                for col, tipo in colunas:
+                    try:
+                        conn.execute(text(f"ALTER TABLE {tabela} ADD COLUMN {col} {tipo}"))
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()
 
-            # 3. Novas colunas para a tabela 'rescisao_historico' (Salvamento permanente)
-            colunas_rescisao = [
-                ("rg", "VARCHAR(20)"),
-                ("endereco", "VARCHAR(200)"),
-                ("num_contrato", "VARCHAR(50)")
-            ]
-            
-            # 4. Novas colunas para a tabela 'log_auditoria' (Rastreamento Minucioso)
-            colunas_log = [
-                ("tabela_afetada", "VARCHAR(50)"),
-                ("registro_id", "INTEGER"),
-                ("dados_antigos", "TEXT"),
-                ("dados_novos", "TEXT"),
-                ("ip_origem", "VARCHAR(50)"),
-                ("user_agent", "VARCHAR(255)"),
-                ("rota_acessada", "VARCHAR(255)")
-            ]
-
-            # Processa tabela funcionario
-            for col, tipo in colunas_funcionario:
+            # Expande colunas em PostgreSQL (ignorado no SQLite)
+            for sql_alter in [
+                "ALTER TABLE log_auditoria ALTER COLUMN acao TYPE VARCHAR(255)",
+                "ALTER TABLE log_auditoria ALTER COLUMN alvo TYPE VARCHAR(500)",
+                'ALTER TABLE "user" ALTER COLUMN role TYPE VARCHAR(40)',
+            ]:
                 try:
-                    conn.execute(text(f"ALTER TABLE funcionario ADD COLUMN {col} {tipo}"))
+                    conn.execute(text(sql_alter))
                     conn.commit()
-                except Exception as e:
-                    conn.rollback() 
-
-            # Processa tabela local_trabalho
-            for col, tipo in colunas_local:
-                try:
-                    conn.execute(text(f"ALTER TABLE local_trabalho ADD COLUMN {col} {tipo}"))
-                    conn.commit()
-                except Exception as e:
+                except Exception:
                     conn.rollback()
 
-            # Processa tabela rescisao_historico (POSTGRESQL RAILWAY)
-            for col, tipo in colunas_rescisao:
+            # Índices de performance
+            for sql_idx in [
+                "CREATE INDEX IF NOT EXISTS idx_funcionario_cpf_limpo ON funcionario (cpf_limpo)",
+                "CREATE INDEX IF NOT EXISTS idx_funcionario_sec_ativo ON funcionario (secretaria_id, ativo)",
+                "CREATE INDEX IF NOT EXISTS idx_local_trabalho_sec ON local_trabalho (secretaria_id)",
+                "CREATE INDEX IF NOT EXISTS idx_log_auditoria_sec ON log_auditoria (secretaria_id)",
+            ]:
                 try:
-                    conn.execute(text(f"ALTER TABLE rescisao_historico ADD COLUMN {col} {tipo}"))
+                    conn.execute(text(sql_idx))
                     conn.commit()
-                    print(f"SUCESSO: Coluna '{col}' adicionada em 'rescisao_historico'.")
-                except Exception as e:
-                    conn.rollback()
-                    
-            # 5. Novas colunas para a tabela 'contrato_gerado' (Rastreamento de Edição)
-            colunas_contrato = [
-                ("editado", "BOOLEAN DEFAULT FALSE"),
-                ("motivo_edicao", "TEXT"),
-                ("data_edicao", "TIMESTAMP"),
-                ("quem_editou_id", "INTEGER")
-            ]
-
-            # Processa tabela log_auditoria
-            for col, tipo in colunas_log:
-                try:
-                    conn.execute(text(f"ALTER TABLE log_auditoria ADD COLUMN {col} {tipo}"))
-                    conn.commit()
-                    print(f"SUCESSO: Coluna '{col}' adicionada em 'log_auditoria'.")
-                except Exception as e:
+                except Exception:
                     conn.rollback()
 
-            # Expande tamanho de colunas acao e alvo no PostgreSQL se já existirem
-            try:
-                conn.execute(text("ALTER TABLE log_auditoria ALTER COLUMN acao TYPE VARCHAR(255)"))
-                conn.execute(text("ALTER TABLE log_auditoria ALTER COLUMN alvo TYPE VARCHAR(500)"))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-
-            # Processa tabela contrato_gerado
-            for col, tipo in colunas_contrato:
+            # Valores padrão sem NULL
+            for sql_upd in [
+                "UPDATE funcionario SET ativo = TRUE WHERE ativo IS NULL",
+                "UPDATE secretaria SET ativa = TRUE WHERE ativa IS NULL",
+                "UPDATE local_trabalho SET ativa = TRUE WHERE ativa IS NULL",
+                "UPDATE local_trabalho SET tipo_unidade = 'UNIDADE' WHERE tipo_unidade IS NULL",
+                'UPDATE "user" SET ativo = TRUE WHERE ativo IS NULL',
+                'UPDATE "user" SET tentativas_falhas = 0 WHERE tentativas_falhas IS NULL',
+                'UPDATE "user" SET pergunta_troca_senha_exibida = FALSE WHERE pergunta_troca_senha_exibida IS NULL',
+                "UPDATE log_auditoria SET nivel = 'INFO' WHERE nivel IS NULL",
+            ]:
                 try:
-                    conn.execute(text(f"ALTER TABLE contrato_gerado ADD COLUMN {col} {tipo}"))
+                    conn.execute(text(sql_upd))
                     conn.commit()
-                    print(f"SUCESSO: Coluna '{col}' adicionada em 'contrato_gerado'.")
-                except Exception as e:
+                except Exception:
                     conn.rollback()
 
-            # 6. Novas colunas para a tabela 'user' (Aceite do Termo de Responsabilidade e Redefinição de Senha)
-            colunas_user = [
-                ("termo_aceito", "BOOLEAN DEFAULT FALSE"),
-                ("termo_aceito_em", "TIMESTAMP"),
-                ("pergunta_troca_senha_exibida", "BOOLEAN DEFAULT FALSE")
-            ]
-            for col, tipo in colunas_user:
-                try:
-                    conn.execute(text(f"ALTER TABLE \"user\" ADD COLUMN {col} {tipo}"))
-                    conn.commit()
-                    print(f"SUCESSO: Coluna '{col}' adicionada em 'user'.")
-                except Exception as e:
-                    conn.rollback()
-
-            # Garante valores default sem NULL para as colunas de controle
-            try:
-                conn.execute(text("UPDATE funcionario SET ativo = TRUE WHERE ativo IS NULL"))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-
-            try:
-                conn.execute(text("UPDATE \"user\" SET pergunta_troca_senha_exibida = FALSE WHERE pergunta_troca_senha_exibida IS NULL"))
-                conn.commit()
-            except Exception:
-                conn.rollback()
-
-            # 5. Migração automática do nome da Função de Apoio (no Railway PostgreSQL e SQLite local)
+            # Migração automática do nome da Função de Apoio
             try:
                 conn.execute(
                     text(
@@ -2376,7 +2766,7 @@ def atualizar_schema():
                     )
                 )
                 conn.commit()
-            except Exception as e:
+            except Exception:
                 conn.rollback()
 
             try:
@@ -2394,14 +2784,100 @@ def atualizar_schema():
                         conn.execute(text("UPDATE funcionario SET funcao_id = :id_novo WHERE funcao_id = :id_antigo"), {"id_novo": id_novo, "id_antigo": id_antigo})
                         conn.execute(text("DELETE FROM funcao WHERE id = :id_antigo"), {"id_antigo": id_antigo})
                     conn.commit()
-            except Exception as e:
+            except Exception:
                 conn.rollback()
 
-            # Garantir que a nova tabela contrato_gerado seja criada
-            try:
-                db.create_all()
-            except Exception as e:
-                pass
+        # Garante novas tabelas (ex.: backup_historico)
+        try:
+            db.create_all()
+        except Exception:
+            pass
+
+        # --- BACKFILL AUTOMÁTICO SEGURO DOS REGISTROS LEGADOS (2026 -> 2027) ---
+        try:
+            # 1. Preenche cpf_limpo e remuneracao_valor em funcionários legados
+            funcs_sem_backfill = Funcionario.query.filter(
+                (Funcionario.cpf_limpo.is_(None))
+                | ((Funcionario.remuneracao.isnot(None)) & ((Funcionario.remuneracao_valor.is_(None)) | (Funcionario.remuneracao_valor == 0)))
+            ).all()
+            alterou_func = False
+            for f in funcs_sem_backfill:
+                if f.cpf and not f.cpf_limpo:
+                    f.cpf_limpo = normalizar_cpf(f.cpf)[:11] or None
+                    alterou_func = True
+                if f.remuneracao and (not f.remuneracao_valor):
+                    val = security.parse_remuneracao_float(f.remuneracao)
+                    if val > 0:
+                        f.remuneracao_valor = val
+                        alterou_func = True
+            if alterou_func:
+                db.session.commit()
+
+            # Descobre secretaria predominante (ex.: Educação) para vincular registros órfãos antigos
+            sec_predominante_row = (
+                db.session.query(Funcionario.secretaria_id, func.count(Funcionario.id))
+                .group_by(Funcionario.secretaria_id)
+                .order_by(func.count(Funcionario.id).desc())
+                .first()
+            )
+            default_sec_id = sec_predominante_row[0] if sec_predominante_row else None
+            if default_sec_id is None:
+                first_sec = Secretaria.query.order_by(Secretaria.id.asc()).first()
+                default_sec_id = first_sec.id if first_sec else None
+
+            # 2. Vincula LocalTrabalho sem secretaria_id à secretaria predominante de seus servidores
+            locais_orfaos = LocalTrabalho.query.filter(LocalTrabalho.secretaria_id.is_(None)).all()
+            if locais_orfaos and default_sec_id:
+                for loc in locais_orfaos:
+                    row_sec = (
+                        db.session.query(Funcionario.secretaria_id, func.count(Funcionario.id))
+                        .filter(Funcionario.local_trabalho_id == loc.id)
+                        .group_by(Funcionario.secretaria_id)
+                        .order_by(func.count(Funcionario.id).desc())
+                        .first()
+                    )
+                    loc.secretaria_id = row_sec[0] if row_sec else default_sec_id
+                db.session.commit()
+
+            # 3. Vincula ContratoGerado sem secretaria_id
+            contratos_orfaos = ContratoGerado.query.filter(ContratoGerado.secretaria_id.is_(None)).all()
+            if contratos_orfaos and default_sec_id:
+                for cg in contratos_orfaos:
+                    sec_c = None
+                    if cg.funcionario_id:
+                        f_c = db.session.get(Funcionario, cg.funcionario_id)
+                        if f_c:
+                            sec_c = f_c.secretaria_id
+                    if not sec_c and cg.contratado_cpf:
+                        cpf_c = normalizar_cpf(cg.contratado_cpf)
+                        f_c = Funcionario.query.filter_by(cpf_limpo=cpf_c).first()
+                        if f_c:
+                            sec_c = f_c.secretaria_id
+                    cg.secretaria_id = sec_c or default_sec_id
+                db.session.commit()
+
+            # 4. Vincula RescisaoHistorico sem secretaria_id
+            rescisoes_orfas = RescisaoHistorico.query.filter(RescisaoHistorico.secretaria_id.is_(None)).all()
+            if rescisoes_orfas and default_sec_id:
+                for rh in rescisoes_orfas:
+                    sec_r = None
+                    if rh.cpf:
+                        cpf_r = normalizar_cpf(rh.cpf)
+                        f_r = Funcionario.query.filter_by(cpf_limpo=cpf_r).first()
+                        if f_r:
+                            sec_r = f_r.secretaria_id
+                    rh.secretaria_id = sec_r or default_sec_id
+                db.session.commit()
+
+            # 5. Vincula OrganogramaExercicio sem secretaria_id
+            orgs_orfaos = OrganogramaExercicio.query.filter(OrganogramaExercicio.secretaria_id.is_(None)).all()
+            if orgs_orfaos and default_sec_id:
+                for org in orgs_orfaos:
+                    org.secretaria_id = default_sec_id
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Aviso backfill seguro: {e}")
 
 
 @app.route("/api/aceitar_termo", methods=["POST"])
@@ -2451,25 +2927,41 @@ def utility_processor():
 
 @app.route("/api/proximo_numero_contrato")
 @login_required
+@security.require_permission("view_contratos", api=True)
 def api_proximo_numero_contrato():
-    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
-        return {"num_contrato": "01/2026"}, 403
     ano = request.args.get("ano", type=int) or datetime.now().year
-    proximo = gerar_proximo_numero_contrato(ano)
+    sec_id = (
+        request.args.get("secretaria_id", type=int)
+        if security.has_global_scope(current_user)
+        else current_user.secretaria_id
+    )
+    proximo = gerar_proximo_numero_contrato(ano, secretaria_id=sec_id)
     return {"num_contrato": proximo}
 
 
 @app.route("/gerar_contrato", methods=["POST"])
 @login_required
+@security.require_permission("manage_contratos", api=True)
 def processar_gerar_contrato():
-    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
-        return {"success": False, "message": "Acesso negado: Apenas administradores podem gerar contratos."}, 403
     try:
         funcionario_id = request.form.get("funcionario_id", type=int)
         contratado_cpf = request.form.get("contratado_cpf", "").strip()
         contratado_nome = request.form.get("contratado_nome", "").strip()
-        
-        # O servidor não pode ter contrato gerado mais de uma vez (verifica por ID, CPF e Nome)
+
+        func_obj = db.session.get(Funcionario, funcionario_id) if funcionario_id else None
+        if func_obj and not security.can_access_record(current_user, func_obj):
+            registrar_violacao_acesso(f"Gerar contrato funcionario_id={funcionario_id}")
+            return {"success": False, "message": "Acesso negado: servidor pertence a outra secretaria."}, 403
+
+        sec_id_contrato = (
+            func_obj.secretaria_id
+            if func_obj
+            else (request.form.get("secretaria_id", type=int) if security.has_global_scope(current_user) else current_user.secretaria_id)
+        )
+        sec_obj = db.session.get(Secretaria, sec_id_contrato) if sec_id_contrato else None
+        rep_padrao = obter_dados_representante_secretaria(sec_obj)
+
+        # Verifica duplicidade de contrato no mesmo exercício/servidor
         existente = None
         if funcionario_id:
             existente = ContratoGerado.query.filter_by(funcionario_id=funcionario_id).first()
@@ -2481,7 +2973,7 @@ def processar_gerar_contrato():
         if existente:
             return {
                 "success": False,
-                "message": f"Este servidor já possui um contrato gerado (Nº {existente.num_contrato}). Cada servidor só pode ter 1 contrato gerado. Utilize a opção de edição na página 'Contratos Gerados' para alterá-lo.",
+                "message": f"Este servidor já possui um contrato gerado (Nº {existente.num_contrato}). Utilize a opção de edição na página 'Contratos Gerados' para alterá-lo.",
                 "existente_num": existente.num_contrato,
                 "existente_id": existente.id
             }, 400
@@ -2490,40 +2982,34 @@ def processar_gerar_contrato():
         dt_inicio_str = request.form.get("dt_inicio")
         dt_termino_str = request.form.get("dt_termino")
         dt_assinatura_str = request.form.get("dt_assinatura")
-        
-        contratado_nome = request.form.get("contratado_nome", "").strip()
-        contratado_cpf = request.form.get("contratado_cpf", "").strip()
+
         contratado_rg = request.form.get("contratado_rg", "").strip()
         contratado_nacionalidade = request.form.get("contratado_nacionalidade", "brasileiro(a)").strip()
         contratado_naturalidade = request.form.get("contratado_naturalidade", "piauiense").strip()
         contratado_estado_civil = request.form.get("contratado_estado_civil", "solteiro(a)").strip()
         contratado_endereco = request.form.get("contratado_endereco", "").strip()
-        
+
         funcao_nome = request.form.get("funcao_nome", "").strip()
         jornada_trabalho = request.form.get("jornada_trabalho", "").strip()
         remuneracao = request.form.get("remuneracao", "").strip()
         remuneracao_extenso = request.form.get("remuneracao_extenso", "").strip()
-        
-        representante_nome = request.form.get("representante_nome", "MARIA EDNA DE SOUSA QUARESMA").strip()
-        representante_cargo = request.form.get("representante_cargo", "Secretária Municipal de Educação").strip()
-        representante_rg_cpf = request.form.get("representante_rg_cpf", "676.079.263-72").strip()
-        representante_endereco = request.form.get("representante_endereco", "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI").strip()
 
-        func = db.session.get(Funcionario, funcionario_id) if funcionario_id else None
-        dt_admissao_ficha = func.dt_inicio if (func and func.dt_inicio) else None
+        representante_nome = (request.form.get("representante_nome") or rep_padrao["nome"]).strip()
+        representante_cargo = (request.form.get("representante_cargo") or rep_padrao["cargo"]).strip()
+        representante_rg_cpf = (request.form.get("representante_rg_cpf") or rep_padrao["cpf"]).strip()
+        representante_endereco = (request.form.get("representante_endereco") or rep_padrao["endereco"]).strip()
 
+        dt_admissao_ficha = func_obj.dt_inicio if (func_obj and func_obj.dt_inicio) else None
         dt_inicio = parse_date(dt_inicio_str) if dt_inicio_str else (dt_admissao_ficha or date.today())
         dt_termino = parse_date(dt_termino_str) if dt_termino_str else None
-        
-        # A data da assinatura do contrato é a informada no formulário ou a data de início/admissão
         dt_assinatura = parse_date(dt_assinatura_str) if dt_assinatura_str else (dt_inicio or dt_admissao_ficha or date.today())
-        
         ano_exercicio = dt_inicio.year if dt_inicio else datetime.now().year
-        
+
         if not num_contrato:
-            num_contrato = gerar_proximo_numero_contrato(ano_exercicio)
+            num_contrato = gerar_proximo_numero_contrato(ano_exercicio, secretaria_id=sec_id_contrato)
 
         novo_contrato = ContratoGerado(
+            secretaria_id=sec_id_contrato,
             num_contrato=num_contrato,
             ano_exercicio=ano_exercicio,
             funcionario_id=funcionario_id,
@@ -2552,7 +3038,7 @@ def processar_gerar_contrato():
         db.session.add(novo_contrato)
         db.session.commit()
 
-        registrar_log("Gerou Contrato", f"Contrato Nº {num_contrato} - {contratado_nome}")
+        registrar_log("Gerou Contrato", f"Contrato Nº {num_contrato} - {contratado_nome}", secretaria_id=sec_id_contrato)
 
         return {
             "success": True,
@@ -2566,13 +3052,14 @@ def processar_gerar_contrato():
 
 @app.route("/contrato/alterar_data_assinatura/<int:id>", methods=["POST"])
 @login_required
+@security.require_permission("manage_contratos", api=True)
 def alterar_data_assinatura_contrato(id):
-    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
-        return {"success": False, "message": "Acesso negado: Apenas administradores podem alterar a data de assinatura."}, 403
-
     contrato = db.session.get(ContratoGerado, id)
     if not contrato:
         return {"success": False, "message": "Contrato não encontrado."}, 404
+    if not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"Alterar assinatura contrato_id={id}")
+        return {"success": False, "message": "Acesso negado: contrato pertence a outra secretaria."}, 403
 
     data_json = request.get_json(silent=True) or {}
     dt_assinatura_str = (
@@ -2602,13 +3089,14 @@ def alterar_data_assinatura_contrato(id):
 
 @app.route("/contrato/editar/<int:id>", methods=["POST"])
 @login_required
+@security.require_permission("manage_contratos", api=True)
 def editar_contrato(id):
-    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
-        return {"success": False, "message": "Acesso negado: Apenas administradores podem editar contratos."}, 403
-
     contrato = db.session.get(ContratoGerado, id)
     if not contrato:
         return {"success": False, "message": "Contrato não encontrado."}, 404
+    if not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"Editar contrato_id={id}")
+        return {"success": False, "message": "Acesso negado: contrato pertence a outra secretaria."}, 403
 
     motivo = request.form.get("motivo_edicao", "").strip()
 
@@ -2634,12 +3122,11 @@ def editar_contrato(id):
         novo_dt_termino = parse_date(dt_termino_str) if dt_termino_str else contrato.dt_termino
         novo_dt_assinatura = parse_date(dt_assinatura_str) if dt_assinatura_str else contrato.dt_assinatura
 
-        novo_rep_nome = request.form.get("representante_nome", "MARIA EDNA DE SOUSA QUARESMA").strip()
-        novo_rep_cargo = request.form.get("representante_cargo", "Secretária Municipal de Educação").strip()
-        novo_rep_cpf = request.form.get("representante_rg_cpf", "676.079.263-72").strip()
-        novo_rep_end = request.form.get("representante_endereco", "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI").strip()
+        novo_rep_nome = request.form.get("representante_nome", contrato.representante_nome or "").strip()
+        novo_rep_cargo = request.form.get("representante_cargo", contrato.representante_cargo or "").strip()
+        novo_rep_cpf = request.form.get("representante_rg_cpf", contrato.representante_rg_cpf or "").strip()
+        novo_rep_end = request.form.get("representante_endereco", contrato.representante_endereco or "").strip()
 
-        # Verifica se houve alteração em qualquer campo além da data de assinatura
         alterou_outros_campos = any([
             novo_nome != (contrato.contratado_nome or "").strip(),
             novo_cpf != (contrato.contratado_cpf or "").strip(),
@@ -2654,16 +3141,15 @@ def editar_contrato(id):
             nova_rem_ext != (contrato.remuneracao_extenso or "").strip(),
             novo_dt_inicio != contrato.dt_inicio,
             novo_dt_termino != contrato.dt_termino,
-            novo_rep_nome != (contrato.representante_nome or "MARIA EDNA DE SOUSA QUARESMA").strip(),
-            novo_rep_cargo != (contrato.representante_cargo or "Secretária Municipal de Educação").strip(),
-            novo_rep_cpf != (contrato.representante_rg_cpf or "676.079.263-72").strip(),
-            novo_rep_end != (contrato.representante_endereco or "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI").strip(),
+            novo_rep_nome != (contrato.representante_nome or "").strip(),
+            novo_rep_cargo != (contrato.representante_cargo or "").strip(),
+            novo_rep_cpf != (contrato.representante_rg_cpf or "").strip(),
+            novo_rep_end != (contrato.representante_endereco or "").strip(),
         ])
 
         if alterou_outros_campos and not motivo:
             return {"success": False, "message": "É obrigatório informar o motivo da edição ao alterar dados cadastrais ou cláusulas do contrato."}, 400
 
-        # Manter num_contrato e ano_exercicio originais intactos
         contrato.contratado_nome = novo_nome
         contrato.contratado_cpf = novo_cpf
         contrato.contratado_rg = novo_rg
@@ -2695,7 +3181,7 @@ def editar_contrato(id):
         db.session.commit()
 
         if alterou_outros_campos:
-            registrar_log("Editou Contrato", f"Contrato Nº {contrato.num_contrato} ({contrato.contratado_nome}) - Motivo: {motivo}")
+            registrar_log("Editou Contrato", f"Contrato Nº {contrato.num_contrato} ({contrato.contratado_nome}) - Motivo: {motivo}", secretaria_id=contrato.secretaria_id)
 
         return {
             "success": True,
@@ -2709,11 +3195,11 @@ def editar_contrato(id):
 
 @app.route("/contratos")
 @login_required
+@security.require_permission("view_contratos")
 def pagina_contratos():
-    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
-        flash("Acesso negado: Apenas administradores podem visualizar os contratos gerados.", "danger")
-        return redirect(url_for("sistema"))
-    historico = ContratoGerado.query.order_by(ContratoGerado.data_geracao.desc()).all()
+    historico = security.scope_query(
+        ContratoGerado.query, ContratoGerado, current_user
+    ).order_by(ContratoGerado.data_geracao.desc()).all()
     return render_template("contratos_painel.html", historico=historico)
 
 
@@ -2728,13 +3214,14 @@ def formatar_remuneracao_rs(valor_str):
 
 @app.route("/contrato/documento/<int:id>")
 @login_required
+@security.require_permission("view_contratos")
 def visualizar_contrato_documento(id):
-    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
-        flash("Acesso negado: Apenas administradores podem visualizar contratos.", "danger")
-        return redirect(url_for("sistema"))
     contrato = db.session.get(ContratoGerado, id)
     if not contrato:
         return "Contrato não encontrado", 404
+    if not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"Visualizar contrato_id={id}")
+        return "Acesso negado", 403
 
     dt_ass = contrato.dt_assinatura or contrato.dt_inicio or (contrato.funcionario.dt_inicio if contrato.funcionario else None)
 
@@ -2771,13 +3258,14 @@ def visualizar_contrato_documento(id):
 
 @app.route("/contrato/extrato/<int:id>")
 @login_required
+@security.require_permission("view_contratos")
 def visualizar_contrato_extrato(id):
-    if not current_user.is_admin and getattr(current_user, "role", "") != "admin":
-        flash("Acesso negado: Apenas administradores podem visualizar os extratos.", "danger")
-        return redirect(url_for("sistema"))
     contrato = db.session.get(ContratoGerado, id)
     if not contrato:
         return "Contrato não encontrado", 404
+    if not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"Visualizar extrato contrato_id={id}")
+        return "Acesso negado", 403
 
     dt_ass_ext = contrato.dt_assinatura or contrato.dt_inicio or (contrato.funcionario.dt_inicio if contrato.funcionario else None)
 
@@ -2800,11 +3288,8 @@ def visualizar_contrato_extrato(id):
 
 @app.route("/contrato/excluir/<int:id>", methods=["POST"])
 @login_required
+@security.require_permission("delete_permanently")
 def excluir_contrato(id):
-    if not current_user.is_admin:
-        flash("Apenas administradores podem excluir registros de contratos.", "danger")
-        return redirect(url_for("pagina_contratos"))
-
     contrato = db.session.get(ContratoGerado, id)
     if not contrato:
         flash("Contrato não encontrado.", "danger")
@@ -2813,9 +3298,10 @@ def excluir_contrato(id):
     try:
         num = contrato.num_contrato
         nome = contrato.contratado_nome
+        sec_id = contrato.secretaria_id
         db.session.delete(contrato)
         db.session.commit()
-        registrar_log("Excluiu Contrato", f"Contrato Nº {num} - {nome}")
+        registrar_log("Excluiu Contrato", f"Contrato Nº {num} - {nome}", nivel="WARN", secretaria_id=sec_id)
         flash(f"Contrato Nº {num} excluído com sucesso.", "success")
     except Exception as e:
         db.session.rollback()
@@ -2826,25 +3312,19 @@ def excluir_contrato(id):
 
 @app.route("/imprimir_encaminhamento/<int:id>")
 @login_required
+@security.require_permission("view_rh")
 def imprimir_encaminhamento(id):
     funcionario = db.session.get(Funcionario, id)
     if not funcionario:
         return "Funcionário não encontrado", 404
+    if not security.can_access_record(current_user, funcionario):
+        registrar_violacao_acesso(f"Encaminhamento funcionario_id={id}")
+        return "Acesso negado", 403
 
     hoje = datetime.now()
     meses = [
-        "Janeiro",
-        "Fevereiro",
-        "Março",
-        "Abril",
-        "Maio",
-        "Junho",
-        "Julho",
-        "Agosto",
-        "Setembro",
-        "Outubro",
-        "Novembro",
-        "Dezembro",
+        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
     ]
     data_extenso = f"{hoje.day} de {meses[hoje.month - 1]} de {hoje.year}"
 
@@ -2858,13 +3338,10 @@ def imprimir_encaminhamento(id):
 
 @app.route("/apoio_pedagogico")
 @login_required
+@security.require_permission("view_admin_panel")
 def apoio_pedagogico():
-    if not current_user.is_admin:
-        flash("Acesso não autorizado.", "error")
-        return redirect(url_for("sistema"))
-
     cuidadores = (
-        Funcionario.query.join(Funcao)
+        security.scope_query(Funcionario.query.join(Funcao), Funcionario, current_user)
         .filter(
             Funcao.nome.in_(
                 [
@@ -2882,32 +3359,40 @@ def apoio_pedagogico():
 
 @app.route("/fotos")
 @login_required
+@security.require_permission("view_rh")
 def gerenciar_fotos():
-    funcionarios = Funcionario.query.order_by(Funcionario.nome).all()
+    funcionarios = security.scope_query(
+        Funcionario.query, Funcionario, current_user
+    ).order_by(Funcionario.nome).all()
     return render_template("fotos.html", funcionarios=funcionarios)
 
 
 @app.route("/admin/folha_pagamento", methods=["GET"])
 @login_required
+@security.require_permission("view_folha")
 def folha_pagamento():
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
-
-    locais_trabalho = LocalTrabalho.query.order_by(LocalTrabalho.nome).all()
+    locais_trabalho = security.scope_query(
+        LocalTrabalho.query, LocalTrabalho, current_user
+    ).order_by(LocalTrabalho.nome).all()
 
     local_id_filtro = request.args.get("local_id")
     funcionarios_folha = []
     local_selecionado = None
 
     if local_id_filtro:
-        # Removido o filtro 'validado=True' para permitir a exibição de todos os servidores do local
-        funcionarios_folha = (
-            Funcionario.query.filter_by(local_trabalho_id=local_id_filtro)
-            .order_by(Funcionario.nome)
-            .all()
-        )
-
         local_selecionado = db.session.get(LocalTrabalho, local_id_filtro)
+        if local_selecionado and security.can_access_record(current_user, local_selecionado):
+            funcionarios_folha = (
+                security.scope_query(
+                    Funcionario.query.filter_by(local_trabalho_id=local_id_filtro),
+                    Funcionario,
+                    current_user,
+                )
+                .order_by(Funcionario.nome)
+                .all()
+            )
+        else:
+            local_selecionado = None
 
     return render_template(
         "folha_pagamento.html",
@@ -2919,19 +3404,13 @@ def folha_pagamento():
 
 @app.route("/admin/ponto", methods=["GET"])
 @login_required
+@security.require_permission("view_ponto")
 def painel_ponto():
-    """Painel interno para visualizar registros de ponto de todos os servidores."""
-    # Permite admin, RH secretaria e supervisor (visualização).
-    if not (
-        getattr(current_user, "is_admin", False)
-        or current_user.role in ["admin", "rh_secretaria", "rh_supervisor"]
-    ):
-        return redirect(url_for("sistema"))
-
-    secretaria_id = request.args.get("secretaria_id")
+    """Painel interno para visualizar registros de ponto (isolado por secretaria/unidade)."""
+    is_global = security.has_global_scope(current_user)
+    secretaria_id = request.args.get("secretaria_id") if is_global else str(current_user.secretaria_id or "")
     busca_nome = request.args.get("busca_nome")
     mes = request.args.get("mes")
-    # Horários esperados (entrada 1 e retorno)
     inicio_20 = request.args.get("inicio_20", "07:00")
     inicio_40 = request.args.get("inicio_40", "07:00")
     entrada_2 = request.args.get("entrada_2", "13:30")
@@ -3010,14 +3489,20 @@ def painel_ponto():
     else:
         end_month = datetime(start_month.year, start_month.month + 1, 1)
 
-    query = RegistroPonto.query.join(Funcionario)
-    if secretaria_id:
+    query = security.scope_query(
+        RegistroPonto.query.join(Funcionario), Funcionario, current_user
+    )
+    if secretaria_id and is_global:
         query = query.filter(Funcionario.secretaria_id == secretaria_id)
     if busca_nome:
         termo = f"%{busca_nome.upper()}%"
         query = query.filter(Funcionario.nome.like(termo))
 
-    secretarias = Secretaria.query.order_by(Secretaria.nome).all()
+    secretarias = (
+        Secretaria.query.order_by(Secretaria.nome).all()
+        if is_global
+        else Secretaria.query.filter_by(id=current_user.secretaria_id).all()
+    )
 
     query_mes = query.filter(
         RegistroPonto.data_hora >= start_month, RegistroPonto.data_hora < end_month
@@ -3100,8 +3585,9 @@ def painel_ponto():
 
 @app.route("/exportar_migracao")
 @login_required
+@security.require_permission("export_rh")
 def exportar_migracao():
-    funcionarios = Funcionario.query.all()
+    funcionarios = security.scope_query(Funcionario.query, Funcionario, current_user).all()
     output = io.StringIO()
     writer = csv.writer(output, delimiter=";")
 
@@ -3196,11 +3682,8 @@ def exportar_migracao():
 
 @app.route("/admin/movimentar_servidor", methods=["POST"])
 @login_required
+@security.require_permission("move_servidores")
 def movimentar_servidor():
-    if not current_user.is_admin:
-        flash("Acesso não autorizado.", "error")
-        return redirect(url_for("sistema"))
-
     func_id = request.form.get("funcionario_id")
     nova_funcao_id = request.form.get("nova_funcao_id")
     novo_local_id = request.form.get("novo_local_id")
@@ -3210,6 +3693,18 @@ def movimentar_servidor():
     if not funcionario:
         flash("Funcionário não encontrado.", "error")
         return redirect(url_for("admin_dashboard"))
+
+    if not security.can_access_record(current_user, funcionario):
+        registrar_violacao_acesso(f"Movimentar funcionario_id={func_id}")
+        flash("Acesso negado: servidor pertence a outra secretaria.", "error")
+        return redirect(url_for("admin_dashboard", tab="dados"))
+
+    if novo_local_id and not security.has_global_scope(current_user):
+        loc_dest = db.session.get(LocalTrabalho, int(novo_local_id))
+        if loc_dest and not security.can_access_record(current_user, loc_dest):
+            registrar_violacao_acesso(f"Movimentar para local_id={novo_local_id} de outra secretaria")
+            flash("Acesso negado: local de destino pertence a outra secretaria.", "error")
+            return redirect(url_for("admin_dashboard", tab="dados"))
 
     mudou_funcao = str(funcionario.funcao_id) != str(nova_funcao_id)
     mudou_local = str(funcionario.local_trabalho_id) != str(novo_local_id)
@@ -3263,9 +3758,8 @@ def processar_pdf_para_excel(pdf_path, output_excel):
 
 @app.route("/importar_pdf_para_excel", methods=["GET", "POST"])
 @login_required
+@security.require_permission("export_rh")
 def importar_pdf_para_excel():
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
 
     if request.method == "POST":
         file = request.files.get("pdf_file")
@@ -3302,9 +3796,8 @@ def importar_pdf_para_excel():
 
 @app.route("/importar_pdf", methods=["GET", "POST"])
 @login_required
+@security.require_permission("export_rh")
 def importar_pdf():
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
 
     if request.method == "POST":
         file = request.files.get("pdf_file")
@@ -3488,73 +3981,63 @@ def registrar_ponto(token):
     return redirect(url_for("pagina_ponto", token=token))
 
 
-@app.route("/gerar_rescisao_excluir/<int:id>")
+@app.route("/gerar_rescisao_excluir/<int:id>", methods=["GET", "POST"])
 @login_required
+@security.require_permission("manage_rescisoes")
 def gerar_rescisao_excluir(id):
     funcionario = db.session.get(Funcionario, id)
     if not funcionario:
         flash("Funcionário não encontrado", "error")
         return redirect(url_for("sistema"))
+    if not security.can_access_record(current_user, funcionario):
+        registrar_violacao_acesso(f"Rescisao rapida funcionario_id={id}")
+        flash("Acesso negado: servidor pertence a outra secretaria.", "error")
+        return redirect(url_for("sistema"))
 
     try:
+        dt_sai = funcionario.dt_termino if funcionario.dt_termino else date.today()
         nova_rescisao = RescisaoHistorico(
+            secretaria_id=funcionario.secretaria_id,
             nome=funcionario.nome,
             cpf=funcionario.cpf,
+            rg=funcionario.rg,
+            endereco=funcionario.endereco,
             funcao=funcionario.funcao.nome if funcionario.funcao else "N/A",
+            num_contrato=funcionario.num_vinculo,
             data_inicio=funcionario.dt_inicio,
-            data_saida=(
-                funcionario.dt_termino if funcionario.dt_termino else date.today()
-            ),
+            data_saida=dt_sai,
         )
         db.session.add(nova_rescisao)
 
-        dados_rescisao = {
+        dados_doc = {
             "nome": funcionario.nome,
-            "dt_inicio": (
-                funcionario.dt_inicio.strftime("%d/%m/%Y")
-                if funcionario.dt_inicio
-                else "N/D"
-            ),
-            "dt_termino": (
-                funcionario.dt_termino.strftime("%d/%m/%Y")
-                if funcionario.dt_termino
-                else date.today().strftime("%d/%m/%Y")
-            ),
-            "funcao_nome": funcionario.funcao.nome if funcionario.funcao else "N/A",
+            "funcao": funcionario.funcao.nome if funcionario.funcao else "N/A",
+            "data_inicio": funcionario.dt_inicio,
+            "data_saida": dt_sai,
+            "cpf": funcionario.cpf,
+            "rg": funcionario.rg,
+            "endereco": funcionario.endereco,
+            "num_contrato": funcionario.num_vinculo,
         }
 
-        registrar_log("RESCISAO DE SERVIDOR", funcionario.nome)
+        registrar_log("RESCISAO DE SERVIDOR", funcionario.nome, secretaria_id=funcionario.secretaria_id)
 
         funcionario.ativo = False
         if not funcionario.dt_termino:
-            funcionario.dt_termino = date.today()
+            funcionario.dt_termino = dt_sai
         db.session.commit()
 
-        meses = [
-            "janeiro",
-            "fevereiro",
-            "março",
-            "abril",
-            "maio",
-            "junho",
-            "julho",
-            "agosto",
-            "setembro",
-            "outubro",
-            "novembro",
-            "dezembro",
-        ]
-        hoje = datetime.now()
-        data_extenso = f"{hoje.day} de {meses[hoje.month - 1]} de {hoje.year}"
+        fuso_br = pytz.timezone('America/Sao_Paulo')
+        agora_br = datetime.now(fuso_br).replace(tzinfo=None)
 
         return render_template(
-            "recisao.html", funcionario=dados_rescisao, data_atual=data_extenso
+            "recisao_documento.html", f=dados_doc, data_atual=agora_br
         )
 
     except Exception as e:
         db.session.rollback()
-        print(f"Erro ao excluir: {e}")
-        flash("Erro ao processar exclusão no banco de dados.", "error")
+        print(f"Erro ao processar rescisão: {e}")
+        flash("Erro ao processar rescisão no banco de dados.", "error")
         return redirect(url_for("sistema"))
 
 
@@ -3689,14 +4172,20 @@ def registrar_ponto_facial():
 
 @app.route("/admin/ponto/escola/<int:local_id>")
 @login_required
+@security.require_permission("view_ponto")
 def ponto_por_escola(local_id):
-    if not current_user.is_admin:
-        return redirect(url_for("sistema"))
-
     escola = db.session.get(LocalTrabalho, local_id)
-    # Filtra apenas servidores vinculados a esta escola
+    if not escola or not security.can_access_record(current_user, escola):
+        registrar_violacao_acesso(f"Ponto por unidade local_id={local_id}")
+        flash("Acesso negado: unidade fora do seu escopo.", "error")
+        return redirect(url_for(security.get_default_home_endpoint(current_user)))
+
     servidores = (
-        Funcionario.query.filter_by(local_trabalho_id=local_id)
+        security.scope_query(
+            Funcionario.query.filter_by(local_trabalho_id=local_id),
+            Funcionario,
+            current_user,
+        )
         .order_by(Funcionario.nome)
         .all()
     )
@@ -3710,11 +4199,17 @@ def ponto_por_escola(local_id):
 
 @app.route("/admin/ponto/gerar_pdf/<int:func_id>")
 @login_required
+@security.require_permission("view_ponto")
 def gerar_relatorio_frequencia(func_id):
     mes_ref = request.args.get("mes", datetime.now().strftime("%Y-%m"))
     ano, mes = map(int, mes_ref.split("-"))
 
     funcionario = db.session.get(Funcionario, func_id)
+    if not funcionario:
+        return "Servidor não encontrado", 404
+    if not security.can_access_record(current_user, funcionario):
+        registrar_violacao_acesso(f"Relatorio frequencia funcionario_id={func_id}")
+        return "Acesso negado", 403
     # Busca todos os pontos do servidor no mês
     registros = (
         RegistroPonto.query.filter(
@@ -3824,19 +4319,20 @@ def calcular_distancia(lat1, lon1, lat2, lon2):
 
 @app.route("/admin/salvar_biometria", methods=["POST"])
 @login_required
+@security.require_permission("manage_biometria", api=True)
 def salvar_biometria():
-    if not current_user.is_admin:
-        return {"error": "Não autorizado"}, 403
-    
-    dados = request.json
+    dados = request.json or {}
     funcionario_id = dados.get("id")
     foto_base64 = dados.get("foto")
 
     funcionario = db.session.get(Funcionario, funcionario_id)
     if funcionario:
+        if not security.can_access_record(current_user, funcionario):
+            registrar_violacao_acesso(f"Biometria funcionario_id={funcionario_id}")
+            return {"error": "Não autorizado"}, 403
         funcionario.foto_biometria = foto_base64
         db.session.commit()
-        registrar_log("MAPEAMENTO_FACIAL", funcionario.nome)
+        registrar_log("MAPEAMENTO_FACIAL", funcionario.nome, secretaria_id=funcionario.secretaria_id)
         return {"status": "sucesso"}
     return {"error": "Funcionário não encontrado"}, 404
 
@@ -3877,10 +4373,15 @@ def ponto_portal():
 
 @app.route("/reimprimir_rescisao/<int:id>")
 @login_required
+@security.require_permission("view_rescisoes")
 def reimprimir_rescisao(id):
     rescisao = db.session.get(RescisaoHistorico, id)
     if not rescisao:
         flash("Registro de rescisão não encontrado.", "error")
+        return redirect(url_for("pagina_recisoes"))
+    if not security.can_access_record(current_user, rescisao):
+        registrar_violacao_acesso(f"Reimprimir rescisao_id={id}")
+        flash("Acesso negado: registro pertence a outra secretaria.", "error")
         return redirect(url_for("pagina_recisoes"))
 
     dados_doc = {
@@ -3903,51 +4404,59 @@ def reimprimir_rescisao(id):
 
 @app.route("/api/salvar_dados_rescisao", methods=["POST"])
 @login_required
+@security.require_permission("manage_rescisoes", api=True)
 def api_salvar_dados_rescisao():
     """Rota API para salvar as edições de histórico via AJAX sem recarregar a tela"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         rescisao_id = data.get("id")
         rescisao = db.session.get(RescisaoHistorico, rescisao_id)
-        
+
         if not rescisao:
             return {"success": False, "message": "Registro não encontrado"}, 404
-            
+        if not security.can_access_record(current_user, rescisao):
+            registrar_violacao_acesso(f"Editar rescisao_id={rescisao_id}")
+            return {"success": False, "message": "Acesso negado: registro pertence a outra secretaria."}, 403
+
         rescisao.rg = data.get("rg")
         rescisao.endereco = data.get("endereco")
         rescisao.num_contrato = data.get("num_contrato")
-        
+
         db.session.commit()
-        registrar_log("ATUALIZOU DADOS HISTORICOS RESCISAO", rescisao.nome)
+        registrar_log("ATUALIZOU DADOS HISTORICOS RESCISAO", rescisao.nome, secretaria_id=rescisao.secretaria_id)
         return {"success": True}
     except Exception as e:
         db.session.rollback()
         return {"success": False, "message": str(e)}, 500
     
 @app.route('/relatorio-geral')
-@login_required # Remova ou altere se não usar flask_login nesse projeto
+@login_required
+@security.require_permission("export_rh")
 def relatorio_pessoal():
-    # Aqui recuperamos todos os funcionários do banco de dados (exemplo usando SQLAlchemy)
-    # Ajuste 'Funcionario' para o nome da sua classe de modelo se for diferente
-    funcionarios = Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))).all() 
+    funcionarios = security.scope_query(
+        Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))),
+        Funcionario,
+        current_user,
+    ).order_by(Funcionario.nome).all()
     
     return render_template('relatorio_pessoal.html', funcionarios=funcionarios)    
 
 @app.route("/admin/escolas/atalhos")
 @login_required
+@security.require_permission("view_ponto")
 def atalhos_escolas():
-    # Busca todas as escolas do banco de dados
-    escolas = Escola.query.order_all() 
+    escolas = security.scope_query(
+        LocalTrabalho.query, LocalTrabalho, current_user
+    ).order_by(LocalTrabalho.nome).all()
     return render_template("atalhos_escolas.html", escolas=escolas)
 
 @app.route("/admin/unidades_ponto")
 @login_required
+@security.require_permission("view_ponto")
 def unidades_ponto():
-    if not current_user.is_admin:
-        return redirect(url_for('sistema'))
-    
-    # Busca todos os locais de trabalho ordenados por nome
-    locais = LocalTrabalho.query.order_by(LocalTrabalho.nome).all()
+    locais = security.scope_query(
+        LocalTrabalho.query, LocalTrabalho, current_user
+    ).order_by(LocalTrabalho.nome).all()
     return render_template("unidades_ponto.html", locais=locais)
 
 
@@ -3957,26 +4466,34 @@ def unidades_ponto():
 
 @app.route('/organograma')
 @login_required
+@security.require_permission("view_organograma")
 def organograma_page():
-    exercicios = OrganogramaExercicio.query.order_by(OrganogramaExercicio.ano.desc(), OrganogramaExercicio.id.desc()).all()
-    
-    if not exercicios:
+    exercicios_q = security.scope_query(
+        OrganogramaExercicio.query, OrganogramaExercicio, current_user
+    )
+    exercicios = exercicios_q.order_by(OrganogramaExercicio.ano.desc(), OrganogramaExercicio.id.desc()).all()
+
+    if not exercicios and security.has_permission(current_user, "manage_organograma"):
         ano_atual = datetime.now().year
+        sec_id_novo = current_user.secretaria_id
+        sec_nome = current_user.secretaria.nome if current_user.secretaria else "SECRETARIA"
+        sec_sigla = (current_user.secretaria.sigla if (current_user.secretaria and current_user.secretaria.sigla) else "GABINETE")
         novo_ex = OrganogramaExercicio(
             ano=ano_atual,
-            titulo=f"Quadro de Cargos e Estrutura Organizacional - {ano_atual}",
+            titulo=f"Quadro de Cargos — {sec_nome} ({ano_atual})",
+            secretaria_id=sec_id_novo,
             ativo=True,
             criado_por_id=current_user.id if hasattr(current_user, 'id') else None
         )
         db.session.add(novo_ex)
         db.session.commit()
-        
+
         no_raiz = OrganogramaNode(
             exercicio_id=novo_ex.id,
             parent_id=None,
             tipo="CARGO_CHEFIA",
             titulo="Secretário(a) Municipal",
-            sigla="GABINETE/SEME",
+            sigla=sec_sigla,
             nivel_hierarquico=1,
             tipo_vinculo_requerido="COMISSIONADO",
             vagas_totais=1
@@ -3984,23 +4501,29 @@ def organograma_page():
         db.session.add(no_raiz)
         db.session.commit()
         exercicios = [novo_ex]
-        
+
     exercicio_id = request.args.get('exercicio_id', type=int)
     selected_exercicio = None
     if exercicio_id:
-        selected_exercicio = OrganogramaExercicio.query.get(exercicio_id)
-    if not selected_exercicio:
+        cand = db.session.get(OrganogramaExercicio, exercicio_id)
+        if cand and security.can_access_record(current_user, cand):
+            selected_exercicio = cand
+    if not selected_exercicio and exercicios:
         selected_exercicio = exercicios[0]
 
-    return render_template('organograma.html', 
-                           exercicios=exercicios, 
+    return render_template('organograma.html',
+                           exercicios=exercicios,
                            selected_exercicio=selected_exercicio)
 
 
 @app.route('/api/organograma/tree/<int:exercicio_id>')
 @login_required
+@security.require_permission("view_organograma", api=True)
 def api_organograma_tree(exercicio_id):
     exercicio = OrganogramaExercicio.query.get_or_404(exercicio_id)
+    if not security.can_access_record(current_user, exercicio):
+        registrar_violacao_acesso(f"Organograma tree exercicio_id={exercicio_id}")
+        return {"success": False, "message": "Acesso negado: organograma pertence a outra secretaria."}, 403
     nodes = OrganogramaNode.query.filter_by(exercicio_id=exercicio.id).all()
     valid_ids = {n.id for n in nodes}
     
@@ -4094,25 +4617,32 @@ def api_organograma_tree(exercicio_id):
 
 @app.route('/api/organograma/exercicio/salvar', methods=['POST'])
 @login_required
+@security.require_permission("manage_organograma", api=True)
 def api_organograma_exercicio_salvar():
     try:
         data = request.json or {}
         ano = int(data.get('ano', datetime.now().year))
         titulo = data.get('titulo', f'Quadro de Cargos - Exercício {ano}').strip()
         copiar_de_id = data.get('copiar_de_id')
-        
+        sec_id = (
+            data.get('secretaria_id') or current_user.secretaria_id
+            if security.has_global_scope(current_user)
+            else current_user.secretaria_id
+        )
+
         novo_ex = OrganogramaExercicio(
             ano=ano,
             titulo=titulo,
+            secretaria_id=int(sec_id) if sec_id else None,
             ativo=True,
             criado_por_id=current_user.id
         )
         db.session.add(novo_ex)
         db.session.commit()
-        
+
         if copiar_de_id:
-            ex_antigo = OrganogramaExercicio.query.get(copiar_de_id)
-            if ex_antigo:
+            ex_antigo = db.session.get(OrganogramaExercicio, copiar_de_id)
+            if ex_antigo and security.can_access_record(current_user, ex_antigo):
                 id_map = {}
                 old_nodes = OrganogramaNode.query.filter_by(exercicio_id=ex_antigo.id).all()
                 for old_n in old_nodes:
@@ -4129,11 +4659,11 @@ def api_organograma_exercicio_salvar():
                     db.session.add(new_n)
                     db.session.flush()
                     id_map[old_n.id] = new_n.id
-                
+
                 for old_n in old_nodes:
                     if old_n.parent_id and old_n.id in id_map and old_n.parent_id in id_map:
                         new_node_id = id_map[old_n.id]
-                        new_node = OrganogramaNode.query.get(new_node_id)
+                        new_node = db.session.get(OrganogramaNode, new_node_id)
                         new_node.parent_id = id_map[old_n.parent_id]
                 db.session.commit()
 
@@ -4146,7 +4676,7 @@ def api_organograma_exercicio_salvar():
         )
         db.session.add(hist)
         db.session.commit()
-        
+
         return {"success": True, "exercicio_id": novo_ex.id}
     except Exception as e:
         db.session.rollback()
@@ -4155,6 +4685,7 @@ def api_organograma_exercicio_salvar():
 
 @app.route('/api/organograma/exercicio/limpar', methods=['POST'])
 @login_required
+@security.require_permission("manage_organograma", api=True)
 def api_organograma_exercicio_limpar():
     try:
         data = request.json or {}
@@ -4162,21 +4693,27 @@ def api_organograma_exercicio_limpar():
         if not exercicio_id:
             return {"success": False, "message": "ID do exercício é obrigatório."}, 400
 
+        ex_obj = db.session.get(OrganogramaExercicio, exercicio_id)
+        if not ex_obj or not security.can_access_record(current_user, ex_obj):
+            registrar_violacao_acesso(f"Limpar organograma exercicio_id={exercicio_id}")
+            return {"success": False, "message": "Acesso negado: organograma pertence a outra secretaria."}, 403
+
         OrganogramaHistorico.query.filter_by(exercicio_id=exercicio_id).delete(synchronize_session=False)
-        
+
         OrganogramaServidor.query.filter(OrganogramaServidor.node_id.in_(
             db.session.query(OrganogramaNode.id).filter_by(exercicio_id=exercicio_id)
         )).delete(synchronize_session=False)
-        
+
         OrganogramaNode.query.filter_by(exercicio_id=exercicio_id).delete(synchronize_session=False)
         db.session.commit()
 
+        sec_sigla = (ex_obj.secretaria.sigla if (ex_obj.secretaria and ex_obj.secretaria.sigla) else "GABINETE")
         no_raiz = OrganogramaNode(
             exercicio_id=exercicio_id,
             parent_id=None,
             tipo="CARGO_CHEFIA",
             titulo="Secretário(a) Municipal",
-            sigla="GABINETE/SEME",
+            sigla=sec_sigla,
             nivel_hierarquico=1,
             tipo_vinculo_requerido="COMISSIONADO",
             vagas_totais=1
@@ -4203,6 +4740,7 @@ def api_organograma_exercicio_limpar():
 
 @app.route('/api/organograma/node/salvar', methods=['POST'])
 @login_required
+@security.require_permission("manage_organograma", api=True)
 def api_organograma_node_salvar():
     try:
         data = request.json or {}
@@ -4213,6 +4751,17 @@ def api_organograma_node_salvar():
             parent_id = int(parent_id)
         else:
             parent_id = None
+
+        if node_id:
+            node_chk = db.session.get(OrganogramaNode, node_id)
+            if not node_chk or not security.can_access_record(current_user, node_chk):
+                registrar_violacao_acesso(f"Salvar organograma node_id={node_id}")
+                return {"success": False, "message": "Acesso negado."}, 403
+        elif exercicio_id:
+            ex_chk = db.session.get(OrganogramaExercicio, exercicio_id)
+            if not ex_chk or not security.can_access_record(current_user, ex_chk):
+                registrar_violacao_acesso(f"Adicionar node em exercicio_id={exercicio_id}")
+                return {"success": False, "message": "Acesso negado."}, 403
             
         titulo = data.get('titulo', '').strip()
         sigla = data.get('sigla', '').strip()
@@ -4276,11 +4825,15 @@ def api_organograma_node_salvar():
 
 @app.route('/api/organograma/node/deletar', methods=['POST'])
 @login_required
+@security.require_permission("manage_organograma", api=True)
 def api_organograma_node_deletar():
     try:
         data = request.json or {}
         node_id = data.get('node_id')
         node = OrganogramaNode.query.get_or_404(node_id)
+        if not security.can_access_record(current_user, node):
+            registrar_violacao_acesso(f"Deletar organograma node_id={node_id}")
+            return {"success": False, "message": "Acesso negado."}, 403
         
         filhos = OrganogramaNode.query.filter_by(parent_id=node.id).count()
         if filhos > 0:
@@ -4311,6 +4864,7 @@ def api_organograma_node_deletar():
 
 @app.route('/api/organograma/servidor/nomear', methods=['POST'])
 @login_required
+@security.require_permission("manage_organograma", api=True)
 def api_organograma_servidor_nomear():
     try:
         data = request.json or {}
@@ -4324,11 +4878,14 @@ def api_organograma_servidor_nomear():
         data_inicio_str = data.get('data_inicio')
         remuneracao_estimada = float(data.get('remuneracao_estimada', 0.0) or 0.0)
         foto_url = data.get('foto_url', '').strip()
-        
+
         if not node_id or not nome_servidor:
             return {"success": False, "message": "Nome do servidor e cargo são obrigatórios."}, 400
-            
+
         node = OrganogramaNode.query.get_or_404(node_id)
+        if not security.can_access_record(current_user, node):
+            registrar_violacao_acesso(f"Nomear em organograma node_id={node_id}")
+            return {"success": False, "message": "Acesso negado."}, 403
         
         dt_nom = None
         if data_nomeacao_str and str(data_nomeacao_str).strip():
@@ -4386,6 +4943,7 @@ def api_organograma_servidor_nomear():
 
 @app.route('/api/organograma/servidor/exonerar', methods=['POST'])
 @login_required
+@security.require_permission("manage_organograma", api=True)
 def api_organograma_servidor_exonerar():
     try:
         data = request.json or {}
@@ -4393,15 +4951,18 @@ def api_organograma_servidor_exonerar():
         portaria_exoneracao = data.get('portaria_exoneracao', '').strip()
         data_exoneracao_str = data.get('data_exoneracao')
         motivo_exoneracao = data.get('motivo_exoneracao', 'Exoneração a Pedido / Ofício').strip()
-        
+
         if not servidor_id:
             return {"success": False, "message": "ID do servidor é obrigatório."}, 400
-            
+
         if not portaria_exoneracao:
             return {"success": False, "message": "A Portaria de Exoneração é OBRIGATÓRIA para desligar/exonerar um servidor do quadro."}, 400
-            
+
         servidor = OrganogramaServidor.query.get_or_404(servidor_id)
-        node = OrganogramaNode.query.get(servidor.node_id)
+        node = db.session.get(OrganogramaNode, servidor.node_id)
+        if not node or not security.can_access_record(current_user, node):
+            registrar_violacao_acesso(f"Exonerar organograma servidor_id={servidor_id}")
+            return {"success": False, "message": "Acesso negado."}, 403
         
         dt_exo = datetime.strptime(data_exoneracao_str, '%Y-%m-%d').date() if data_exoneracao_str else datetime.now().date()
         
@@ -4433,6 +4994,7 @@ def api_organograma_servidor_exonerar():
 
 @app.route('/api/organograma/servidor/substituir', methods=['POST'])
 @login_required
+@security.require_permission("manage_organograma", api=True)
 def api_organograma_servidor_substituir():
     try:
         data = request.json or {}
@@ -4440,7 +5002,7 @@ def api_organograma_servidor_substituir():
         portaria_exoneracao = data.get('portaria_exoneracao', '').strip()
         data_exoneracao_str = data.get('data_exoneracao')
         motivo_exoneracao = data.get('motivo_exoneracao', 'Substituição no Cargo').strip()
-        
+
         nome_novo_servidor = data.get('nome_novo_servidor', '').strip()
         cpf_novo = data.get('cpf_novo', '').strip()
         matricula_novo = data.get('matricula_novo', '').strip()
@@ -4449,18 +5011,21 @@ def api_organograma_servidor_substituir():
         data_nomeacao_str = data.get('data_nomeacao')
         remuneracao_estimada = float(data.get('remuneracao_estimada', 0.0) or 0.0)
         foto_url_novo = data.get('foto_url_novo', '').strip()
-        
+
         if not servidor_antigo_id or not nome_novo_servidor:
             return {"success": False, "message": "Preencha os dados do servidor antigo e do novo servidor."}, 400
-            
+
         if not portaria_exoneracao:
             return {"success": False, "message": "A Portaria de Exoneração do antigo ocupante é OBRIGATÓRIA."}, 400
-            
+
         if not portaria_nomeacao:
             return {"success": False, "message": "A Portaria de Nomeação do novo servidor é OBRIGATÓRIA."}, 400
-            
+
         servidor_antigo = OrganogramaServidor.query.get_or_404(servidor_antigo_id)
         node = OrganogramaNode.query.get_or_404(servidor_antigo.node_id)
+        if not security.can_access_record(current_user, node):
+            registrar_violacao_acesso(f"Substituir organograma servidor_id={servidor_antigo_id}")
+            return {"success": False, "message": "Acesso negado."}, 403
         dt_exo = datetime.strptime(data_exoneracao_str, '%Y-%m-%d').date() if data_exoneracao_str else datetime.now().date()
         
         servidor_antigo.ativo = False
@@ -4508,8 +5073,12 @@ def api_organograma_servidor_substituir():
 
 @app.route('/organograma/exportar/excel/<int:exercicio_id>')
 @login_required
+@security.require_permission("view_organograma")
 def organograma_exportar_excel(exercicio_id):
     exercicio = OrganogramaExercicio.query.get_or_404(exercicio_id)
+    if not security.can_access_record(current_user, exercicio):
+        registrar_violacao_acesso(f"Exportar organograma exercicio_id={exercicio_id}")
+        return "Acesso negado", 403
     nodes = OrganogramaNode.query.filter_by(exercicio_id=exercicio.id).all()
     
     output = io.StringIO()
@@ -4558,9 +5127,10 @@ def organograma_exportar_excel(exercicio_id):
 
 @app.route('/api/organograma/buscar_funcionarios')
 @login_required
+@security.require_permission("view_organograma", api=True)
 def api_organograma_buscar_funcionarios():
     q = request.args.get('q', '').strip()
-    query = Funcionario.query
+    query = security.scope_query(Funcionario.query, Funcionario, current_user)
     if q:
         query = query.filter(
             db.or_(
@@ -4586,8 +5156,12 @@ def api_organograma_buscar_funcionarios():
 
 @app.route('/organograma/pdf/<int:exercicio_id>')
 @login_required
+@security.require_permission("view_organograma")
 def organograma_pdf_view(exercicio_id):
     exercicio = OrganogramaExercicio.query.get_or_404(exercicio_id)
+    if not security.can_access_record(current_user, exercicio):
+        registrar_violacao_acesso(f"PDF organograma exercicio_id={exercicio_id}")
+        return "Acesso negado", 403
     nodes = OrganogramaNode.query.filter_by(exercicio_id=exercicio.id).order_by(OrganogramaNode.nivel_hierarquico, OrganogramaNode.ordem, OrganogramaNode.id).all()
     valid_ids = {n.id for n in nodes}
     
@@ -4746,6 +5320,12 @@ def portal_servidor_login():
         return redirect(url_for("portal_servidor_dashboard"))
 
     if request.method == "POST":
+        ip_key = f"portal_srv:{request.remote_addr}"
+        limited, retry_after = security.login_rate_limiter.is_limited(ip_key, max_attempts=15, window_seconds=300)
+        if limited:
+            flash(f"Muitas tentativas de acesso. Aguarde {retry_after} segundos.", "danger")
+            return redirect(url_for("portal_servidor_login"))
+
         cpf_raw = request.form.get("cpf", "").strip()
         data_nasc_raw = request.form.get("data_nasc", "").strip()
 
@@ -4754,19 +5334,16 @@ def portal_servidor_login():
             flash("Informe um CPF válido para login.", "danger")
             return redirect(url_for("portal_servidor_login"))
 
-        # Busca funcionario por CPF
-        funcionarios = Funcionario.query.all()
-        funcionario = None
-        for f in funcionarios:
-            if f.cpf and re.sub(r"\D", "", f.cpf) == cpf_clean:
-                funcionario = f
-                break
+        # Busca indexada por cpf_limpo (sem carregar todos os registros na memória!)
+        funcionario = Funcionario.query.filter(
+            (Funcionario.cpf_limpo == cpf_clean) | (Funcionario.cpf == cpf_raw)
+        ).order_by(Funcionario.ativo.desc(), Funcionario.id.desc()).first()
 
         if not funcionario:
+            security.login_rate_limiter.register_failure(ip_key)
             flash("CPF não encontrado no cadastro do município. Procure o RH da Secretaria.", "danger")
             return redirect(url_for("portal_servidor_login"))
 
-        # Validação da Data de Nascimento (Senha)
         if not funcionario.data_nasc:
             flash("Data de nascimento não cadastrada para este servidor. Contate o RH.", "danger")
             return redirect(url_for("portal_servidor_login"))
@@ -4774,7 +5351,6 @@ def portal_servidor_login():
         dt_nasc_valida = False
         data_nasc_clean = re.sub(r"\D", "", data_nasc_raw)
 
-        # Formatos aceitos: DD/MM/AAAA ou YYYY-MM-DD
         dt_func_str1 = funcionario.data_nasc.strftime("%d/%m/%Y")
         dt_func_str2 = funcionario.data_nasc.strftime("%Y-%m-%d")
         dt_func_clean = funcionario.data_nasc.strftime("%d%m%Y")
@@ -4783,10 +5359,11 @@ def portal_servidor_login():
             dt_nasc_valida = True
 
         if not dt_nasc_valida:
+            security.login_rate_limiter.register_failure(ip_key)
             flash("Data de nascimento (senha) incorreta. Tente no formato DD/MM/AAAA.", "danger")
             return redirect(url_for("portal_servidor_login"))
 
-        # Login com sucesso na sessão do servidor
+        security.login_rate_limiter.reset(ip_key)
         session["servidor_id"] = funcionario.id
         session["servidor_nome"] = funcionario.nome
         session["servidor_cpf"] = funcionario.cpf
@@ -4890,11 +5467,17 @@ def portal_servidor_justificativa_salvar():
 def portal_servidor_download_atestado(id):
     just = JustificativaFalta.query.get_or_404(id)
 
-    # Autorização: servidor dono da solicitação ou usuário admin/rh autenticado
     is_owner = session.get("servidor_id") == just.funcionario_id
-    is_rh = current_user.is_authenticated
+    is_rh = (
+        current_user.is_authenticated
+        and security.has_permission(current_user, "view_atestados")
+        and security.can_access_record(current_user, just)
+    )
 
     if not (is_owner or is_rh):
+        if current_user.is_authenticated:
+            registrar_violacao_acesso(f"Download atestado_id={id}")
+            return "Acesso negado", 403
         flash("Acesso não autorizado.", "danger")
         return redirect(url_for("portal_servidor_login"))
 
@@ -4925,23 +5508,23 @@ def portal_servidor_logout():
 
 @app.route("/admin/atestados")
 @login_required
+@security.require_permission("view_atestados")
 def admin_atestados():
     status_filter = request.args.get("status", "TODOS").upper()
     search = request.args.get("search", "").strip()
 
-    query = JustificativaFalta.query
-
-    # Filtra por secretaria se o usuário não for super admin
-    if not (current_user.is_admin or getattr(current_user, "role", "") == "admin"):
-        if current_user.secretaria_id:
-            query = query.filter_by(secretaria_id=current_user.secretaria_id)
+    query = security.scope_query(JustificativaFalta.query, JustificativaFalta, current_user)
+    if security.get_role_scope(current_user) == "unidade":
+        query = query.join(Funcionario).filter(Funcionario.local_trabalho_id == current_user.local_trabalho_id)
 
     if status_filter in ("PENDENTE", "APROVADO", "REJEITADO"):
-        query = query.filter_by(status=status_filter)
+        query = query.filter(JustificativaFalta.status == status_filter)
 
     if search:
         search_like = f"%{search}%"
-        query = query.join(Funcionario).filter(
+        if security.get_role_scope(current_user) != "unidade":
+            query = query.join(Funcionario)
+        query = query.filter(
             (Funcionario.nome.ilike(search_like)) |
             (Funcionario.cpf.ilike(search_like)) |
             (JustificativaFalta.protocolo.ilike(search_like))
@@ -4949,16 +5532,14 @@ def admin_atestados():
 
     justificativas = query.order_by(JustificativaFalta.data_solicitacao.desc()).all()
 
-    # Estatísticas KPI
-    base_query = JustificativaFalta.query
-    if not (current_user.is_admin or getattr(current_user, "role", "") == "admin"):
-        if current_user.secretaria_id:
-            base_query = base_query.filter_by(secretaria_id=current_user.secretaria_id)
+    base_query = security.scope_query(JustificativaFalta.query, JustificativaFalta, current_user)
+    if security.get_role_scope(current_user) == "unidade":
+        base_query = base_query.join(Funcionario).filter(Funcionario.local_trabalho_id == current_user.local_trabalho_id)
 
     total_qtd = base_query.count()
-    pendentes_qtd = base_query.filter_by(status="PENDENTE").count()
-    aprovados_qtd = base_query.filter_by(status="APROVADO").count()
-    rejeitados_qtd = base_query.filter_by(status="REJEITADO").count()
+    pendentes_qtd = base_query.filter(JustificativaFalta.status == "PENDENTE").count()
+    aprovados_qtd = base_query.filter(JustificativaFalta.status == "APROVADO").count()
+    rejeitados_qtd = base_query.filter(JustificativaFalta.status == "REJEITADO").count()
 
     return render_template(
         "admin_atestados.html",
@@ -4974,6 +5555,7 @@ def admin_atestados():
 
 @app.route("/api/atestados/aprovar", methods=["POST"])
 @login_required
+@security.require_permission("decide_atestados", api=True)
 def api_atestados_aprovar():
     data = request.get_json() or {}
     just_id = data.get("id")
@@ -4983,9 +5565,12 @@ def api_atestados_aprovar():
     if not just_id:
         return jsonify({"success": False, "message": "ID do atestado não fornecido."})
 
-    just = JustificativaFalta.query.get(just_id)
+    just = db.session.get(JustificativaFalta, just_id)
     if not just:
         return jsonify({"success": False, "message": "Solicitação não encontrada."})
+    if not security.can_access_record(current_user, just):
+        registrar_violacao_acesso(f"Aprovar atestado_id={just_id}")
+        return jsonify({"success": False, "message": "Acesso negado: atestado pertence a outra secretaria."}), 403
 
     try:
         dias_val = int(dias_liberados)
@@ -4998,11 +5583,12 @@ def api_atestados_aprovar():
     just.analisado_por_id = current_user.id
     just.data_analise = datetime.utcnow()
 
-    # Log de auditoria
     log = LogAuditoria(
         usuario_id=current_user.id,
-        acao=f"Aprovou Atestado {just.protocolo}"[:50],
-        alvo=f"Servidor: {just.funcionario.nome} | Dias: {dias_val}"[:250]
+        secretaria_id=just.secretaria_id,
+        nivel="INFO",
+        acao=f"Aprovou Atestado {just.protocolo}"[:250],
+        alvo=f"Servidor: {just.funcionario.nome} | Dias: {dias_val}"[:495]
     )
     db.session.add(log)
     db.session.commit()
@@ -5012,6 +5598,7 @@ def api_atestados_aprovar():
 
 @app.route("/api/atestados/reprovar", methods=["POST"])
 @login_required
+@security.require_permission("decide_atestados", api=True)
 def api_atestados_reprovar():
     data = request.get_json() or {}
     just_id = data.get("id")
@@ -5023,20 +5610,24 @@ def api_atestados_reprovar():
     if not motivo:
         return jsonify({"success": False, "message": "O motivo do indeferimento é OBRIGATÓRIO!"})
 
-    just = JustificativaFalta.query.get(just_id)
+    just = db.session.get(JustificativaFalta, just_id)
     if not just:
         return jsonify({"success": False, "message": "Solicitação não encontrada."})
+    if not security.can_access_record(current_user, just):
+        registrar_violacao_acesso(f"Reprovar atestado_id={just_id}")
+        return jsonify({"success": False, "message": "Acesso negado: atestado pertence a outra secretaria."}), 403
 
     just.status = "REJEITADO"
     just.motivo_rejeicao = motivo
     just.analisado_por_id = current_user.id
     just.data_analise = datetime.utcnow()
 
-    # Log de auditoria
     log = LogAuditoria(
         usuario_id=current_user.id,
-        acao=f"Indeferiu Atestado {just.protocolo}"[:50],
-        alvo=f"Servidor: {just.funcionario.nome} | Motivo: {motivo}"[:250]
+        secretaria_id=just.secretaria_id,
+        nivel="INFO",
+        acao=f"Indeferiu Atestado {just.protocolo}"[:250],
+        alvo=f"Servidor: {just.funcionario.nome} | Motivo: {motivo}"[:495]
     )
     db.session.add(log)
     db.session.commit()
@@ -5048,9 +5639,17 @@ def api_atestados_reprovar():
 def atestado_parecer_pdf(id):
     just = JustificativaFalta.query.get_or_404(id)
 
-    # Permite acesso se for usuário logado no admin ou se for o próprio servidor no portal
     servidor_id = session.get("servidor_id")
-    if not current_user.is_authenticated and servidor_id != just.funcionario_id:
+    is_owner = servidor_id == just.funcionario_id
+    is_rh = (
+        current_user.is_authenticated
+        and security.has_permission(current_user, "view_atestados")
+        and security.can_access_record(current_user, just)
+    )
+    if not (is_owner or is_rh):
+        if current_user.is_authenticated:
+            registrar_violacao_acesso(f"PDF parecer atestado_id={id}")
+            return "Acesso negado", 403
         flash("Acesso não autorizado.", "danger")
         return redirect(url_for("portal_servidor_login"))
 
@@ -5122,6 +5721,7 @@ def obter_servidores_pendentes(funcionarios, locais):
 
 @app.route("/eleitoral", methods=["GET"])
 @login_required
+@security.require_permission("view_eleitoral")
 def eleitoral_index():
     sec_id = request.args.get("secretaria_id", type=int)
     busca = request.args.get("busca", "").strip()
@@ -5196,6 +5796,7 @@ def eleitoral_index():
 
 @app.route("/eleitoral/local/novo", methods=["POST"])
 @login_required
+@security.require_permission("manage_eleitoral")
 def eleitoral_local_novo():
     nome = request.form.get("nome", "").strip()
     zona_eleitoral = request.form.get("zona_eleitoral", "018").strip()
@@ -5232,6 +5833,7 @@ def eleitoral_local_novo():
 
 @app.route("/eleitoral/local/<int:id>/editar", methods=["POST"])
 @login_required
+@security.require_permission("manage_eleitoral")
 def eleitoral_local_editar(id):
     local = LocalVotacao.query.get_or_404(id)
 
@@ -5256,6 +5858,7 @@ def eleitoral_local_editar(id):
 
 @app.route("/eleitoral/local/<int:id>/excluir", methods=["POST"])
 @login_required
+@security.require_permission("manage_eleitoral")
 def eleitoral_local_excluir(id):
     local = LocalVotacao.query.get_or_404(id)
     nome = local.nome
@@ -5275,6 +5878,7 @@ def eleitoral_local_excluir(id):
 
 @app.route("/api/eleitoral/local/<int:id>/servidores", methods=["GET"])
 @login_required
+@security.require_permission("view_eleitoral", api=True)
 def api_eleitoral_servidores_local(id):
     local = LocalVotacao.query.get_or_404(id)
     sec_id = request.args.get("secretaria_id", type=int)
@@ -5326,6 +5930,7 @@ def api_eleitoral_servidores_local(id):
 
 @app.route("/api/eleitoral/servidores-pendentes", methods=["GET"])
 @login_required
+@security.require_permission("view_eleitoral", api=True)
 def api_eleitoral_servidores_pendentes():
     sec_id = request.args.get("secretaria_id", type=int)
 
@@ -5364,6 +5969,7 @@ def api_eleitoral_servidores_pendentes():
 
 @app.route("/eleitoral/pdf", methods=["GET"])
 @login_required
+@security.require_permission("view_eleitoral")
 def eleitoral_pdf():
     tipo = request.args.get("tipo", "sintetico")
     sec_id = request.args.get("secretaria_id", type=int)
@@ -5459,28 +6065,15 @@ def eleitoral_pdf():
 # ==============================================================================
 
 def _is_backup_admin():
-    return bool(
-        current_user.is_authenticated
-        and (getattr(current_user, "is_admin", False) or getattr(current_user, "role", "") == "admin")
-    )
+    return security.has_permission(current_user, "manage_backup")
 
 
 def _get_backup_csrf_token():
-    token = session.get("backup_csrf_token")
-    if not token:
-        token = secrets.token_hex(32)
-        session["backup_csrf_token"] = token
-    return token
+    return security.get_csrf_token()
 
 
 def _validate_backup_csrf():
-    expected = session.get("backup_csrf_token")
-    if not expected:
-        return False
-    provided = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
-    if not provided and request.is_json:
-        provided = (request.get_json(silent=True) or {}).get("csrf_token")
-    return bool(provided and hmac.compare_digest(str(expected), str(provided)))
+    return security.validate_csrf_request()
 
 
 def _formatar_tamanho(num_bytes):
@@ -5826,6 +6419,7 @@ def api_backup_restaurar():
             password=backup_password,
             restored_by=admin_username_anterior,
             safety_password=backup_password,
+            post_restore_hook=atualizar_schema,
         )
 
         # Registra o Auto-Snapshot de Segurança e o Evento de Restauração no BackupHistorico

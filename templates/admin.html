@@ -164,6 +164,7 @@
                     </div>
                 </button>
 
+                {% if has_perm('view_organograma') %}
                 <a href="/organograma"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-indigo-50 hover:text-indigo-700 transition-colors dark:text-gray-200 dark:hover:bg-indigo-950/50">
                     <div class="flex items-center gap-2.5">
@@ -171,13 +172,15 @@
                         <span>Organograma</span>
                     </div>
                 </a>
+                {% endif %}
             </div>
 
-            {% if role == 'admin' or is_admin %}
             <!-- SECTION 2: PONTO & FREQUÊNCIA -->
+            {% if has_perm('view_ponto') or has_perm('view_atestados') %}
             <div class="sidebar-nav-section space-y-1">
                 <p class="sidebar-section-title px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Ponto & Frequência</p>
 
+                {% if has_perm('view_ponto') %}
                 <a href="/admin/ponto"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
                     <div class="flex items-center gap-2.5">
@@ -190,7 +193,7 @@
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700 text-left">
                     <div class="flex items-center gap-2.5">
                         <i class="ph ph-calendar-check text-base text-teal-500"></i>
-                        <span>Frequência Escolar</span>
+                        <span>Frequência por Unidade</span>
                     </div>
                 </button>
 
@@ -201,7 +204,9 @@
                         <span>Unidades de Ponto</span>
                     </div>
                 </a>
+                {% endif %}
 
+                {% if has_perm('view_atestados') %}
                 <a href="/admin/atestados"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-rose-50 hover:text-rose-700 transition-colors dark:text-gray-200 dark:hover:bg-rose-950/40">
                     <div class="flex items-center gap-2.5">
@@ -212,19 +217,34 @@
                     <span class="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">{{ atestados_pendentes_count }}</span>
                     {% endif %}
                 </a>
+                {% endif %}
             </div>
+            {% endif %}
 
             <!-- SECTION 3: GESTÃO DE PESSOAS & RH -->
             <div class="sidebar-nav-section space-y-1">
                 <p class="sidebar-section-title px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Gestão de Pessoas & RH</p>
 
+                {% if has_perm('view_eleitoral') %}
                 <a href="/eleitoral"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition-colors dark:text-gray-200 dark:hover:bg-blue-950/40">
                     <div class="flex items-center gap-2.5">
                         <i class="ph ph-vote text-base text-blue-600"></i>
                         <span>Mapeamento Eleitoral</span>
                     </div>
+                    <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">Sigiloso</span>
                 </a>
+                {% endif %}
+
+                {% if has_perm('view_contratos') %}
+                <a href="{{ url_for('pagina_contratos') }}"
+                    class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-purple-50 hover:text-purple-700 transition-colors dark:text-gray-200 dark:hover:bg-purple-950/40">
+                    <div class="flex items-center gap-2.5">
+                        <i class="ph ph-files text-base text-purple-600"></i>
+                        <span>Contratos Gerados</span>
+                    </div>
+                </a>
+                {% endif %}
 
                 <a href="{{ url_for('gerenciar_fotos') }}"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
@@ -234,6 +254,7 @@
                     </div>
                 </a>
 
+                {% if has_perm('manage_biometria') %}
                 <a href="/admin/reconhecimento_facial"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
                     <div class="flex items-center gap-2.5">
@@ -241,6 +262,7 @@
                         <span>Reconhecimento Facial</span>
                     </div>
                 </a>
+                {% endif %}
 
                 <a href="/admin/cargos_total"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
@@ -250,6 +272,7 @@
                     </div>
                 </a>
 
+                {% if has_perm('view_rescisoes') %}
                 <a href="/recisoes"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
                     <div class="flex items-center gap-2.5">
@@ -257,12 +280,14 @@
                         <span>Rescisão Contratual</span>
                     </div>
                 </a>
+                {% endif %}
             </div>
 
             <!-- SECTION 4: RELATÓRIOS & FOLHA -->
             <div class="sidebar-nav-section space-y-1">
                 <p class="sidebar-section-title px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Relatórios & Folha</p>
 
+                {% if has_perm('view_folha') %}
                 <a href="{{ url_for('folha_pagamento') }}"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
                     <div class="flex items-center gap-2.5">
@@ -270,6 +295,7 @@
                         <span>Folha de Pagamento</span>
                     </div>
                 </a>
+                {% endif %}
 
                 <a href="{{ url_for('apoio_pedagogico') }}"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
@@ -300,6 +326,7 @@
             <div class="sidebar-nav-section space-y-1">
                 <p class="sidebar-section-title px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Sistema</p>
 
+                {% if has_perm('view_auditoria') %}
                 <button onclick="switchTab('auditoria', this)"
                     class="sidebar-nav-item nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
                     <div class="flex items-center gap-2.5">
@@ -307,7 +334,9 @@
                         <span>Auditoria</span>
                     </div>
                 </button>
+                {% endif %}
 
+                {% if has_perm('manage_backup') %}
                 <a href="{{ url_for('admin_backup') }}"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 transition-colors dark:text-gray-200 dark:hover:bg-emerald-950/40">
                     <div class="flex items-center gap-2.5">
@@ -316,7 +345,9 @@
                     </div>
                     <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">AES-256</span>
                 </a>
+                {% endif %}
 
+                {% if has_perm('manage_secretarias') or has_perm('manage_users') or has_perm('manage_locais') or has_perm('manage_funcoes') %}
                 <button onclick="switchTab('config', this)"
                     class="sidebar-nav-item nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
                     <div class="flex items-center gap-2.5">
@@ -324,16 +355,18 @@
                         <span>Configurações</span>
                     </div>
                 </button>
+                {% endif %}
             </div>
-            {% endif %}
         </nav>
 
         <div class="p-3 border-t border-gray-100 dark:border-gray-700 flex-shrink-0 space-y-0.5">
+            {% if has_perm('write_rh') %}
             <a href="{{ url_for('sistema') }}"
                 class="flex items-center gap-2.5 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white transition">
                 <i class="ph ph-plus-circle text-sm text-emerald-500"></i> Novo Cadastro
             </a>
-            {% if role == 'admin' or is_admin %}
+            {% endif %}
+            {% if has_perm('validate_cadastros') %}
             <a href="{{ url_for('validar_cadastros') }}"
                 class="flex items-center justify-between px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white transition">
                 <div class="flex items-center gap-2.5">
@@ -343,11 +376,11 @@
                 <span class="bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">{{ pending_count }}</span>
                 {% endif %}
             </a>
+            {% endif %}
             <a href="{{ url_for('validar_documento') }}"
                 class="flex items-center gap-2.5 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-black dark:text-gray-400 dark:hover:text-white transition">
                 <i class="ph ph-qr-code text-sm text-purple-500"></i> Validar Documento
             </a>
-            {% endif %}
             <button
                 onclick="confirmAction('{{ url_for('logout') }}', 'Sair do Sistema', 'Tem certeza que deseja encerrar sua sessão?')"
                 class="w-full flex items-center gap-2.5 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 text-left transition">
@@ -401,9 +434,8 @@
                     <i id="theme-icon" class="ph ph-moon text-xl"></i>
                 </button>
                 <div class="text-right">
-                    <p class="text-sm font-bold text-gray-900 dark:text-white">{% if role == 'admin' or is_admin
-                        %}Administrador{% else %}Supervisor{% endif %}</p>
-                    <p class="text-xs text-green-600 dark:text-green-400">● Online</p>
+                    <p class="text-sm font-bold text-gray-900 dark:text-white">{{ user_role_label }}</p>
+                    <p class="text-xs text-green-600 dark:text-green-400">● {% if is_global_scope %}Visão Global Municipal{% elif current_user.secretaria %}{{ current_user.secretaria.nome }}{% else %}Online{% endif %}</p>
                 </div>
             </div>
         </header>
@@ -546,7 +578,7 @@
                 </div>
             </div>
 
-            {% if role == 'admin' or is_admin %}
+            {% if has_perm('view_admin_panel') %}
             <div id="dados" class="tab-content">
                 <div
                     class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 mb-6 dark:bg-gray-800 dark:border-gray-700">
@@ -594,7 +626,9 @@
                             <label class="text-xs font-bold text-gray-500 uppercase">Secretaria</label>
                             <select name="secretaria_id" id="filter_sec"
                                 class="w-full mt-1 border border-gray-200 rounded-lg p-2 text-sm bg-gray-50 outline-none focus:ring-2 focus:ring-black dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                                {% if is_global_scope %}
                                 <option value="">Todas</option>
+                                {% endif %}
                                 {% for sec in secretarias %}
                                 <option value="{{ sec.id }}" {{ 'selected' if filtros.sec==sec.id|string }}>{{ sec.nome
                                     }}</option>
@@ -614,6 +648,7 @@
                                     Terceirizado</option>
                             </select>
                         </div>
+                        {% if has_perm('view_padrinhos') %}
                         <div>
                             <label class="text-xs font-bold text-gray-500 uppercase text-blue-600">Padrinho</label>
                             <select name="padrinho_id"
@@ -625,6 +660,7 @@
                                 {% endfor %}
                             </select>
                         </div>
+                        {% endif %}
                         <div>
                             <label class="text-xs font-bold text-gray-500 uppercase">Função</label>
                             <select name="funcao_id"
@@ -709,7 +745,7 @@
                                 data-admissao="{{ (f.dt_inicio.strftime('%d/%m/%Y') if f.dt_inicio else '---')|e }}"
                                 data-remuneracao="{{ (('R$ ' + f.remuneracao) if f.remuneracao else '---')|e }}"
                                 data-banco="{{ (((f.banco or '') + (' Ag: ' + f.agencia if f.agencia else '') + (' C/C: ' + f.conta if f.conta else '')) or '---')|e }}"
-                                data-padrinho="{{ (f.padrinho.nome if f.padrinho else '---')|e }}"
+                                data-padrinho="{{ ((f.padrinho.nome if f.padrinho else '---') if has_perm('view_padrinhos') else 'RESTRITO')|e }}"
                                 data-sangue="{{ (f.tipo_sanguineo or '---')|e }}"
                                 data-dependentes="{{ (f.qtd_dependentes or 0)|e }}">
                                 <td class="px-6 py-4"><span class="block font-bold text-gray-900 dark:text-white">{{
@@ -722,12 +758,12 @@
                                         f.funcao else 'Não Definido' }}</span><span
                                         class="text-xs bg-gray-100 px-1 rounded dark:bg-gray-600 dark:text-gray-200">{{
                                         f.tipo_vinculo }}</span></td>
-                                <td class="px-6 py-4 text-center">{% if f.foi_indicacao %}<span
+                                <td class="px-6 py-4 text-center">{% if has_perm('view_padrinhos') %}{% if f.foi_indicacao %}<span
                                         class="w-2 h-2 bg-red-500 rounded-full inline-block" title="Sim"></span>{% else
                                     %}<span class="w-2 h-2 bg-gray-200 rounded-full inline-block" title="Não"></span>{%
-                                    endif %}</td>
+                                    endif %}{% else %}<span class="text-xs text-gray-400">—</span>{% endif %}</td>
                                 <td class="px-6 py-4 text-xs font-bold text-blue-800 uppercase dark:text-blue-400">{{
-                                    f.padrinho.nome if f.padrinho else '---' }}</td>
+                                    (f.padrinho.nome if f.padrinho else '---') if has_perm('view_padrinhos') else 'RESTRITO' }}</td>
                                 <td class="px-6 py-4 text-center flex justify-center gap-2">
                                     <button
                                         onclick="abrirModalMovimentacao({{ f.id }}, '{{ f.nome }}', '{{ f.funcao_id }}', '{{ f.local_trabalho_id }}')"
@@ -830,43 +866,65 @@
 
             <div id="config" class="tab-content">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {% if has_perm('manage_secretarias') %}
                     <div
                         class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-gray-800 dark:text-white">Secretarias</h3><button
+                            <h3 class="font-bold text-gray-800 dark:text-white">Secretarias (Multi-Pasta)</h3><button
                                 onclick="document.getElementById('formSec').classList.toggle('hidden')"
-                                class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Nova</button>
+                                class="text-xs bg-black text-white px-2.5 py-1 rounded-lg dark:bg-blue-600">Nova</button>
                         </div>
-                        <form method="POST" id="formSec" class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700">
-                            <input type="hidden" name="create_secretaria" value="1"><input type="text"
-                                name="nome_secretaria"
-                                class="w-full border p-2 rounded mb-2 uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
-                                placeholder="Nome da Secretaria" required><button
-                                class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Salvar</button>
+                        <form method="POST" id="formSec" class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700 space-y-2">
+                            <input type="hidden" name="create_secretaria" value="1">
+                            <input type="text" name="nome_secretaria"
+                                class="w-full border p-2 rounded uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                                placeholder="Nome da Secretaria" required>
+                            <input type="text" name="sigla_secretaria" maxlength="20"
+                                class="w-full border p-2 rounded uppercase text-xs dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                                placeholder="Sigla (ex: SEME, SMS, SMAS)">
+                            <input type="text" name="secretario_nome"
+                                class="w-full border p-2 rounded uppercase text-xs dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                                placeholder="Nome do(a) Secretário(a) (opcional)">
+                            <button class="w-full bg-black text-white text-xs py-2 rounded font-bold dark:bg-blue-600">Salvar</button>
                         </form>
-                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">{% for sec in secretarias %}<li
-                                class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
-                                <span>{{ sec.nome }}</span><button
-                                    onclick="confirmAction('{{ url_for('delete_secretaria', sec_id=sec.id) }}', 'Excluir Secretaria', 'Tem certeza? Isso pode afetar usuários e servidores vinculados.')"
-                                    class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button>
-                            </li>{%
-                            endfor %}</ul>
+                        <ul class="space-y-2 max-h-72 overflow-y-auto menu-scroll">
+                            {% for sec in secretarias %}
+                            <li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
+                                <div class="min-w-0 pr-2">
+                                    <span class="font-bold block truncate">{{ sec.nome }} {% if sec.sigla %}<span class="text-[10px] text-indigo-600 dark:text-indigo-400">({{ sec.sigla }})</span>{% endif %}</span>
+                                    <span class="text-[10px] text-gray-400 block truncate">{{ sec.secretario_nome or 'Secretário não configurado' }}</span>
+                                </div>
+                                <div class="flex items-center gap-1 flex-shrink-0">
+                                    <button type="button"
+                                        onclick='abrirModalEditarSecretaria({{ sec.id }}, {{ sec.nome|tojson }}, {{ (sec.sigla or "")|tojson }}, {{ (sec.cnpj or "")|tojson }}, {{ (sec.endereco or "")|tojson }}, {{ (sec.telefone or "")|tojson }}, {{ (sec.email or "")|tojson }}, {{ (sec.secretario_nome or "")|tojson }}, {{ (sec.secretario_cargo or "")|tojson }}, {{ (sec.secretario_cpf or "")|tojson }}, {{ (sec.secretario_portaria or "")|tojson }}, {{ sec.teto_comissionados or 0 }}, {{ sec.teto_folha_mensal or 0 }})'
+                                        class="text-blue-500 hover:text-blue-700 p-1" title="Editar Perfil Institucional">
+                                        <i class="ph ph-pencil-simple"></i>
+                                    </button>
+                                    <button onclick="confirmAction('{{ url_for('delete_secretaria', sec_id=sec.id) }}', 'Excluir Secretaria', 'Tem certeza? Só é possível excluir secretarias sem vínculos.')"
+                                        class="text-red-500 hover:text-red-700 p-1"><i class="ph ph-trash"></i></button>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
                     </div>
+                    {% endif %}
+
+                    {% if has_perm('manage_funcoes') %}
                     <div
                         class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-gray-800 dark:text-white">Funções</h3><button
                                 onclick="document.getElementById('formFuncao').classList.toggle('hidden')"
-                                class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Nova</button>
+                                class="text-xs bg-black text-white px-2.5 py-1 rounded-lg dark:bg-blue-600">Nova</button>
                         </div>
                         <form method="POST" id="formFuncao"
                             class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700"><input type="hidden"
                                 name="create_funcao" value="1"><input type="text" name="nome_funcao"
                                 class="w-full border p-2 rounded mb-2 uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
                                 placeholder="Nome da Função" required><button
-                                class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Salvar</button>
+                                class="w-full bg-black text-white text-xs py-2 rounded font-bold dark:bg-blue-600">Salvar</button>
                         </form>
-                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">
+                        <ul class="space-y-2 max-h-72 overflow-y-auto menu-scroll">
                             {% for f in funcoes %}
                             <li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
                                 <span>{{ f.nome }}</span>
@@ -888,35 +946,57 @@
                             {% endfor %}
                         </ul>
                     </div>
+                    {% endif %}
 
+                    {% if has_perm('manage_locais') %}
                     <div
                         class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-gray-800 dark:text-white">Locais de Trabalho</h3>
                             <button onclick="document.getElementById('formLocal').classList.toggle('hidden')"
-                                class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600 hover:bg-gray-800 transition">Novo</button>
+                                class="text-xs bg-black text-white px-2.5 py-1 rounded-lg dark:bg-blue-600 hover:bg-gray-800 transition">Novo</button>
                         </div>
 
                         <form method="POST" id="formLocal"
-                            class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700 space-y-4">
+                            class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700 space-y-3">
                             <input type="hidden" name="create_local" value="1">
 
                             <div>
-                                <label
-                                    class="block text-[10px] font-bold text-gray-500 uppercase mb-1 dark:text-gray-400 tracking-widest">Nome
-                                    do Local</label>
+                                <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1 dark:text-gray-400 tracking-widest">Nome do Local</label>
                                 <input type="text" name="nome_local"
                                     class="w-full border border-gray-200 p-2 rounded-lg uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white outline-none focus:border-blue-500"
-                                    placeholder="Ex: Escola Municipal João XXIII" required>
+                                    placeholder="Ex: Escola / UBS / CRAS / Sede" required>
                             </div>
 
-                            <div
-                                class="bg-white border border-gray-200 rounded-xl p-3 shadow-sm relative overflow-hidden dark:bg-gray-800 dark:border-gray-600">
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Tipo Unidade</label>
+                                    <select name="tipo_unidade" class="w-full border border-gray-200 p-2 rounded-lg text-xs dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                                        <option value="UNIDADE">Unidade / Setor</option>
+                                        <option value="ESCOLA">Escola</option>
+                                        <option value="UBS">UBS / Posto Saúde</option>
+                                        <option value="HOSPITAL">Hospital / UPA</option>
+                                        <option value="CRAS">CRAS / CREAS</option>
+                                        <option value="SEDE">Sede Secretaria</option>
+                                    </select>
+                                </div>
+                                {% if is_global_scope %}
+                                <div>
+                                    <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Secretaria</label>
+                                    <select name="secretaria_id" class="w-full border border-gray-200 p-2 rounded-lg text-xs dark:bg-gray-600 dark:border-gray-500 dark:text-white" required>
+                                        {% for sec in secretarias %}
+                                        <option value="{{ sec.id }}">{{ sec.sigla or sec.nome }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="bg-white border border-gray-200 rounded-xl p-3 shadow-sm relative overflow-hidden dark:bg-gray-800 dark:border-gray-600">
                                 <div class="flex items-center justify-between mb-3">
                                     <div class="flex items-center gap-2">
                                         <i class="ph ph-map-pin-line text-blue-500 text-lg"></i>
-                                        <h4 class="text-xs font-bold text-gray-800 dark:text-white">Georreferenciamento
-                                        </h4>
+                                        <h4 class="text-xs font-bold text-gray-800 dark:text-white">Georreferenciamento</h4>
                                     </div>
                                     <button type="button" onclick="capturarCoordenadasAdmin(this)"
                                         class="text-[10px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded-lg transition-colors flex items-center gap-1 dark:bg-blue-900/30 dark:text-blue-400">
@@ -926,79 +1006,65 @@
 
                                 <div class="grid grid-cols-2 gap-3 mb-3">
                                     <div>
-                                        <label
-                                            class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Latitude</label>
+                                        <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Latitude</label>
                                         <input type="text" name="latitude" id="inputLat" placeholder="-6.234567"
                                             class="w-full border border-gray-200 p-2 rounded-lg text-sm font-mono dark:bg-gray-700 dark:border-gray-500 dark:text-white outline-none focus:border-blue-500">
                                     </div>
                                     <div>
-                                        <label
-                                            class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Longitude</label>
+                                        <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1">Longitude</label>
                                         <input type="text" name="longitude" id="inputLng" placeholder="-41.765432"
                                             class="w-full border border-gray-200 p-2 rounded-lg text-sm font-mono dark:bg-gray-700 dark:border-gray-500 dark:text-white outline-none focus:border-blue-500">
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label
-                                        class="block text-[9px] font-bold text-gray-400 uppercase mb-1 flex justify-between">Raio
-                                        de Tolerância (Metros) <span class="text-blue-500">Padrão: 50m</span></label>
+                                    <label class="block text-[9px] font-bold text-gray-400 uppercase mb-1 flex justify-between">Raio de Tolerância (Metros) <span class="text-blue-500">Padrão: 50m</span></label>
                                     <input type="number" name="raio_permitido" value="50" min="10" max="1000"
                                         class="w-full border border-gray-200 p-2 rounded-lg text-sm font-bold dark:bg-gray-700 dark:border-gray-500 dark:text-white outline-none focus:border-blue-500">
                                 </div>
                             </div>
 
-                            <button
-                                class="w-full bg-black text-white text-xs font-bold py-2.5 rounded-lg dark:bg-blue-600 hover:bg-gray-800 transition">Salvar
-                                Local</button>
+                            <button class="w-full bg-black text-white text-xs font-bold py-2.5 rounded-lg dark:bg-blue-600 hover:bg-gray-800 transition">Salvar Local</button>
                         </form>
 
-                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">
+                        <ul class="space-y-2 max-h-72 overflow-y-auto menu-scroll">
                             {% for l in locais_trabalho %}
-                            <li
-                                class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700 border border-transparent hover:border-gray-100 dark:hover:border-gray-600 transition">
-                                <div class="flex flex-col">
-                                    <span class="font-bold">{{ l.nome }}</span>
-                                    {% if l.latitude %}
-                                    <span
-                                        class="text-[9px] text-blue-500 font-bold flex items-center gap-1 uppercase tracking-tighter">
-                                        <i class="ph ph-check-circle"></i> GPS Configurado ({{ l.raio_permitido }}m)
+                            <li class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700 border border-transparent hover:border-gray-100 dark:hover:border-gray-600 transition">
+                                <div class="flex flex-col min-w-0 pr-2">
+                                    <span class="font-bold truncate">{{ l.nome }}</span>
+                                    <span class="text-[9px] text-gray-400 uppercase tracking-tighter">
+                                        {{ l.secretaria.sigla or l.secretaria.nome if l.secretaria else 'Sem Secretaria' }} • {{ l.tipo_unidade or 'UNIDADE' }}
+                                        {% if l.latitude %} • <span class="text-blue-500 font-bold">GPS ({{ l.raio_permitido }}m)</span>{% endif %}
                                     </span>
-                                    {% else %}
-                                    <span class="text-[9px] text-gray-400 uppercase tracking-tighter">Sem
-                                        Georreferência</span>
-                                    {% endif %}
                                 </div>
-                                <div class="flex gap-1">
-                                    <button
-                                        onclick="abrirModalEditarLocal('{{ l.id }}', '{{ l.nome }}', '{{ l.latitude or '' }}', '{{ l.longitude or '' }}', '{{ l.raio_permitido or 50 }}')"
-                                        class="text-blue-500 hover:text-blue-700 p-1.5 bg-blue-50 rounded-lg dark:bg-blue-900/30 transition"><i
-                                            class="ph ph-pencil-simple"></i></button>
-                                    <button
-                                        onclick="confirmAction('{{ url_for('delete_local', id=l.id) }}', 'Excluir Local', 'Tem certeza? Verifique se não há servidores neste local.')"
-                                        class="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded-lg dark:bg-red-900/30 transition"><i
-                                            class="ph ph-trash"></i></button>
+                                <div class="flex gap-1 flex-shrink-0">
+                                    <button onclick='abrirModalEditarLocal({{ l.id }}, {{ l.nome|tojson }}, {{ (l.latitude or "")|tojson }}, {{ (l.longitude or "")|tojson }}, {{ l.raio_permitido or 50 }}, {{ (l.secretaria_id or "")|tojson }}, {{ (l.tipo_unidade or "UNIDADE")|tojson }})'
+                                        class="text-blue-500 hover:text-blue-700 p-1.5 bg-blue-50 rounded-lg dark:bg-blue-900/30 transition"><i class="ph ph-pencil-simple"></i></button>
+                                    <button onclick="confirmAction('{{ url_for('delete_local', id=l.id) }}', 'Excluir Local', 'Tem certeza? Verifique se não há servidores neste local.')"
+                                        class="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded-lg dark:bg-red-900/30 transition"><i class="ph ph-trash"></i></button>
                                 </div>
                             </li>
                             {% endfor %}
                         </ul>
                     </div>
+                    {% endif %}
 
+                    {% if has_perm('manage_padrinhos') %}
                     <div
                         class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="font-bold text-gray-800 dark:text-white">Padrinhos (Indicadores)</h3><button
                                 onclick="document.getElementById('formPadrinho').classList.toggle('hidden')"
-                                class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Novo</button>
+                                class="text-xs bg-black text-white px-2.5 py-1 rounded-lg dark:bg-blue-600">Novo</button>
                         </div>
                         <form method="POST" id="formPadrinho"
                             class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700"><input type="hidden"
                                 name="create_padrinho" value="1"><input type="text" name="nome_padrinho"
                                 class="w-full border p-2 rounded mb-2 uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
                                 placeholder="Nome do Padrinho" required><button
-                                class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Salvar</button>
+                                class="w-full bg-black text-white text-xs py-2 rounded font-bold dark:bg-blue-600">Salvar</button>
                         </form>
-                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">{% for p in padrinhos %}<li
+                        <ul class="space-y-2 max-h-72 overflow-y-auto menu-scroll">{% for p in padrinhos %}<li
                                 class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
                                 <span>{{ p.nome }}</span><button
                                     onclick="confirmAction('{{ url_for('delete_padrinho', id=p.id) }}', 'Excluir Padrinho', 'Tem certeza? Verifique se não há servidores indicados por ele.')"
@@ -1006,73 +1072,105 @@
                             </li>{%
                             endfor %}</ul>
                     </div>
+                    {% endif %}
 
+                    {% if has_perm('manage_users') %}
                     <div
-                        class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700">
+                        class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700 md:col-span-2">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="font-bold text-gray-800 dark:text-white">Usuários</h3><button
-                                onclick="document.getElementById('formUser').classList.toggle('hidden')"
-                                class="text-xs bg-black text-white px-2 py-1 rounded dark:bg-blue-600">Novo</button>
+                            <div>
+                                <h3 class="font-bold text-gray-800 dark:text-white">Usuários & 7 Níveis de Acesso (RBAC)</h3>
+                                <p class="text-[11px] text-gray-400">Controle isolado por secretaria, unidade e papel institucional</p>
+                            </div>
+                            <button onclick="document.getElementById('formUser').classList.toggle('hidden')"
+                                class="text-xs bg-black text-white px-3 py-1.5 rounded-lg font-bold dark:bg-blue-600">Novo Usuário</button>
                         </div>
 
                         <form method="POST" id="formUser"
-                            class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700">
+                            class="hidden mb-4 bg-gray-50 p-4 rounded-xl dark:bg-gray-700 grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <input type="hidden" name="create_user" value="1">
                             <input type="text" name="username"
-                                class="w-full border p-2 rounded mb-2 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
-                                placeholder="Login" required>
-                            <input type="password" name="password"
-                                class="w-full border p-2 rounded mb-2 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
-                                placeholder="Senha" required>
+                                class="w-full border p-2 rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                                placeholder="Login (ex: sec.saude)" required>
+                            <input type="text" name="nome_completo"
+                                class="w-full border p-2 rounded uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                                placeholder="Nome Completo">
+                            <input type="password" name="password" minlength="8"
+                                class="w-full border p-2 rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                                placeholder="Senha forte (mín. 8 chars, letra+número)" required>
+                            <input type="email" name="email"
+                                class="w-full border p-2 rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                                placeholder="E-mail (opcional)">
+
+                            <select name="role" id="create_user_role" onchange="toggleUnidadeCreateUser(this.value)"
+                                class="w-full border p-2 rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" required>
+                                <option value="" disabled selected>Selecione o Nível de Acesso...</option>
+                                <option value="super_admin">1. Super Admin (Master TI — Total + Backup)</option>
+                                <option value="prefeito">2. Prefeito / Gestor Maior (Global + Eleitoral)</option>
+                                <option value="estrategia_eleitoral">3. Coordenação Estratégica (Só Eleitoral)</option>
+                                <option value="auditor">4. Auditor / Controle Interno (Global Leitura)</option>
+                                <option value="secretario">5. Secretário(a) Municipal (Isolado na Pasta)</option>
+                                <option value="rh_secretaria">6. RH Secretaria (Operador Isolado na Pasta)</option>
+                                <option value="chefe_unidade">7. Chefe de Unidade (Só sua Escola/UBS/Setor)</option>
+                            </select>
 
                             <select name="secretaria_id"
-                                class="w-full border p-2 rounded mb-2 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
-                                required>
-                                <option value="" disabled selected>Selecione a Secretaria...</option>
+                                class="w-full border p-2 rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                                <option value="">Secretaria (Obrigatório p/ perfis locais)</option>
                                 {% for sec in secretarias %}
                                 <option value="{{ sec.id }}">{{ sec.nome }}</option>
                                 {% endfor %}
                             </select>
 
-                            <select name="role"
-                                class="w-full border p-2 rounded mb-2 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
-                                required>
-                                <option value="" disabled selected>Selecione a Permissão...</option>
-                                <option value="rh_secretaria">RH Secretaria (Operador)</option>
-                                <option value="rh_supervisor">Supervisor (Visualizador)</option>
-                                <option value="admin">Administrador (Total)</option>
-                            </select>
+                            <div id="box_create_user_unidade" class="hidden sm:col-span-2">
+                                <select name="local_trabalho_id"
+                                    class="w-full border p-2 rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                                    <option value="">Selecione a Unidade de Trabalho (Chefe de Unidade)...</option>
+                                    {% for l in locais_trabalho %}
+                                    <option value="{{ l.id }}">{{ l.nome }} ({{ l.secretaria.sigla or l.secretaria.nome if l.secretaria else '-' }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
 
-                            <button
-                                class="w-full bg-black text-white text-xs py-2 rounded dark:bg-blue-600">Criar</button>
+                            <button class="sm:col-span-2 w-full bg-black text-white text-xs font-bold py-2.5 rounded-lg dark:bg-blue-600">Criar Usuário</button>
                         </form>
 
-                        <ul class="space-y-2 max-h-60 overflow-y-auto menu-scroll">
+                        <ul class="space-y-2 max-h-72 overflow-y-auto menu-scroll">
                             {% for u in users %}
-                            <li
-                                class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
+                            <li class="flex justify-between items-center text-sm p-2.5 hover:bg-gray-50 rounded-xl dark:text-gray-300 dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700">
                                 <div>
-                                    <span class="font-bold block">{{ u.username }}</span>
-                                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ u.secretaria.nome if
-                                        u.secretaria else 'ADMINISTRAÇÃO' }} {% if u.is_admin %}<span
-                                            class="text-blue-500 font-bold">(Admin)</span>{% endif %}</span>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="font-bold">{{ u.username }}</span>
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">{{ u.role_label }}</span>
+                                        {% if u.ativo is sameas false %}
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">INATIVO</span>
+                                        {% elif u.bloqueado_ate %}
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">BLOQUEADO</span>
+                                        {% endif %}
+                                    </div>
+                                    <span class="text-xs text-gray-500 dark:text-gray-400">
+                                        {{ u.secretaria.nome if u.secretaria else 'ACESSO GLOBAL' }}
+                                        {% if u.local_trabalho %} • {{ u.local_trabalho.nome }}{% endif %}
+                                    </span>
                                 </div>
-                                <div class="flex gap-2">
-                                    <button
-                                        onclick="openEditUserModal('{{ u.id }}', '{{ u.username }}', '{{ u.role }}', '{{ u.secretaria_id }}')"
-                                        class="text-blue-500 hover:text-blue-700" title="Editar"><i
-                                            class="ph ph-pencil-simple"></i></button>
+                                <div class="flex items-center gap-2">
+                                    {% if u.bloqueado_ate or (u.ativo is sameas false) %}
+                                    <form method="POST" action="{{ url_for('desbloquear_usuario', user_id=u.id) }}" class="inline">
+                                        <button type="submit" class="text-[10px] font-bold px-2 py-1 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200" title="Desbloquear / Ativar Conta">Desbloquear</button>
+                                    </form>
+                                    {% endif %}
+                                    <button onclick='openEditUserModal({{ u.id }}, {{ u.username|tojson }}, {{ u.normalized_role|tojson }}, {{ (u.secretaria_id or "")|tojson }}, {{ (u.local_trabalho_id or "")|tojson }}, {{ (u.nome_completo or "")|tojson }}, {{ (u.email or "")|tojson }}, {{ "true" if (u.ativo is not sameas false) else "false" }})'
+                                        class="text-blue-500 hover:text-blue-700 p-1" title="Editar"><i class="ph ph-pencil-simple text-base"></i></button>
                                     {% if u.username != 'admin' %}
-                                    <button
-                                        onclick="confirmAction('{{ url_for('delete_user', user_id=u.id) }}', 'Excluir Usuário', 'Tem certeza que deseja excluir este usuário?')"
-                                        class="text-red-500 hover:text-red-700" title="Excluir"><i
-                                            class="ph ph-trash"></i></button>
+                                    <button onclick="confirmAction('{{ url_for('delete_user', user_id=u.id) }}', 'Excluir Usuário', 'Tem certeza que deseja excluir este usuário?')"
+                                        class="text-red-500 hover:text-red-700 p-1" title="Excluir"><i class="ph ph-trash text-base"></i></button>
                                     {% endif %}
                                 </div>
                             </li>
                             {% endfor %}
                         </ul>
                     </div>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}
@@ -1106,7 +1204,7 @@
                 <div style="text-align: center;">
                     <h2 style="margin: 0; font-size: 13pt; font-weight: 800; color: #1e3a8a; letter-spacing: 0.5px; text-transform: uppercase;">ESTADO DO PIAUÍ</h2>
                     <h2 style="margin: 0; font-size: 11.5pt; font-weight: 700; color: #1e293b; text-transform: uppercase;">PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h2>
-                    <h3 style="margin: 2px 0 0 0; font-size: 9.5pt; font-weight: 600; color: #475569; text-transform: uppercase;">SECRETARIA MUNICIPAL DE EDUCAÇÃO</h3>
+                    <h3 style="margin: 2px 0 0 0; font-size: 9.5pt; font-weight: 600; color: #475569; text-transform: uppercase;">{{ current_user.secretaria.nome if (not is_global_scope and current_user.secretaria) else 'GESTÃO INTEGRADA DE SECRETARIAS MUNICIPAIS' }}</h3>
                 </div>
             </div>
             <div style="background-color: #1e3a8a; color: white; padding: 6px 12px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
@@ -1436,6 +1534,103 @@
         </div>
     </div>
 
+    <div id="modalEditarSecretaria"
+        class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[80] backdrop-blur-sm p-4">
+        <div
+            class="bg-white rounded-2xl w-full max-w-xl p-6 shadow-2xl dark:bg-gray-800 border border-gray-100 dark:border-gray-700 max-h-[90vh] overflow-y-auto menu-scroll">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900 dark:text-white">Perfil Institucional da Secretaria</h3>
+                    <p class="text-[11px] text-gray-400">Usado automaticamente nos cabeçalhos, contratos, encaminhamentos e metas</p>
+                </div>
+                <button type="button" onclick="document.getElementById('modalEditarSecretaria').classList.add('hidden')"
+                    class="text-gray-400 hover:text-black dark:hover:text-white"><i
+                        class="ph ph-x text-xl"></i></button>
+            </div>
+            <form action="{{ url_for('editar_secretaria') }}" method="POST" class="space-y-3">
+                <input type="hidden" name="secretaria_id" id="edit_sec_id">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div class="sm:col-span-2">
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nome Oficial da Secretaria</label>
+                        <input type="text" name="nome" id="edit_sec_nome"
+                            class="w-full border border-gray-200 p-2 rounded-xl text-sm uppercase dark:bg-gray-700 dark:border-gray-600 dark:text-white" required>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Sigla</label>
+                        <input type="text" name="sigla" id="edit_sec_sigla" placeholder="Ex: SEME, SMS"
+                            class="w-full border border-gray-200 p-2 rounded-xl text-sm uppercase dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">CNPJ (Opcional)</label>
+                        <input type="text" name="cnpj" id="edit_sec_cnpj" placeholder="00.000.000/0001-00"
+                            class="w-full border border-gray-200 p-2 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Telefone</label>
+                        <input type="text" name="telefone" id="edit_sec_telefone"
+                            class="w-full border border-gray-200 p-2 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Endereço da Sede</label>
+                        <input type="text" name="endereco" id="edit_sec_endereco"
+                            class="w-full border border-gray-200 p-2 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">E-mail Institucional</label>
+                        <input type="email" name="email" id="edit_sec_email"
+                            class="w-full border border-gray-200 p-2 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    </div>
+                </div>
+                <div class="pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <p class="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-2">Titular / Representante nos Contratos</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Nome do(a) Secretário(a)</label>
+                            <input type="text" name="secretario_nome" id="edit_sec_titular_nome"
+                                class="w-full border border-gray-200 p-2 rounded-xl text-sm uppercase dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Cargo do Titular</label>
+                            <input type="text" name="secretario_cargo" id="edit_sec_titular_cargo" placeholder="Ex: Secretário Municipal de Saúde"
+                                class="w-full border border-gray-200 p-2 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">CPF do Titular</label>
+                            <input type="text" name="secretario_cpf" id="edit_sec_titular_cpf"
+                                class="w-full border border-gray-200 p-2 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Portaria de Nomeação</label>
+                            <input type="text" name="secretario_portaria" id="edit_sec_titular_portaria" placeholder="Ex: Portaria nº 001/2025"
+                                class="w-full border border-gray-200 p-2 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-2 border-t border-gray-100 dark:border-gray-700">
+                    <p class="text-[11px] font-bold text-amber-600 dark:text-amber-400 uppercase mb-2">Limites de Governança (Painel do Prefeito)</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Teto Comissionados/Contratados</label>
+                            <input type="number" min="0" name="teto_comissionados" id="edit_sec_teto_com"
+                                class="w-full border border-gray-200 p-2 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Teto Folha Mensal (R$)</label>
+                            <input type="text" name="teto_folha_mensal" id="edit_sec_teto_folha" placeholder="0,00"
+                                class="w-full border border-gray-200 p-2 rounded-xl text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        </div>
+                    </div>
+                </div>
+                <button type="submit"
+                    class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 shadow-lg transition">Salvar Perfil da Secretaria</button>
+            </form>
+        </div>
+    </div>
+
     <div id="modalEditarLocal"
         class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[80] backdrop-blur-sm">
         <div
@@ -1453,6 +1648,31 @@
                     <input type="text" name="nome_local" id="edit_local_nome"
                         class="w-full border border-gray-200 p-2.5 rounded-xl text-sm dark:bg-gray-700 dark:text-white"
                         required>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Tipo Unidade</label>
+                        <select name="tipo_unidade" id="edit_local_tipo"
+                            class="w-full border border-gray-200 p-2.5 rounded-xl text-xs dark:bg-gray-700 dark:text-white">
+                            <option value="UNIDADE">Unidade / Setor</option>
+                            <option value="ESCOLA">Escola</option>
+                            <option value="UBS">UBS / Posto Saúde</option>
+                            <option value="HOSPITAL">Hospital / UPA</option>
+                            <option value="CRAS">CRAS / CREAS</option>
+                            <option value="SEDE">Sede Secretaria</option>
+                        </select>
+                    </div>
+                    {% if is_global_scope %}
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Secretaria</label>
+                        <select name="secretaria_id" id="edit_local_sec_id"
+                            class="w-full border border-gray-200 p-2.5 rounded-xl text-xs dark:bg-gray-700 dark:text-white">
+                            {% for sec in secretarias %}
+                            <option value="{{ sec.id }}">{{ sec.sigla or sec.nome }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
@@ -1502,41 +1722,86 @@
     </div>
 
     <div id="modalEditUser"
-        class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm">
+        class="fixed inset-0 bg-black/60 hidden flex items-center justify-center z-[60] backdrop-blur-sm p-4">
         <div
-            class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+            class="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl dark:bg-gray-800 border border-gray-100 dark:border-gray-700 max-h-[90vh] overflow-y-auto menu-scroll">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Editar Usuário</h3>
+                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Editar Usuário & Nível de Acesso</h3>
                 <button onclick="document.getElementById('modalEditUser').classList.add('hidden')"
                     class="text-gray-400 hover:text-black dark:hover:text-white"><i
                         class="ph ph-x text-xl"></i></button>
             </div>
-            <form action="{{ url_for('update_user') }}" method="POST">
+            <form action="{{ url_for('update_user') }}" method="POST" class="space-y-3">
                 <input type="hidden" name="user_id" id="edit_user_id">
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Usuário</label>
-                <input type="text" name="username" id="edit_username"
-                    class="w-full border p-2 rounded mb-3 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
-                    required>
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Nova Senha
-                    (Opcional)</label>
-                <input type="password" name="password"
-                    class="w-full border p-2 rounded mb-3 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
-                    placeholder="Deixe em branco para manter">
-                <label
-                    class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Secretaria</label>
-                <select name="secretaria_id" id="edit_secretaria_id"
-                    class="w-full border p-2 rounded mb-3 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
-                    {% for sec in secretarias %}<option value="{{ sec.id }}">{{ sec.nome }}</option>{% endfor %}
-                </select>
-                <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Permissão</label>
-                <select name="role" id="edit_role"
-                    class="w-full border p-2 rounded mb-6 text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
-                    <option value="rh_secretaria">RH Secretaria</option>
-                    <option value="rh_supervisor">Supervisor</option>
-                    <option value="admin">Administrador</option>
-                </select>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Usuário (Login)</label>
+                        <input type="text" name="username" id="edit_username"
+                            class="w-full border p-2 rounded-lg text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                            required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Nome Completo</label>
+                        <input type="text" name="nome_completo" id="edit_nome_completo"
+                            class="w-full border p-2 rounded-lg uppercase text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Nova Senha (Opcional)</label>
+                        <input type="password" name="password" minlength="8"
+                            class="w-full border p-2 rounded-lg text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white"
+                            placeholder="Mín. 8 chars (letra+número)">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">E-mail</label>
+                        <input type="email" name="email" id="edit_email"
+                            class="w-full border p-2 rounded-lg text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Nível de Acesso (RBAC)</label>
+                    <select name="role" id="edit_role" onchange="toggleUnidadeEditUser(this.value)"
+                        class="w-full border p-2 rounded-lg text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                        <option value="super_admin">1. Super Admin (Master TI — Total + Backup)</option>
+                        <option value="prefeito">2. Prefeito / Gestor Maior (Global + Eleitoral)</option>
+                        <option value="estrategia_eleitoral">3. Coordenação Estratégica (Só Eleitoral)</option>
+                        <option value="auditor">4. Auditor / Controle Interno (Global Leitura)</option>
+                        <option value="secretario">5. Secretário(a) Municipal (Isolado na Pasta)</option>
+                        <option value="rh_secretaria">6. RH Secretaria (Operador Isolado na Pasta)</option>
+                        <option value="chefe_unidade">7. Chefe de Unidade (Só sua Escola/UBS/Setor)</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Secretaria</label>
+                        <select name="secretaria_id" id="edit_secretaria_id"
+                            class="w-full border p-2 rounded-lg text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                            <option value="">ACESSO GLOBAL (Sem vínculo único)</option>
+                            {% for sec in secretarias %}<option value="{{ sec.id }}">{{ sec.nome }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Status da Conta</label>
+                        <select name="ativo" id="edit_user_ativo"
+                            class="w-full border p-2 rounded-lg text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                            <option value="1">Ativa (Acesso Liberado)</option>
+                            <option value="0">Inativa (Bloqueada)</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="box_edit_user_unidade" class="hidden">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Unidade de Trabalho (Chefe de Unidade)</label>
+                    <select name="local_trabalho_id" id="edit_local_trabalho_id"
+                        class="w-full border p-2 rounded-lg text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
+                        <option value="">Selecione a Unidade...</option>
+                        {% for l in locais_trabalho %}
+                        <option value="{{ l.id }}">{{ l.nome }} ({{ l.secretaria.sigla or l.secretaria.nome if l.secretaria else '-' }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
                 <button type="submit"
-                    class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700 transition">Salvar
+                    class="w-full bg-blue-600 text-white font-bold py-2.5 rounded-xl hover:bg-blue-700 transition">Salvar
                     Alterações</button>
             </form>
         </div>
@@ -1755,11 +2020,47 @@ function abrirModalAuditoria(btn) {
         }
 
 
-        function openEditUserModal(id, username, role, secId) {
+        function toggleUnidadeCreateUser(role) {
+            const box = document.getElementById('box_create_user_unidade');
+            if (!box) return;
+            if (role === 'chefe_unidade') box.classList.remove('hidden');
+            else box.classList.add('hidden');
+        }
+
+        function toggleUnidadeEditUser(role) {
+            const box = document.getElementById('box_edit_user_unidade');
+            if (!box) return;
+            if (role === 'chefe_unidade') box.classList.remove('hidden');
+            else box.classList.add('hidden');
+        }
+
+        function abrirModalEditarSecretaria(id, nome, sigla, cnpj, endereco, telefone, email, secNome, secCargo, secCpf, secPortaria, tetoCom, tetoFolha) {
+            document.getElementById('edit_sec_id').value = id;
+            document.getElementById('edit_sec_nome').value = nome || '';
+            document.getElementById('edit_sec_sigla').value = sigla || '';
+            document.getElementById('edit_sec_cnpj').value = cnpj || '';
+            document.getElementById('edit_sec_endereco').value = endereco || '';
+            document.getElementById('edit_sec_telefone').value = telefone || '';
+            document.getElementById('edit_sec_email').value = email || '';
+            document.getElementById('edit_sec_titular_nome').value = secNome || '';
+            document.getElementById('edit_sec_titular_cargo').value = secCargo || '';
+            document.getElementById('edit_sec_titular_cpf').value = secCpf || '';
+            document.getElementById('edit_sec_titular_portaria').value = secPortaria || '';
+            document.getElementById('edit_sec_teto_com').value = tetoCom || 0;
+            document.getElementById('edit_sec_teto_folha').value = tetoFolha || 0;
+            document.getElementById('modalEditarSecretaria').classList.remove('hidden');
+        }
+
+        function openEditUserModal(id, username, role, secId, localId, nomeCompleto, email, ativo) {
             document.getElementById('edit_user_id').value = id;
-            document.getElementById('edit_username').value = username;
-            document.getElementById('edit_role').value = role;
-            document.getElementById('edit_secretaria_id').value = secId;
+            document.getElementById('edit_username').value = username || '';
+            document.getElementById('edit_role').value = role || 'rh_secretaria';
+            document.getElementById('edit_secretaria_id').value = secId || '';
+            if (document.getElementById('edit_nome_completo')) document.getElementById('edit_nome_completo').value = nomeCompleto || '';
+            if (document.getElementById('edit_email')) document.getElementById('edit_email').value = email || '';
+            if (document.getElementById('edit_local_trabalho_id')) document.getElementById('edit_local_trabalho_id').value = localId || '';
+            if (document.getElementById('edit_user_ativo')) document.getElementById('edit_user_ativo').value = (ativo === false || ativo === 'false') ? '0' : '1';
+            toggleUnidadeEditUser(role);
             document.getElementById('modalEditUser').classList.remove('hidden');
         }
 
@@ -1807,12 +2108,18 @@ function abrirModalAuditoria(btn) {
             }
         }
 
-        function abrirModalEditarLocal(id, nome, lat, lng, raio) {
+        function abrirModalEditarLocal(id, nome, lat, lng, raio, secId, tipoUnidade) {
             document.getElementById('edit_local_id').value = id;
             document.getElementById('edit_local_nome').value = nome;
             document.getElementById('edit_local_lat').value = lat;
             document.getElementById('edit_local_lng').value = lng;
             document.getElementById('edit_local_raio').value = raio;
+            if (document.getElementById('edit_local_sec_id') && secId) {
+                document.getElementById('edit_local_sec_id').value = secId;
+            }
+            if (document.getElementById('edit_local_tipo') && tipoUnidade) {
+                document.getElementById('edit_local_tipo').value = tipoUnidade;
+            }
             document.getElementById('modalEditarLocal').classList.remove('hidden');
         }
         // --- FIM GEORREFERENCIAMENTO ---
@@ -2587,8 +2894,8 @@ function abrirModalAuditoria(btn) {
         const s1 = document.getElementById('novaSenhaInputAdmin').value;
         const s2 = document.getElementById('confirmaSenhaInputAdmin').value;
         const err = document.getElementById('msgErroTrocaSenhaAdmin');
-        if(!s1 || s1.length < 3) {
-            err.innerText = "A senha deve conter pelo menos 3 caracteres.";
+        if(!s1 || s1.length < 8) {
+            err.innerText = "A senha deve conter pelo menos 8 caracteres (com letras e números).";
             err.classList.remove('hidden');
             return;
         }

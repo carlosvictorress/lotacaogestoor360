@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acesso Restrito - SME</title>
+    <title>Acesso Restrito — Gestoor 360</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -77,8 +77,8 @@
                 <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão" class="h-48 w-auto object-contain mb-8 drop-shadow-2xl dark:invert">
             </div>
             <div class="text-center">
-                <h1 class="text-3xl font-extrabold tracking-tighter text-gray-900 dark:text-white mb-2">Secretaria de Educação</h1>
-                <p class="text-gray-500 dark:text-gray-400 font-medium">Valença do Piauí</p>
+                <h1 class="text-3xl font-extrabold tracking-tighter text-gray-900 dark:text-white mb-2">Gestoor 360 Municipal</h1>
+                <p class="text-gray-500 dark:text-gray-400 font-medium">Prefeitura Municipal de Valença do Piauí</p>
                 <div class="mt-6 flex gap-2 justify-center">
                     <span class="h-1.5 w-12 bg-black dark:bg-blue-500 rounded-full"></span>
                     <span class="h-1.5 w-4 bg-gray-300 dark:bg-gray-600 rounded-full"></span>
@@ -89,7 +89,7 @@
         <div class="p-8 md:p-12 flex flex-col justify-center">
             <div class="lg:hidden flex flex-col items-center mb-8">
                 <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Logo" class="h-20 w-auto mb-4 dark:invert">
-                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Gestão SME</h2>
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Gestoor 360</h2>
             </div>
 
             <div class="mb-10">
@@ -110,6 +110,7 @@
             {% endwith %}
 
             <form action="{{ url_for('login') }}" method="POST" class="space-y-6">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="space-y-2">
                     <label class="block text-[11px] font-black text-gray-400 uppercase tracking-[2px] ml-1">Login de Usuário</label>
                     <div class="relative group">
