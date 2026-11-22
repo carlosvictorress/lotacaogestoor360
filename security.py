@@ -177,9 +177,11 @@ def has_permission(user, permission: str) -> bool:
 
 def get_default_home_endpoint(user) -> str:
     role = normalize_role(user)
+    if role == "prefeito":
+        return "painel_prefeito"
     if role == "estrategia_eleitoral":
         return "eleitoral_index"
-    if role in ("super_admin", "prefeito", "secretario", "auditor"):
+    if role in ("super_admin", "secretario", "auditor"):
         return "admin_dashboard"
     if role == "chefe_unidade":
         return "painel_ponto"

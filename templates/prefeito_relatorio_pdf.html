@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Relatório Executivo do Prefeito — Gestoor 360</title>
+    <style>
+        @page { size: A4 portrait; margin: 12mm; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 0; font-size: 9pt; position: relative; }
+        .watermark {
+            position: fixed; top: 42%; left: 10%; right: 10%; text-align: center;
+            font-size: 26pt; font-weight: 900; color: rgba(15, 23, 42, 0.045);
+            transform: rotate(-30deg); pointer-events: none; z-index: 0;
+        }
+        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 8px; margin-bottom: 12px; }
+        .header-left { display: flex; align-items: center; gap: 10px; }
+        .header-left img { height: 42px; }
+        .header h1 { margin: 0; font-size: 12pt; text-transform: uppercase; }
+        .header p { margin: 2px 0 0; font-size: 8pt; color: #475569; }
+        .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+        .kpi { border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px; background: #f8fafc; }
+        .kpi .lbl { font-size: 7pt; font-weight: 700; text-transform: uppercase; color: #475569; }
+        .kpi .val { font-size: 13pt; font-weight: 800; color: #0f172a; margin-top: 2px; }
+        .kpi .sub { font-size: 7pt; color: #64748b; }
+        h2 { font-size: 9.5pt; text-transform: uppercase; background: #0f172a; color: #fff; padding: 5px 8px; border-radius: 4px; margin: 12px 0 6px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 8pt; }
+        th, td { border: 1px solid #cbd5e1; padding: 4px 6px; text-align: left; }
+        th { background: #f1f5f9; font-weight: 700; text-transform: uppercase; font-size: 7pt; }
+        .num { text-align: right; }
+        .ctr { text-align: center; }
+        .footer { margin-top: 14px; padding-top: 6px; border-top: 1px solid #94a3b8; font-size: 7pt; color: #475569; display: flex; justify-content: space-between; }
+        .no-print { text-align: right; padding: 10px 14px; background: #0f172a; }
+        .no-print button { background: #f59e0b; color: #0f172a; border: none; padding: 8px 16px; border-radius: 6px; font-weight: 800; cursor: pointer; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <button onclick="window.print()">Imprimir / Salvar PDF Executivo</button>
+    </div>
+
+    <div class="watermark">GABINETE DO PREFEITO • {{ emitido_por }} • {{ emitido_ip }}</div>
+
+    <div class="header">
+        <div class="header-left">
+            <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão" onerror="this.style.display='none'">
+            <div>
+                <h1>Prefeitura Municipal — Relatório Executivo de Governança</h1>
+                <p>Painel Supremo do Prefeito • Visão Consolidada de Comissionados, Contratados e Folha</p>
+            </div>
+        </div>
+        <div style="text-align:right; font-size:7.5pt; color:#475569;">
+            <strong>Emitido em:</strong> {{ dados.gerado_em_fmt }}<br>
+            <strong>Escopo:</strong> {{ dados.filtros.escopo|upper }}
+        </div>
+    </div>
+
+    <div class="kpis">
+        <div class="kpi">
+            <div class="lbl">Comissionados + Contratados</div>
+            <div class="val">{{ dados.kpis.total_com_e_cont }}</div>
+            <div class="sub">{{ dados.kpis.pct_com_e_cont }}% do total ({{ dados.kpis.total_ativos }} ativos)</div>
+        </div>
+        <div class="kpi">
+            <div class="lbl">Folha Comiss. / Contrat.</div>
+            <div class="val">{{ dados.kpis.folha_mensal_com_cont_fmt }}</div>
+            <div class="sub">Anual (×13): {{ dados.kpis.folha_anual_com_cont_fmt }}</div>
+        </div>
+        <div class="kpi">
+            <div class="lbl">Folha Geral do Município</div>
+            <div class="val">{{ dados.kpis.folha_mensal_total_fmt }}</div>
+            <div class="sub">{{ dados.kpis.qtd_secretarias }} secretarias • {{ dados.kpis.qtd_unidades }} unidades</div>
+        </div>
+        <div class="kpi">
+            <div class="lbl">Alertas Críticos</div>
+            <div class="val">{{ dados.kpis.qtd_acumulos_cpf }} Acúmulos / {{ dados.kpis.qtd_vencidos }} Venc.</div>
+            <div class="sub">Pend. validação: {{ dados.kpis.pendentes_validacao_total }}</div>
+        </div>
+    </div>
+
+    <h2>1. Consolidado e Termômetro de Tetos por Secretaria</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Secretaria</th>
+                <th>Titular</th>
+                <th class="ctr">Ativos</th>
+                <th class="ctr">Comiss.+Contr.</th>
+                <th class="ctr">Teto Vagas</th>
+                <th class="num">Folha Mensal</th>
+                <th class="num">Teto Folha</th>
+                <th class="ctr">Pend.</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in dados.secretarias_ranking %}
+            <tr>
+                <td><strong>{{ s.nome }}</strong> ({{ s.sigla }})</td>
+                <td>{{ s.secretario_nome }}</td>
+                <td class="ctr">{{ s.total_ativos }}</td>
+                <td class="ctr"><strong>{{ s.com_e_cont }}</strong></td>
+                <td class="ctr">{{ s.teto_comissionados if s.teto_comissionados else '---' }} {% if s.teto_comissionados %}({{ s.sem_vagas.pct }}%){% endif %}</td>
+                <td class="num"><strong>{{ s.folha_mensal_fmt }}</strong></td>
+                <td class="num">{{ s.teto_folha_fmt }}</td>
+                <td class="ctr">{{ s.pendentes }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if dados.acumulos_cpf %}
+    <h2>2. Alertas de Acúmulo de CPF ({{ dados.acumulos_cpf|length }})</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>CPF</th>
+                <th>Servidor</th>
+                <th class="ctr">Tipo</th>
+                <th>Vínculos Ativos</th>
+                <th class="num">Soma Mensal</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ac in dados.acumulos_cpf %}
+            <tr>
+                <td>{{ ac.cpf_formatado }}</td>
+                <td><strong>{{ ac.nome }}</strong></td>
+                <td class="ctr">{{ 'MULTI-SECRETARIA' if ac.multi_secretaria else 'MESMA PASTA' }}</td>
+                <td>{% for v in ac.vinculos %}{{ v.sigla }}: {{ v.funcao }} ({{ v.remuneracao_fmt }}){% if not loop.last %}; {% endif %}{% endfor %}</td>
+                <td class="num"><strong>{{ ac.soma_remuneracao_fmt }}</strong></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if dados.ranking_padrinhos %}
+    <h2>3. Top Lideranças / Indicações por Impacto em Folha</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Liderança / Padrinho</th>
+                <th class="ctr">Total Indicados</th>
+                <th class="ctr">Comiss.+Contr.</th>
+                <th class="num">Impacto Mensal</th>
+                <th>Secretarias</th>
+                <th class="ctr">% Título OK</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in dados.ranking_padrinhos[:20] %}
+            <tr>
+                <td><strong>{{ p.nome }}</strong></td>
+                <td class="ctr">{{ p.total_indicados }}</td>
+                <td class="ctr">{{ p.com_e_cont }}</td>
+                <td class="num"><strong>{{ p.folha_mensal_fmt }}</strong></td>
+                <td>{{ p.secretarias_lista|join(', ') }}</td>
+                <td class="ctr">{{ p.pct_titulo_regular }}%</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+
+    <div class="footer">
+        <span>DOCUMENTO EXECUTIVO RASTREÁVEL — Gestoor 360 Municipal</span>
+        <span>Emitido por: <strong>{{ emitido_por }}</strong> • IP: <strong>{{ emitido_ip }}</strong> • {{ dados.gerado_em_fmt }}</span>
+    </div>
+</body>
+</html>

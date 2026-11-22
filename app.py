@@ -31,6 +31,7 @@ from dotenv import load_dotenv
 from sqlalchemy import func, text, event
 import backup_service
 import security
+import prefeito_service
 
 load_dotenv()
 
@@ -6057,6 +6058,165 @@ def eleitoral_pdf():
         secao_filtro=secao_filtro,
         total_geral_eleitores=total_geral_eleitores,
         data_emissao=data_emissao
+    )
+
+
+# ==============================================================================
+# MÓDULO EXECUTIVO: PAINEL SUPREMO DO PREFEITO (GOVERNANÇA MUNICIPAL 360°)
+# ==============================================================================
+
+def _prefeito_models_ctx():
+    return {
+        "Secretaria": Secretaria,
+        "Funcionario": Funcionario,
+        "RescisaoHistorico": RescisaoHistorico,
+        "ContratoGerado": ContratoGerado,
+        "LogAuditoria": LogAuditoria,
+        "BackupHistorico": BackupHistorico,
+        "Padrinho": Padrinho,
+        "LocalTrabalho": LocalTrabalho,
+        "HistoricoLotacao": HistoricoLotacao,
+        "RegistroPonto": RegistroPonto,
+        "JustificativaFalta": JustificativaFalta,
+        "LocalVotacao": LocalVotacao,
+        "normalizar_numero_eleitoral": normalizar_numero_eleitoral,
+    }
+
+
+@app.route("/prefeito", methods=["GET"])
+@login_required
+@security.require_permission("view_prefeito_panel")
+def painel_prefeito():
+    sec_id = request.args.get("secretaria_id", type=int)
+    escopo = (request.args.get("escopo") or "comissionados_contratados").strip()
+    if escopo not in ("comissionados_contratados", "todos", "comissionado", "contratado", "efetivo", "terceirizado"):
+        escopo = "comissionados_contratados"
+    padrinho_id = request.args.get("padrinho_id", type=int)
+    validacao = (request.args.get("validacao") or "").strip()
+    busca = (request.args.get("busca") or "").strip()
+
+    dados = prefeito_service.build_prefeito_dashboard_data(
+        models=_prefeito_models_ctx(),
+        filtro_secretaria_id=sec_id,
+        filtro_escopo=escopo,
+        filtro_padrinho_id=padrinho_id,
+        filtro_validacao=validacao,
+        filtro_busca=busca,
+    )
+    return render_template("prefeito_dashboard.html", dados=dados)
+
+
+@app.route("/api/prefeito/servidor/<int:func_id>", methods=["GET"])
+@login_required
+@security.require_permission("view_prefeito_panel", api=True)
+def api_prefeito_servidor_360(func_id):
+    dossie = prefeito_service.get_dossie_servidor_360(_prefeito_models_ctx(), func_id)
+    if not dossie:
+        return jsonify({"success": False, "message": "Servidor não encontrado."}), 404
+    return jsonify({"success": True, "dossie": dossie})
+
+
+@app.route("/api/prefeito/atualizar_teto", methods=["POST"])
+@login_required
+@security.require_permission("view_prefeito_panel", api=True)
+def api_prefeito_atualizar_teto():
+    data = request.get_json(silent=True) or request.form
+    sec_id = data.get("secretaria_id")
+    try:
+        sec_id = int(sec_id)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Secretaria inválida."}), 400
+
+    sec = db.session.get(Secretaria, sec_id)
+    if not sec:
+        return jsonify({"success": False, "message": "Secretaria não encontrada."}), 404
+
+    try:
+        teto_com = max(0, int(data.get("teto_comissionados") or 0))
+    except (TypeError, ValueError):
+        teto_com = 0
+    teto_folha = max(0.0, float(security.parse_remuneracao_float(data.get("teto_folha_mensal"))))
+
+    sec.teto_comissionados = teto_com
+    sec.teto_folha_mensal = teto_folha
+    db.session.commit()
+
+    registrar_log(
+        "DEFINIU TETO SECRETARIA",
+        f"{sec.nome}: Vagas={teto_com} | Folha=R$ {teto_folha:,.2f}",
+        nivel="INFO",
+        secretaria_id=sec.id,
+    )
+    return jsonify({
+        "success": True,
+        "message": f"Tetos de '{sec.nome}' atualizados com sucesso!",
+        "teto_comissionados": teto_com,
+        "teto_folha_mensal": teto_folha,
+    })
+
+
+@app.route("/prefeito/exportar_excel", methods=["GET"])
+@login_required
+@security.require_permission("view_prefeito_panel")
+def prefeito_exportar_excel():
+    sec_id = request.args.get("secretaria_id", type=int)
+    escopo = (request.args.get("escopo") or "comissionados_contratados").strip()
+    padrinho_id = request.args.get("padrinho_id", type=int)
+    validacao = (request.args.get("validacao") or "").strip()
+    busca = (request.args.get("busca") or "").strip()
+
+    dados = prefeito_service.build_prefeito_dashboard_data(
+        models=_prefeito_models_ctx(),
+        filtro_secretaria_id=sec_id,
+        filtro_escopo=escopo,
+        filtro_padrinho_id=padrinho_id,
+        filtro_validacao=validacao,
+        filtro_busca=busca,
+    )
+    xlsx_bytes = prefeito_service.export_prefeito_excel_bytes(dados)
+    registrar_log(
+        "EXPORTOU RELATORIO PREFEITO",
+        f"Excel Executivo (escopo={escopo}, registros={dados['kpis']['filtrado_qtd']})",
+        nivel="SECURITY",
+    )
+    stamp = datetime.now().strftime("%Y%m%d_%H%M")
+    return Response(
+        xlsx_bytes,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment;filename=painel_prefeito_{stamp}.xlsx"
+        },
+    )
+
+
+@app.route("/prefeito/relatorio_executivo", methods=["GET"])
+@login_required
+@security.require_permission("view_prefeito_panel")
+def prefeito_relatorio_executivo():
+    sec_id = request.args.get("secretaria_id", type=int)
+    escopo = (request.args.get("escopo") or "comissionados_contratados").strip()
+    padrinho_id = request.args.get("padrinho_id", type=int)
+    validacao = (request.args.get("validacao") or "").strip()
+    busca = (request.args.get("busca") or "").strip()
+
+    dados = prefeito_service.build_prefeito_dashboard_data(
+        models=_prefeito_models_ctx(),
+        filtro_secretaria_id=sec_id,
+        filtro_escopo=escopo,
+        filtro_padrinho_id=padrinho_id,
+        filtro_validacao=validacao,
+        filtro_busca=busca,
+    )
+    registrar_log(
+        "IMPRIMIU RELATORIO PREFEITO",
+        f"Relatório Executivo A4 (escopo={escopo}, registros={dados['kpis']['filtrado_qtd']})",
+        nivel="SECURITY",
+    )
+    return render_template(
+        "prefeito_relatorio_pdf.html",
+        dados=dados,
+        emitido_por=current_user.nome_completo or current_user.username,
+        emitido_ip=request.remote_addr or "N/D",
     )
 
 

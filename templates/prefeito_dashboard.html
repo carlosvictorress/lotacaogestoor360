@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Supremo do Prefeito — Gestoor 360</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .exec-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .exec-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+
+    <!-- CABEÇALHO EXECUTIVO -->
+    <header class="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-40 shadow-lg">
+        <div class="max-w-[1480px] mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+                    <i class="ph-fill ph-crown text-slate-950 text-xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h1 class="text-base sm:text-lg font-extrabold tracking-tight">Painel Supremo do Prefeito</h1>
+                        <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/30">{{ user_role_label }}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        Governança Municipal 360° • {{ dados.kpis.qtd_secretarias }} Secretarias • Atualizado em {{ dados.gerado_em_fmt }}
+                    </p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+                {% if dados.backup_status %}
+                <span class="hidden xl:inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-xl border {{ 'bg-emerald-950/60 text-emerald-300 border-emerald-700/60' if dados.backup_status.saudavel else 'bg-amber-950/60 text-amber-300 border-amber-700/60' }}" title="Último Backup Completo do Sistema">
+                    <i class="ph-fill {{ 'ph-shield-check' if dados.backup_status.saudavel else 'ph-warning' }}"></i>
+                    Backup: {{ dados.backup_status.data_fmt }}
+                </span>
+                {% else %}
+                <span class="hidden xl:inline-flex items-center gap-1.5 text-[11px] font-semibold px-3 py-1.5 rounded-xl bg-rose-950/60 text-rose-300 border border-rose-700/60">
+                    <i class="ph-fill ph-warning-circle"></i> Sem backup recente
+                </span>
+                {% endif %}
+
+                <a href="{{ url_for('prefeito_exportar_excel', secretaria_id=dados.filtros.secretaria_id or '', escopo=dados.filtros.escopo, padrinho_id=dados.filtros.padrinho_id or '', validacao=dados.filtros.validacao, busca=dados.filtros.busca) }}"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm">
+                    <i class="ph ph-microsoft-excel-logo text-base"></i> Excel Executivo
+                </a>
+                <a href="{{ url_for('prefeito_relatorio_executivo', secretaria_id=dados.filtros.secretaria_id or '', escopo=dados.filtros.escopo, padrinho_id=dados.filtros.padrinho_id or '', validacao=dados.filtros.validacao, busca=dados.filtros.busca) }}"
+                   target="_blank"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-sm">
+                    <i class="ph ph-printer text-base"></i> Relatório A4
+                </a>
+                {% if has_perm('view_eleitoral') %}
+                <a href="{{ url_for('eleitoral_index') }}"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-bold transition">
+                    <i class="ph ph-map-pin-area text-base"></i> Eleitoral
+                </a>
+                {% endif %}
+                <a href="{{ url_for('admin_dashboard') }}"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition">
+                    <i class="ph ph-squares-four text-base"></i> Painel Admin
+                </a>
+                {% if has_perm('manage_backup') %}
+                <a href="{{ url_for('admin_backup') }}"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 text-xs font-bold transition">
+                    <i class="ph ph-database text-base"></i> Backup
+                </a>
+                {% endif %}
+                <a href="{{ url_for('logout') }}"
+                   class="inline-flex items-center gap-1 px-2.5 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/60 text-xs font-bold transition" title="Sair">
+                    <i class="ph ph-sign-out text-base"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1480px] mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+        <!-- FLASH MESSAGES -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="space-y-2">
+            {% for cat, msg in messages %}
+            {% if cat != 'aviso_lgpd' %}
+            <div class="px-4 py-3 rounded-xl text-sm font-semibold border {{ 'bg-rose-50 text-rose-800 border-rose-200' if cat == 'error' else 'bg-emerald-50 text-emerald-800 border-emerald-200' }}">
+                {{ msg }}
+            </div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- BARRA DE KPIs EXECUTIVOS -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <!-- KPI 1: Comissionados + Contratados -->
+            <div class="bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-5 shadow-md border border-slate-700 relative overflow-hidden">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-amber-300">Comissionados & Contratados</span>
+                    <i class="ph-fill ph-briefcase text-amber-400 text-xl"></i>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-3xl font-black">{{ dados.kpis.total_com_e_cont }}</span>
+                    <span class="text-xs font-bold text-amber-300">{{ dados.kpis.pct_com_e_cont }}% do quadro</span>
+                </div>
+                <div class="mt-3 pt-2.5 border-t border-slate-700/80 flex justify-between text-[11px] text-slate-300">
+                    <span>Comiss.: <strong class="text-white">{{ dados.kpis.total_comissionados }}</strong></span>
+                    <span>Contrat.: <strong class="text-white">{{ dados.kpis.total_contratados }}</strong></span>
+                </div>
+            </div>
+
+            <!-- KPI 2: Folha Mensal Comiss./Contrat. -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Folha Comiss./Contrat.</span>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><i class="ph-fill ph-currency-circle-dollar text-lg"></i></div>
+                </div>
+                <div class="text-2xl font-black text-slate-900">{{ dados.kpis.folha_mensal_com_cont_fmt }}</div>
+                <p class="text-[11px] text-slate-500 mt-1">Projeção {{ dados.ano_proximo }} (×13): <strong class="text-slate-700">{{ dados.kpis.folha_anual_com_cont_fmt }}</strong></p>
+                <p class="text-[11px] text-slate-400 mt-0.5">Ticket médio: {{ dados.kpis.ticket_medio_com_cont_fmt }}</p>
+            </div>
+
+            <!-- KPI 3: Quadro Geral do Município -->
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-700">Quadro Geral Ativo</span>
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center"><i class="ph-fill ph-users-three text-lg"></i></div>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-3xl font-black text-slate-900">{{ dados.kpis.total_ativos }}</span>
+                    <span class="text-xs text-slate-500">em {{ dados.kpis.qtd_unidades }} unidades</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1">Folha total: <strong class="text-slate-800">{{ dados.kpis.folha_mensal_total_fmt }}/mês</strong></p>
+                <p class="text-[11px] text-slate-400 mt-0.5">Efetivos: {{ dados.kpis.total_efetivos }} • Terceir.: {{ dados.kpis.total_terceirizados }}</p>
+            </div>
+
+            <!-- KPI 4: Radar de Vencimentos -->
+            <button type="button" onclick="ativarAbaPrefeito('tab-radar')" class="text-left bg-white hover:border-amber-400 transition rounded-2xl p-5 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-amber-700">Radar Vencimentos</span>
+                    <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center"><i class="ph-fill ph-calendar-x text-lg"></i></div>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-3xl font-black {{ 'text-rose-600' if dados.kpis.qtd_vencidos > 0 else 'text-slate-900' }}">{{ dados.kpis.qtd_vencidos + dados.kpis.qtd_vencendo_30 }}</span>
+                    <span class="text-xs font-semibold text-slate-500">urgentes</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1">
+                    <span class="text-rose-600 font-bold">{{ dados.kpis.qtd_vencidos }} vencidos</span> •
+                    <span class="text-amber-700 font-bold">{{ dados.kpis.qtd_vencendo_30 }} em ≤30d</span>
+                </p>
+                <p class="text-[11px] text-slate-400 mt-0.5">Próx. 90 dias: {{ dados.kpis.qtd_vencendo_90 }} contratos</p>
+            </button>
+
+            <!-- KPI 5: Alertas de Governança -->
+            <button type="button" onclick="ativarAbaPrefeito('tab-governanca')" class="text-left bg-white hover:border-rose-400 transition rounded-2xl p-5 shadow-sm border border-slate-200">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[11px] font-bold uppercase tracking-wider text-rose-700">Governança & Alertas</span>
+                    <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center"><i class="ph-fill ph-shield-warning text-lg"></i></div>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-3xl font-black {{ 'text-rose-600' if dados.kpis.qtd_acumulos_cpf > 0 else 'text-emerald-600' }}">{{ dados.kpis.qtd_acumulos_cpf }}</span>
+                    <span class="text-xs text-slate-500">acúmulo(s) CPF</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1">
+                    Multi-secretaria: <strong class="text-rose-600">{{ dados.kpis.qtd_acumulos_multi_sec }}</strong> • Pend.: <strong>{{ dados.kpis.pendentes_validacao_total }}</strong>
+                </p>
+                <p class="text-[11px] text-slate-400 mt-0.5">Completude média: <strong>{{ dados.kpis.completude_media }}%</strong></p>
+            </button>
+        </section>
+
+        <!-- FILTROS GLOBAIS DO GABINETE -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+            <form method="GET" action="{{ url_for('painel_prefeito') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Foco de Vínculo</label>
+                    <select name="escopo" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900">
+                        <option value="comissionados_contratados" {{ 'selected' if dados.filtros.escopo == 'comissionados_contratados' }}>Comissionados + Contratados</option>
+                        <option value="todos" {{ 'selected' if dados.filtros.escopo == 'todos' }}>Todos os Vínculos (Geral)</option>
+                        <option value="comissionado" {{ 'selected' if dados.filtros.escopo == 'comissionado' }}>Somente Comissionados</option>
+                        <option value="contratado" {{ 'selected' if dados.filtros.escopo == 'contratado' }}>Somente Contratados</option>
+                        <option value="efetivo" {{ 'selected' if dados.filtros.escopo == 'efetivo' }}>Somente Efetivos</option>
+                        <option value="terceirizado" {{ 'selected' if dados.filtros.escopo == 'terceirizado' }}>Somente Terceirizados</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Secretaria</label>
+                    <select name="secretaria_id" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900">
+                        <option value="">Todas as Secretarias</option>
+                        {% for s in dados.secretarias %}
+                        <option value="{{ s.id }}" {{ 'selected' if dados.filtros.secretaria_id == s.id }}>{{ s.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Liderança / Padrinho</label>
+                    <select name="padrinho_id" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900">
+                        <option value="">Todas as Lideranças</option>
+                        {% for p in dados.padrinhos %}
+                        <option value="{{ p.id }}" {{ 'selected' if dados.filtros.padrinho_id == p.id }}>{{ p.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Validação RH</label>
+                    <select name="validacao" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-slate-900">
+                        <option value="">Todos</option>
+                        <option value="validado" {{ 'selected' if dados.filtros.validacao == 'validado' }}>Validados</option>
+                        <option value="pendente" {{ 'selected' if dados.filtros.validacao == 'pendente' }}>Pendentes</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Servidor / CPF / Cargo</label>
+                    <input type="text" name="busca" value="{{ dados.filtros.busca }}" placeholder="Nome, CPF, cargo ou unidade..."
+                           class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-slate-900">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold py-2 px-3 rounded-xl transition flex items-center justify-center gap-1.5">
+                        <i class="ph ph-funnel"></i> Aplicar
+                    </button>
+                    <a href="{{ url_for('painel_prefeito') }}" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold transition" title="Limpar Filtros">
+                        <i class="ph ph-arrows-counter-clockwise"></i>
+                    </a>
+                </div>
+            </form>
+        </section>
+
+        <!-- ABAS EXECUTIVAS -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1">
+            <button type="button" data-tab="tab-secretarias" onclick="ativarAbaPrefeito('tab-secretarias')"
+                    class="pref-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition bg-slate-900 text-white shadow-sm">
+                <i class="ph ph-buildings text-base"></i> Secretarias & Termômetro de Tetos
+            </button>
+            <button type="button" data-tab="tab-quadro" onclick="ativarAbaPrefeito('tab-quadro')"
+                    class="pref-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">
+                <i class="ph ph-identification-card text-base"></i> Quadro Nominal ({{ dados.kpis.filtrado_qtd }})
+            </button>
+            <button type="button" data-tab="tab-radar" onclick="ativarAbaPrefeito('tab-radar')"
+                    class="pref-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">
+                <i class="ph ph-clock-countdown text-base"></i> Radar de Vencimentos
+                {% if dados.kpis.qtd_vencidos + dados.kpis.qtd_vencendo_30 > 0 %}
+                <span class="px-1.5 py-0.5 text-[10px] rounded-full bg-rose-100 text-rose-700">{{ dados.kpis.qtd_vencidos + dados.kpis.qtd_vencendo_30 }}</span>
+                {% endif %}
+            </button>
+            <button type="button" data-tab="tab-governanca" onclick="ativarAbaPrefeito('tab-governanca')"
+                    class="pref-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">
+                <i class="ph ph-shield-warning text-base"></i> Acúmulos de CPF & Segurança
+                {% if dados.kpis.qtd_acumulos_cpf > 0 %}
+                <span class="px-1.5 py-0.5 text-[10px] rounded-full bg-rose-100 text-rose-700">{{ dados.kpis.qtd_acumulos_cpf }}</span>
+                {% endif %}
+            </button>
+            <button type="button" data-tab="tab-liderancas" onclick="ativarAbaPrefeito('tab-liderancas')"
+                    class="pref-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">
+                <i class="ph ph-handshake text-base"></i> Lideranças & Impacto em Folha ({{ dados.ranking_padrinhos|length }})
+            </button>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- ABA 1: SECRETARIAS, GRÁFICOS & TERMÔMETRO DE TETOS -->
+        <!-- ================================================================ -->
+        <section id="tab-secretarias" class="tab-panel active space-y-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h2 class="text-sm font-extrabold text-slate-900">Distribuição por Secretaria</h2>
+                            <p class="text-[11px] text-slate-400">Comissionados/Contratados vs. Efetivos/Outros</p>
+                        </div>
+                    </div>
+                    <div class="h-64"><canvas id="chartSecretarias"></canvas></div>
+                </div>
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h2 class="text-sm font-extrabold text-slate-900">Evolução 12 Meses: Admissões × Rescisões</h2>
+                            <p class="text-[11px] text-slate-400">Movimento consolidado do município</p>
+                        </div>
+                    </div>
+                    <div class="h-64"><canvas id="chartEvolucao"></canvas></div>
+                </div>
+            </div>
+
+            <!-- TABELA TERMÔMETRO DE TETOS POR SECRETARIA -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 class="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                            <i class="ph-fill ph-gauge text-amber-500 text-lg"></i> Termômetro de Tetos e Custo por Secretaria
+                        </h2>
+                        <p class="text-[11px] text-slate-400">Acompanhe ocupação de vagas comissionadas/contratadas e folha mensal em tempo real</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto exec-scroll">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-[10px] font-bold uppercase text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">Secretaria / Titular</th>
+                                <th class="px-3 py-3 text-center">Ativos</th>
+                                <th class="px-3 py-3 text-center">Comiss.+Contr.</th>
+                                <th class="px-4 py-3 min-w-[180px]">Termômetro Vagas</th>
+                                <th class="px-4 py-3 min-w-[200px]">Folha Mensal × Teto</th>
+                                <th class="px-3 py-3 text-center">Pend. / Venc.</th>
+                                <th class="px-4 py-3 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for s in dados.secretarias_ranking %}
+                            <tr class="hover:bg-slate-50/80 transition">
+                                <td class="px-4 py-3">
+                                    <div class="font-bold text-slate-900">{{ s.nome }} <span class="text-[10px] text-indigo-600">({{ s.sigla }})</span></div>
+                                    <div class="text-[11px] text-slate-400">Titular: {{ s.secretario_nome }}</div>
+                                </td>
+                                <td class="px-3 py-3 text-center">
+                                    <span class="font-extrabold text-slate-800">{{ s.total_ativos }}</span>
+                                    <div class="text-[10px] text-slate-400">Efet: {{ s.efetivos }}</div>
+                                </td>
+                                <td class="px-3 py-3 text-center">
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg bg-slate-900 text-white font-extrabold">{{ s.com_e_cont }}</span>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">C:{{ s.comissionados }} • T:{{ s.contratados }}</div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    {% if s.teto_comissionados > 0 %}
+                                    <div class="flex justify-between text-[10px] font-bold mb-1">
+                                        <span class="{{ 'text-rose-600' if s.sem_vagas.status == 'CRITICO' else ('text-amber-600' if s.sem_vagas.status == 'ATENCAO' else 'text-emerald-700') }}">{{ s.com_e_cont }} / {{ s.teto_comissionados }}</span>
+                                        <span>{{ s.sem_vagas.pct }}%</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div class="h-full rounded-full {{ 'bg-rose-500' if s.sem_vagas.status == 'CRITICO' else ('bg-amber-500' if s.sem_vagas.status == 'ATENCAO' else 'bg-emerald-500') }}" style="width: {{ [s.sem_vagas.pct, 100]|min }}%;"></div>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-[11px] text-slate-400 italic">Teto não definido</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="font-bold text-slate-900">{{ s.folha_mensal_fmt }} <span class="text-[10px] font-normal text-slate-400">(C/T: {{ s.folha_com_cont_fmt }})</span></div>
+                                    {% if s.teto_folha_mensal > 0 %}
+                                    <div class="flex justify-between text-[10px] font-bold mt-1 mb-0.5">
+                                        <span class="text-slate-500">Teto: {{ s.teto_folha_fmt }}</span>
+                                        <span class="{{ 'text-rose-600' if s.sem_folha.status == 'CRITICO' else ('text-amber-600' if s.sem_folha.status == 'ATENCAO' else 'text-emerald-700') }}">{{ s.sem_folha.pct }}%</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div class="h-full rounded-full {{ 'bg-rose-500' if s.sem_folha.status == 'CRITICO' else ('bg-amber-500' if s.sem_folha.status == 'ATENCAO' else 'bg-emerald-500') }}" style="width: {{ [s.sem_folha.pct, 100]|min }}%;"></div>
+                                    </div>
+                                    {% else %}
+                                    <span class="text-[10px] text-slate-400 italic">Sem teto de folha</span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-3 py-3 text-center">
+                                    {% if s.pendentes > 0 %}
+                                    <span class="inline-block px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold text-[10px]">{{ s.pendentes }} pend.</span>
+                                    {% else %}
+                                    <span class="inline-block px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[10px]">OK</span>
+                                    {% endif %}
+                                    {% if s.contratos_vencidos + s.contratos_vencendo_30 > 0 %}
+                                    <div class="text-[10px] text-rose-600 font-bold mt-0.5">{{ s.contratos_vencidos + s.contratos_vencendo_30 }} venc.</div>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap">
+                                    <button type="button"
+                                            onclick='abrirModalTeto({{ s.id }}, {{ s.nome|tojson }}, {{ s.teto_comissionados }}, {{ s.teto_folha_mensal }})'
+                                            class="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold text-[11px] transition">
+                                        <i class="ph ph-sliders-horizontal"></i> Tetos
+                                    </button>
+                                    <a href="{{ url_for('painel_prefeito', secretaria_id=s.id, escopo=dados.filtros.escopo) }}"
+                                       class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] transition ml-1">
+                                        Filtrar
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- ABA 2: QUADRO NOMINAL (RAIO-X 360° EM 1 CLIQUE) -->
+        <!-- ================================================================ -->
+        <section id="tab-quadro" class="tab-panel space-y-4">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 class="text-sm font-extrabold text-slate-900">Quadro Nominal Filtrado ({{ dados.kpis.filtrado_qtd }} servidores)</h2>
+                        <p class="text-[11px] text-slate-500">Folha mensal do recorte atual: <strong class="text-emerald-700">{{ dados.kpis.filtrado_folha_fmt }}</strong> • Clique em <strong>Raio-X 360°</strong> para dossiê completo</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto exec-scroll">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-[10px] font-bold uppercase text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">Servidor / CPF</th>
+                                <th class="px-4 py-3">Secretaria / Unidade</th>
+                                <th class="px-4 py-3">Cargo / Vínculo</th>
+                                <th class="px-3 py-3 text-right">Remuneração</th>
+                                <th class="px-3 py-3 text-center">Vigência</th>
+                                <th class="px-4 py-3">Indicação / Padrinho</th>
+                                <th class="px-3 py-3 text-center">Qualidade</th>
+                                <th class="px-4 py-3 text-right">Dossiê</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for f in dados.servidores_filtrados %}
+                            <tr class="hover:bg-slate-50 transition">
+                                <td class="px-4 py-3">
+                                    <div class="font-bold text-slate-900">{{ f.nome }}</div>
+                                    <div class="text-[11px] font-mono text-slate-400">{{ f.cpf }}</div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="font-bold text-slate-800">{{ f.secretaria_sigla }}</div>
+                                    <div class="text-[11px] text-slate-400 truncate max-w-[180px]" title="{{ f.local_nome }}">{{ f.local_nome }}</div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="font-semibold text-slate-800">{{ f.funcao_nome }}</div>
+                                    <span class="inline-block mt-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full {{ 'bg-amber-100 text-amber-800' if f.categoria_vinculo in ('COMISSIONADO', 'CONTRATADO') else 'bg-slate-100 text-slate-600' }}">{{ f.tipo_vinculo }}</span>
+                                </td>
+                                <td class="px-3 py-3 text-right font-bold text-slate-900 whitespace-nowrap">{{ f.remuneracao_fmt }}</td>
+                                <td class="px-3 py-3 text-center whitespace-nowrap">
+                                    <div class="text-[11px] text-slate-600">{{ f.dt_inicio_fmt }} → {{ f.dt_termino_fmt }}</div>
+                                    {% if f.dias_restantes is not none %}
+                                        {% if f.dias_restantes < 0 %}
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">Vencido há {{ -f.dias_restantes }}d</span>
+                                        {% elif f.dias_restantes <= 30 %}
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">Vence em {{ f.dias_restantes }}d</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 text-[11px] font-bold text-indigo-700 uppercase">{{ f.padrinho_nome }}</td>
+                                <td class="px-3 py-3 text-center">
+                                    <div class="flex flex-col items-center gap-0.5">
+                                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ 'bg-emerald-50 text-emerald-700' if f.validado else 'bg-amber-50 text-amber-700' }}">
+                                            {{ 'Validado' if f.validado else 'Pendente' }}
+                                        </span>
+                                        <span class="text-[10px] text-slate-400">{{ f.completude_pct }}% compl.</span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <button type="button" onclick="abrirDossie360({{ f.id }})"
+                                            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-[11px] font-bold transition shadow-sm">
+                                        <i class="ph ph-scan"></i> Raio-X 360°
+                                    </button>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" class="px-6 py-10 text-center text-slate-400">Nenhum servidor encontrado para o filtro selecionado.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- ABA 3: RADAR DE VENCIMENTOS (VIRADA 2026 -> 2027) -->
+        <!-- ================================================================ -->
+        <section id="tab-radar" class="tab-panel space-y-5">
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div class="bg-rose-50 border border-rose-200 rounded-2xl p-4">
+                    <span class="text-[10px] font-bold uppercase text-rose-700">Vencidos</span>
+                    <div class="text-2xl font-black text-rose-700 mt-1">{{ dados.radar_vencimentos.vencidos|length }}</div>
+                </div>
+                <div class="bg-orange-50 border border-orange-200 rounded-2xl p-4">
+                    <span class="text-[10px] font-bold uppercase text-orange-700">Crítico (≤ 15d)</span>
+                    <div class="text-2xl font-black text-orange-700 mt-1">{{ dados.radar_vencimentos.d15|length }}</div>
+                </div>
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                    <span class="text-[10px] font-bold uppercase text-amber-700">Atenção (16-30d)</span>
+                    <div class="text-2xl font-black text-amber-700 mt-1">{{ dados.radar_vencimentos.d30|length }}</div>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                    <span class="text-[10px] font-bold uppercase text-blue-700">31 a 60 dias</span>
+                    <div class="text-2xl font-black text-blue-700 mt-1">{{ dados.radar_vencimentos.d60|length }}</div>
+                </div>
+                <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
+                    <span class="text-[10px] font-bold uppercase text-indigo-700">61 a 90 dias</span>
+                    <div class="text-2xl font-black text-indigo-700 mt-1">{{ dados.radar_vencimentos.d90|length }}</div>
+                </div>
+                <div class="bg-slate-100 border border-slate-200 rounded-2xl p-4">
+                    <span class="text-[10px] font-bold uppercase text-slate-600">Sem Término (C/T)</span>
+                    <div class="text-2xl font-black text-slate-800 mt-1">{{ dados.radar_vencimentos.sem_termino_com_cont }}</div>
+                </div>
+            </div>
+
+            {% for faixa_key, faixa_titulo, badge_cls in [
+                ('vencidos', 'Contratos / Vínculos Já Vencidos (Ativos)', 'bg-rose-100 text-rose-800'),
+                ('d15', 'Vencendo em até 15 dias (Crítico)', 'bg-orange-100 text-orange-800'),
+                ('d30', 'Vencendo entre 16 e 30 dias', 'bg-amber-100 text-amber-800'),
+                ('d60', 'Vencendo entre 31 e 60 dias', 'bg-blue-100 text-blue-800'),
+                ('d90', 'Vencendo entre 61 e 90 dias', 'bg-indigo-100 text-indigo-800')
+            ] %}
+            {% set lista_f = dados.radar_vencimentos[faixa_key] %}
+            {% if lista_f %}
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                    <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-800">{{ faixa_titulo }}</h3>
+                    <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold {{ badge_cls }}">{{ lista_f|length }}</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-[10px] uppercase text-slate-500">
+                            <tr>
+                                <th class="px-4 py-2.5">Servidor</th>
+                                <th class="px-4 py-2.5">Secretaria</th>
+                                <th class="px-4 py-2.5">Cargo / Vínculo</th>
+                                <th class="px-3 py-2.5 text-right">Remuneração</th>
+                                <th class="px-3 py-2.5 text-center">Término</th>
+                                <th class="px-4 py-2.5 text-right">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for item in lista_f %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-2.5"><strong class="text-slate-900">{{ item.nome }}</strong><div class="text-[10px] font-mono text-slate-400">{{ item.cpf }}</div></td>
+                                <td class="px-4 py-2.5 font-bold text-slate-700">{{ item.secretaria }}</td>
+                                <td class="px-4 py-2.5">{{ item.funcao }} <span class="text-[10px] text-slate-400">({{ item.tipo_vinculo }})</span></td>
+                                <td class="px-3 py-2.5 text-right font-bold">{{ item.remuneracao_fmt }}</td>
+                                <td class="px-3 py-2.5 text-center font-bold {{ 'text-rose-600' if item.dias_restantes < 0 else 'text-amber-700' }}">
+                                    {{ item.dt_termino_fmt }}
+                                    <div class="text-[10px]">{{ 'há ' ~ (-item.dias_restantes) ~ 'd' if item.dias_restantes < 0 else 'em ' ~ item.dias_restantes ~ 'd' }}</div>
+                                </td>
+                                <td class="px-4 py-2.5 text-right">
+                                    <button type="button" onclick="abrirDossie360({{ item.id }})" class="px-2.5 py-1 rounded-lg bg-slate-900 text-white text-[11px] font-bold hover:bg-indigo-600">Raio-X 360°</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+            {% endfor %}
+
+            {% if not dados.radar_vencimentos.vencidos and not dados.radar_vencimentos.d15 and not dados.radar_vencimentos.d30 and not dados.radar_vencimentos.d60 and not dados.radar_vencimentos.d90 %}
+            <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-8 text-center">
+                <i class="ph-fill ph-check-circle text-emerald-600 text-3xl"></i>
+                <p class="text-sm font-bold text-emerald-900 mt-2">Nenhum contrato vencido ou expirando nos próximos 90 dias.</p>
+                <p class="text-xs text-emerald-700 mt-1">Atenção: {{ dados.radar_vencimentos.sem_termino_com_cont }} comissionado(s)/contratado(s) estão sem data de término informada.</p>
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- ABA 4: GOVERNANÇA — ACÚMULOS DE CPF & ALERTAS DE SEGURANÇA -->
+        <!-- ================================================================ -->
+        <section id="tab-governanca" class="tab-panel grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                            <i class="ph-fill ph-warning-octagon text-rose-600 text-lg"></i> Radar de Acúmulo de CPF (Múltiplos Vínculos Ativos)
+                        </h2>
+                        <p class="text-[11px] text-slate-400">Cruzamento automático em tempo real entre todas as secretarias</p>
+                    </div>
+                    <span class="px-3 py-1 rounded-full text-xs font-extrabold {{ 'bg-rose-100 text-rose-700' if dados.acumulos_cpf else 'bg-emerald-100 text-emerald-700' }}">
+                        {{ dados.acumulos_cpf|length }} ocorrência(s)
+                    </span>
+                </div>
+                <div class="p-4 space-y-3">
+                    {% for ac in dados.acumulos_cpf %}
+                    <div class="rounded-xl border p-4 {{ 'bg-rose-50/50 border-rose-200' if ac.multi_secretaria else 'bg-amber-50/40 border-amber-200' }}">
+                        <div class="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="px-2 py-0.5 rounded bg-slate-900 text-white font-mono text-[11px] font-bold">{{ ac.cpf_formatado }}</span>
+                                <strong class="text-xs text-slate-900">{{ ac.nome }}</strong>
+                                {% if ac.multi_secretaria %}
+                                <span class="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold">MULTI-SECRETARIA</span>
+                                {% else %}
+                                <span class="px-2 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-bold">MESMA PASTA</span>
+                                {% endif %}
+                            </div>
+                            <span class="text-xs font-extrabold text-slate-900">Soma: {{ ac.soma_remuneracao_fmt }}/mês</span>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            {% for v in ac.vinculos %}
+                            <div class="bg-white rounded-lg p-2.5 border border-slate-200 flex items-center justify-between gap-2 text-[11px]">
+                                <div>
+                                    <div class="font-bold text-slate-800">{{ v.sigla }} — {{ v.funcao }}</div>
+                                    <div class="text-slate-500">{{ v.tipo_vinculo }} • <strong>{{ v.remuneracao_fmt }}</strong></div>
+                                </div>
+                                <button type="button" onclick="abrirDossie360({{ v.id }})" class="px-2 py-1 rounded bg-slate-900 text-white text-[10px] font-bold hover:bg-indigo-600 shrink-0">360°</button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="py-10 text-center text-emerald-700 bg-emerald-50/60 rounded-xl border border-emerald-200">
+                        <i class="ph-fill ph-shield-check text-3xl"></i>
+                        <p class="text-sm font-bold mt-2">Nenhum acúmulo de CPF detectado!</p>
+                        <p class="text-xs text-emerald-600">Todos os servidores ativos possuem vínculo único no município.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- FEED DE SEGURANÇA -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100">
+                    <h2 class="text-sm font-extrabold text-slate-900 flex items-center gap-2">
+                        <i class="ph-fill ph-lock-key text-indigo-600 text-lg"></i> Alertas de Segurança & Auditoria
+                    </h2>
+                    <p class="text-[11px] text-slate-400">Eventos críticos visíveis somente ao Gabinete / TI</p>
+                </div>
+                <div class="p-4 space-y-2.5 max-h-[520px] overflow-y-auto exec-scroll">
+                    {% for al in dados.alertas_seguranca %}
+                    <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                        <div class="flex items-center justify-between gap-2 mb-1">
+                            <span class="px-2 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-extrabold">{{ al.acao }}</span>
+                            <span class="text-[10px] font-mono text-slate-400">{{ al.data_hora_fmt }}</span>
+                        </div>
+                        <p class="text-slate-700 text-[11px] leading-snug">{{ al.alvo }}</p>
+                        <div class="text-[10px] text-slate-400 mt-1">Por: <strong>{{ al.usuario }}</strong> • IP: {{ al.ip }}</div>
+                    </div>
+                    {% else %}
+                    <p class="text-xs text-slate-400 text-center py-8">Nenhum alerta crítico registrado.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- ABA 5: LIDERANÇAS / PADRINHOS & IMPACTO FINANCEIRO -->
+        <!-- ================================================================ -->
+        <section id="tab-liderancas" class="tab-panel">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100">
+                    <h2 class="text-sm font-extrabold text-slate-900">Ranking de Lideranças / Indicações & Impacto em Folha</h2>
+                    <p class="text-[11px] text-slate-400">Consolidado sigiloso de quantitativo, custo mensal e regularidade eleitoral por liderança</p>
+                </div>
+                <div class="overflow-x-auto exec-scroll">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-[10px] font-bold uppercase text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">#</th>
+                                <th class="px-4 py-3">Liderança / Padrinho</th>
+                                <th class="px-3 py-3 text-center">Total Indicados</th>
+                                <th class="px-3 py-3 text-center">Comiss. + Contrat.</th>
+                                <th class="px-4 py-3 text-right">Impacto Mensal em Folha</th>
+                                <th class="px-4 py-3">Secretarias</th>
+                                <th class="px-3 py-3 text-center">Título Regular</th>
+                                <th class="px-4 py-3 text-right">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for p in dados.ranking_padrinhos %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-3 font-mono text-slate-400">{{ loop.index }}</td>
+                                <td class="px-4 py-3 font-extrabold text-slate-900 uppercase">{{ p.nome }}</td>
+                                <td class="px-3 py-3 text-center font-extrabold text-indigo-700">{{ p.total_indicados }}</td>
+                                <td class="px-3 py-3 text-center font-bold text-slate-800">{{ p.com_e_cont }}</td>
+                                <td class="px-4 py-3 text-right font-extrabold text-emerald-700">{{ p.folha_mensal_fmt }}</td>
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-wrap gap-1">
+                                        {% for sn in p.secretarias_lista[:4] %}
+                                        <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-semibold">{{ sn }}</span>
+                                        {% endfor %}
+                                        {% if p.qtd_secretarias > 4 %}
+                                        <span class="text-[10px] text-slate-400">+{{ p.qtd_secretarias - 4 }}</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ 'bg-emerald-50 text-emerald-700' if p.pct_titulo_regular >= 80 else 'bg-amber-50 text-amber-700' }}">{{ p.pct_titulo_regular }}%</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <a href="{{ url_for('painel_prefeito', padrinho_id=p.id, escopo='todos') }}"
+                                       class="px-2.5 py-1.5 rounded-lg bg-slate-900 text-white text-[11px] font-bold hover:bg-indigo-600 transition">Ver Indicados</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="8" class="px-6 py-8 text-center text-slate-400">Nenhuma indicação registrada.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL: DEFINIR TETOS DA SECRETARIA -->
+    <div id="modalTetoSecretaria" class="fixed inset-0 bg-slate-950/70 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900">Definir Tetos da Secretaria</h3>
+                    <p id="teto_sec_nome_lbl" class="text-xs text-slate-500 mt-0.5"></p>
+                </div>
+                <button type="button" onclick="fecharModalTeto()" class="text-slate-400 hover:text-slate-900"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            <div class="space-y-4">
+                <input type="hidden" id="teto_sec_id">
+                <div>
+                    <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Teto de Vagas (Comissionados + Contratados)</label>
+                    <input type="number" min="0" id="teto_com_input" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-bold uppercase text-slate-500 mb-1">Teto de Folha Mensal (R$)</label>
+                    <input type="text" id="teto_folha_input" placeholder="Ex: 250.000,00" class="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-900">
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="fecharModalTeto()" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-xs hover:bg-slate-200">Cancelar</button>
+                    <button type="button" onclick="salvarTetoSecretaria()" class="flex-1 py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-indigo-600">Salvar Tetos</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: RAIO-X 360° DO SERVIDOR -->
+    <div id="modalDossie360" class="fixed inset-0 bg-slate-950/75 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl w-full max-w-4xl shadow-2xl border border-slate-200 overflow-hidden max-h-[92vh] flex flex-col">
+            <div class="bg-slate-950 text-white px-6 py-4 flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center">
+                        <i class="ph-fill ph-identification-badge text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 id="d360_nome" class="text-base font-extrabold">Carregando Dossiê 360°...</h3>
+                        <p id="d360_sub" class="text-xs text-slate-400"></p>
+                    </div>
+                </div>
+                <button type="button" onclick="fecharDossie360()" class="text-slate-400 hover:text-white p-1"><i class="ph ph-x text-2xl"></i></button>
+            </div>
+            <div id="d360_body" class="p-6 overflow-y-auto exec-scroll space-y-5 text-xs">
+                <div class="py-12 text-center text-slate-400">Carregando informações consolidadas...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function ativarAbaPrefeito(tabId) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            const target = document.getElementById(tabId);
+            if (target) target.classList.add('active');
+            document.querySelectorAll('.pref-tab-btn').forEach(btn => {
+                if (btn.getAttribute('data-tab') === tabId) {
+                    btn.className = 'pref-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition bg-slate-900 text-white shadow-sm';
+                } else {
+                    btn.className = 'pref-tab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap transition bg-white text-slate-600 border border-slate-200 hover:bg-slate-100';
+                }
+            });
+        }
+
+        // Se houver filtro ativo de busca/padrinho/validação, abre direto o Quadro Nominal
+        {% if dados.filtros.busca or dados.filtros.padrinho_id or dados.filtros.validacao or dados.filtros.secretaria_id %}
+        document.addEventListener('DOMContentLoaded', () => ativarAbaPrefeito('tab-quadro'));
+        {% endif %}
+
+        function abrirModalTeto(secId, secNome, tetoCom, tetoFolha) {
+            document.getElementById('teto_sec_id').value = secId;
+            document.getElementById('teto_sec_nome_lbl').innerText = secNome;
+            document.getElementById('teto_com_input').value = tetoCom || 0;
+            document.getElementById('teto_folha_input').value = tetoFolha ? Number(tetoFolha).toFixed(2).replace('.', ',') : '0,00';
+            document.getElementById('modalTetoSecretaria').classList.remove('hidden');
+        }
+        function fecharModalTeto() {
+            document.getElementById('modalTetoSecretaria').classList.add('hidden');
+        }
+        async function salvarTetoSecretaria() {
+            const payload = {
+                secretaria_id: document.getElementById('teto_sec_id').value,
+                teto_comissionados: document.getElementById('teto_com_input').value,
+                teto_folha_mensal: document.getElementById('teto_folha_input').value,
+            };
+            const resp = await fetch('/api/prefeito/atualizar_teto', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await resp.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert(data.message || 'Erro ao salvar tetos.');
+            }
+        }
+
+        function fecharDossie360() {
+            document.getElementById('modalDossie360').classList.add('hidden');
+        }
+        function escHtml(v) {
+            return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+        async function abrirDossie360(funcId) {
+            const modal = document.getElementById('modalDossie360');
+            const body = document.getElementById('d360_body');
+            document.getElementById('d360_nome').innerText = 'Carregando Dossiê 360°...';
+            document.getElementById('d360_sub').innerText = '';
+            body.innerHTML = '<div class="py-12 text-center text-slate-400">Buscando histórico funcional, folha, ponto e situação eleitoral...</div>';
+            modal.classList.remove('hidden');
+
+            try {
+                const resp = await fetch(`/api/prefeito/servidor/${funcId}`);
+                const data = await resp.json();
+                if (!data.success) {
+                    body.innerHTML = `<div class="p-6 text-rose-600 font-bold">${escHtml(data.message)}</div>`;
+                    return;
+                }
+                const d = data.dossie;
+                document.getElementById('d360_nome').innerText = d.nome;
+                document.getElementById('d360_sub').innerText = `${d.secretaria_nome} • ${d.funcao} (${d.tipo_vinculo})`;
+
+                let alertaAcumulo = '';
+                if (d.outros_vinculos_ativos && d.outros_vinculos_ativos.length > 0) {
+                    alertaAcumulo = `
+                        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900">
+                            <div class="font-extrabold flex items-center gap-1.5 mb-1.5"><i class="ph-fill ph-warning-octagon text-base"></i> ALERTA DE ACÚMULO DE CPF (${d.outros_vinculos_ativos.length} outro(s) vínculo(s) ativo(s))</div>
+                            ${d.outros_vinculos_ativos.map(v => `<div class="text-[11px]">• <strong>${escHtml(v.secretaria)}</strong> — ${escHtml(v.funcao)} (${escHtml(v.tipo_vinculo)}) • ${escHtml(v.remuneracao_fmt)}</div>`).join('')}
+                        </div>`;
+                }
+
+                const colegioHtml = d.colegio_eleitoral
+                    ? `<strong class="text-indigo-700">${escHtml(d.colegio_eleitoral.nome)}</strong> (${escHtml(d.colegio_eleitoral.bairro)})`
+                    : '<span class="text-slate-400">Não mapeado em LocalVotacao</span>';
+
+                const pendenciasHtml = d.pendencias_cadastro.length
+                    ? d.pendencias_cadastro.map(p => `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">${escHtml(p)}</span>`).join(' ')
+                    : '<span class="px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold">Cadastro 100% Completo</span>';
+
+                body.innerHTML = `
+                    ${alertaAcumulo}
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                            <span class="text-[10px] font-bold uppercase text-slate-400">Remuneração</span>
+                            <div class="text-base font-black text-emerald-700 mt-0.5">${escHtml(d.remuneracao_fmt)}</div>
+                            <div class="text-[10px] text-slate-500">Jornada: ${escHtml(d.jornada)}</div>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                            <span class="text-[10px] font-bold uppercase text-slate-400">Vigência</span>
+                            <div class="text-xs font-extrabold text-slate-900 mt-1">${escHtml(d.dt_inicio_fmt)} → ${escHtml(d.dt_termino_fmt)}</div>
+                            <div class="text-[10px] text-slate-500">Vínculo nº ${escHtml(d.num_vinculo)}</div>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                            <span class="text-[10px] font-bold uppercase text-slate-400">Indicação / Liderança</span>
+                            <div class="text-xs font-extrabold text-indigo-700 mt-1 uppercase">${escHtml(d.padrinho_nome)}</div>
+                            <div class="text-[10px] text-slate-500">Status: ${d.validado ? 'Validado RH' : 'Pendente RH'}</div>
+                        </div>
+                        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                            <span class="text-[10px] font-bold uppercase text-slate-400">Frequência / Ponto</span>
+                            <div class="text-base font-black text-slate-900 mt-0.5">${d.ponto.ultimos_30d} <span class="text-[10px] font-normal text-slate-500">batidas (30d)</span></div>
+                            <div class="text-[10px] text-slate-500">Última: ${escHtml(d.ponto.ultimo_registro)}</div>
+                        </div>
+                    </div>
+
+                    <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
+                        <div class="flex justify-between items-center mb-1.5">
+                            <span class="text-[10px] font-bold uppercase text-slate-500">Completude Cadastral</span>
+                            <span class="font-extrabold text-slate-900">${d.completude_pct}%</span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden mb-2">
+                            <div class="h-full rounded-full ${d.completude_pct >= 85 ? 'bg-emerald-500' : 'bg-amber-500'}" style="width:${d.completude_pct}%"></div>
+                        </div>
+                        <div class="flex flex-wrap gap-1">${pendenciasHtml}</div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 rounded-2xl border border-slate-200 space-y-1.5">
+                            <h4 class="font-extrabold text-slate-900 uppercase text-[11px] mb-2">Dados Pessoais & Contato</h4>
+                            <div><span class="text-slate-400">CPF:</span> <strong class="font-mono">${escHtml(d.cpf)}</strong> • <span class="text-slate-400">RG:</span> <strong>${escHtml(d.rg)}</strong></div>
+                            <div><span class="text-slate-400">Nascimento:</span> <strong>${escHtml(d.data_nasc_fmt)}</strong> • <span class="text-slate-400">PIS:</span> <strong>${escHtml(d.pis)}</strong></div>
+                            <div><span class="text-slate-400">Mãe:</span> <strong>${escHtml(d.mae)}</strong></div>
+                            <div><span class="text-slate-400">Escolaridade:</span> <strong>${escHtml(d.escolaridade)}</strong> ${escHtml(d.especialidade)}</div>
+                            <div><span class="text-slate-400">Telefone:</span> <strong>${escHtml(d.telefone)}</strong> • <span class="text-slate-400">E-mail:</span> <strong>${escHtml(d.email)}</strong></div>
+                            <div><span class="text-slate-400">Endereço:</span> <strong>${escHtml(d.endereco)}</strong></div>
+                        </div>
+                        <div class="p-4 rounded-2xl border border-slate-200 space-y-1.5">
+                            <h4 class="font-extrabold text-slate-900 uppercase text-[11px] mb-2">Situação Eleitoral & Bancária</h4>
+                            <div><span class="text-slate-400">Título:</span> <strong class="font-mono">${escHtml(d.titulo_eleitor)}</strong> • <span class="text-slate-400">Zona:</span> <strong>${escHtml(d.zona_eleitoral)}</strong> • <span class="text-slate-400">Seção:</span> <strong>${escHtml(d.secao_eleitoral)}</strong></div>
+                            <div><span class="text-slate-400">Colégio Eleitoral:</span> ${colegioHtml}</div>
+                            <hr class="my-2 border-slate-100">
+                            <div><span class="text-slate-400">Local de Trabalho:</span> <strong>${escHtml(d.local_trabalho)}</strong></div>
+                            <div><span class="text-slate-400">Banco:</span> <strong>${escHtml(d.banco)}</strong> • <span class="text-slate-400">Ag:</span> <strong>${escHtml(d.agencia)}</strong> • <span class="text-slate-400">Conta:</span> <strong>${escHtml(d.conta)}</strong></div>
+                            <div><span class="text-slate-400">Emergência:</span> <strong>${escHtml(d.contato_emergencia)}</strong> (${escHtml(d.tipo_sanguineo)})</div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-4 rounded-2xl border border-slate-200">
+                            <h4 class="font-extrabold text-slate-900 uppercase text-[11px] mb-2">Contratos Gerados (${d.contratos.length})</h4>
+                            ${d.contratos.length ? d.contratos.map(c => `<div class="py-1.5 border-b border-slate-100 last:border-0 flex justify-between"><span><strong>Nº ${escHtml(c.num_contrato)}</strong> — ${escHtml(c.funcao)}</span><span class="text-slate-500">${escHtml(c.periodo)}</span></div>`).join('') : '<p class="text-slate-400">Nenhum contrato registrado.</p>'}
+                        </div>
+                        <div class="p-4 rounded-2xl border border-slate-200">
+                            <h4 class="font-extrabold text-slate-900 uppercase text-[11px] mb-2">Histórico de Movimentações (${d.historico_lotacao.length})</h4>
+                            ${d.historico_lotacao.length ? d.historico_lotacao.map(h => `<div class="py-1.5 border-b border-slate-100 last:border-0"><strong>${escHtml(h.data_fmt)}</strong>: saiu de ${escHtml(h.antigo_local)} (${escHtml(h.antiga_funcao)}) <span class="text-slate-400">por ${escHtml(h.quem_mudou)}</span></div>`).join('') : '<p class="text-slate-400">Sem movimentações anteriores.</p>'}
+                        </div>
+                    </div>
+                `;
+            } catch (e) {
+                body.innerHTML = '<div class="p-6 text-rose-600 font-bold">Erro ao carregar Dossiê 360°.</div>';
+            }
+        }
+
+        // GRÁFICOS CHART.JS
+        document.addEventListener('DOMContentLoaded', () => {
+            const secRanking = {{ dados.secretarias_ranking | tojson }};
+            const evolucao = {{ dados.evolucao_mensal | tojson }};
+
+            const ctxSec = document.getElementById('chartSecretarias');
+            if (ctxSec && secRanking.length) {
+                new Chart(ctxSec, {
+                    type: 'bar',
+                    data: {
+                        labels: secRanking.map(s => s.sigla),
+                        datasets: [
+                            { label: 'Comiss. + Contrat.', data: secRanking.map(s => s.com_e_cont), backgroundColor: '#f59e0b', borderRadius: 6 },
+                            { label: 'Efetivos', data: secRanking.map(s => s.efetivos), backgroundColor: '#1e293b', borderRadius: 6 },
+                            { label: 'Terceirizados', data: secRanking.map(s => s.terceirizados), backgroundColor: '#6366f1', borderRadius: 6 },
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+                        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }
+                    }
+                });
+            }
+
+            const ctxEv = document.getElementById('chartEvolucao');
+            if (ctxEv && evolucao.labels) {
+                new Chart(ctxEv, {
+                    type: 'line',
+                    data: {
+                        labels: evolucao.labels,
+                        datasets: [
+                            { label: 'Admissões', data: evolucao.admissoes, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.12)', fill: true, tension: 0.3 },
+                            { label: 'Rescisões', data: evolucao.rescisoes, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.08)', fill: true, tension: 0.3 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 } } } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/inactivity.js') }}"></script>
+</body>
+</html>
