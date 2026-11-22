@@ -32,6 +32,7 @@ from sqlalchemy import func, text, event
 import backup_service
 import security
 import prefeito_service
+import ficha_service
 
 load_dotenv()
 
@@ -336,6 +337,68 @@ class Funcionario(db.Model):
     # --- CAMPOS DE PERFORMANCE & FINANCEIRO (v2027) ---
     cpf_limpo = db.Column(db.String(11), index=True, nullable=True)
     remuneracao_valor = db.Column(db.Float, default=0.0)
+
+    # --- FASE 4: FICHA PROFISSIONAL 2.0, FOTO 3X4 & EXERCICIO 2027 ---
+    foto_3x4_b64 = db.Column(db.Text, nullable=True)
+    numero_portaria = db.Column(db.String(80), nullable=True)
+    data_portaria = db.Column(db.Date, nullable=True)
+    zona_moradia = db.Column(db.String(20), default="URBANA")
+    povoado_comunidade = db.Column(db.String(120), nullable=True)
+    gratificacao_valor = db.Column(db.Float, default=0.0)
+    ano_exercicio_atual = db.Column(db.Integer, default=2026)
+
+
+class DocumentoServidor(db.Model):
+    __tablename__ = "documento_servidor"
+
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey("funcionario.id"), nullable=False, index=True)
+    secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=False, index=True)
+    tipo_documento = db.Column(db.String(60), nullable=False)
+    nome_arquivo = db.Column(db.String(200), nullable=False)
+    mime_type = db.Column(db.String(100), nullable=False, default="application/pdf")
+    tamanho_bytes = db.Column(db.Integer, default=0)
+    sha256 = db.Column(db.String(64), nullable=True)
+    conteudo_b64 = db.Column(db.Text, nullable=False)
+    observacao = db.Column(db.String(255), nullable=True)
+    validado = db.Column(db.Boolean, default=False)
+    validado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    validado_em = db.Column(db.DateTime, nullable=True)
+    enviado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    data_upload = db.Column(db.DateTime, default=datetime.utcnow)
+
+    funcionario = db.relationship("Funcionario", backref=db.backref("documentos_ged", lazy=True, cascade="all, delete-orphan"))
+    secretaria = db.relationship("Secretaria", foreign_keys=[secretaria_id])
+    validado_por = db.relationship("User", foreign_keys=[validado_por_id])
+    enviado_por = db.relationship("User", foreign_keys=[enviado_por_id])
+
+
+class HistoricoVinculoExercicio(db.Model):
+    __tablename__ = "historico_vinculo_exercicio"
+
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey("funcionario.id"), nullable=False, index=True)
+    secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=False, index=True)
+    ano_exercicio = db.Column(db.Integer, nullable=False, index=True)
+    funcao_nome = db.Column(db.String(120), nullable=True)
+    local_trabalho_nome = db.Column(db.String(150), nullable=True)
+    tipo_vinculo = db.Column(db.String(50), nullable=True)
+    jornada_trabalho = db.Column(db.String(50), nullable=True)
+    remuneracao = db.Column(db.String(50), nullable=True)
+    remuneracao_valor = db.Column(db.Float, default=0.0)
+    gratificacao_valor = db.Column(db.Float, default=0.0)
+    dt_inicio = db.Column(db.Date, nullable=True)
+    dt_termino = db.Column(db.Date, nullable=True)
+    numero_portaria = db.Column(db.String(80), nullable=True)
+    data_portaria = db.Column(db.Date, nullable=True)
+    status = db.Column(db.String(30), default="ATIVO")  # ATIVO, ENCERRADO, RENOVADO, EXONERADO
+    observacao = db.Column(db.String(255), nullable=True)
+    criado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    data_registro = db.Column(db.DateTime, default=datetime.utcnow)
+
+    funcionario = db.relationship("Funcionario", backref=db.backref("historico_exercicios", lazy=True, cascade="all, delete-orphan"))
+    secretaria = db.relationship("Secretaria", foreign_keys=[secretaria_id])
+    criado_por = db.relationship("User", foreign_keys=[criado_por_id])
 
 
 class RegistroPonto(db.Model):
@@ -817,7 +880,7 @@ def auditar_edicao_funcionario(mapper, connection, target):
             val_novo = hist.added[0] if hist.added else None
             
             # Ignora atualizações do próprio sistema que não importam pra auditoria
-            if attr.key not in ['token_validacao', 'cpf_limpo']: 
+            if attr.key not in ['token_validacao', 'cpf_limpo', 'foto_3x4_b64', 'foto_biometria']: 
                 dados_antigos[attr.key] = str(val_antigo) if val_antigo is not None else ""
                 dados_novos[attr.key] = str(val_novo) if val_novo is not None else ""
 
@@ -2411,7 +2474,24 @@ def sistema():
             "contato_emergencia_nome": request.form.get("contato_emergencia_nome").upper() if request.form.get("contato_emergencia_nome") else None,
             "contato_emergencia_tel": request.form.get("contato_emergencia_tel"),
             "tipo_sanguineo": request.form.get("tipo_sanguineo"),
+            "numero_portaria": (request.form.get("numero_portaria") or "").strip().upper() or None,
+            "data_portaria": parse_date(request.form.get("data_portaria")),
+            "zona_moradia": (request.form.get("zona_moradia") or "URBANA").strip().upper(),
+            "povoado_comunidade": (request.form.get("povoado_comunidade") or "").strip().upper() or None,
+            "gratificacao_valor": security.parse_remuneracao_float(request.form.get("gratificacao_valor")),
+            "ano_exercicio_atual": request.form.get("ano_exercicio_atual", type=int) or datetime.now().year,
         }
+
+        foto_3x4_raw = request.form.get("foto_3x4_b64")
+        remover_foto_3x4 = request.form.get("remover_foto_3x4") == "1"
+        if foto_3x4_raw and foto_3x4_raw.strip():
+            ok_foto, foto_limpa, msg_foto = ficha_service.validar_foto_3x4_b64(foto_3x4_raw)
+            if not ok_foto:
+                flash(msg_foto, "error")
+                return redirect(url_for("sistema"))
+            dados_form["foto_3x4_b64"] = foto_limpa
+        elif remover_foto_3x4:
+            dados_form["foto_3x4_b64"] = None
 
         if not dados_form.get("dt_inicio"):
             flash("Data de Início é obrigatória!", "error")
@@ -2564,6 +2644,13 @@ def sistema():
         if cg.contratado_nome and cg.contratado_nome.strip():
             mapa_contratos_gerados[f"nome_{cg.contratado_nome.strip().upper()}"] = cg.num_contrato
 
+    ged_counts_rows = (
+        db.session.query(DocumentoServidor.funcionario_id, func.count(DocumentoServidor.id))
+        .group_by(DocumentoServidor.funcionario_id)
+        .all()
+    )
+    mapa_ged_counts = {fid: cnt for fid, cnt in ged_counts_rows}
+
     return render_template(
         "sistema.html",
         nome_usuario=current_user.username,
@@ -2578,6 +2665,9 @@ def sistema():
         proximo_vinculo_form=proximo_vinculo_form,
         funcao_apoio_id=funcao_apoio_id,
         mapa_contratos_gerados=mapa_contratos_gerados,
+        ged_tipos=ficha_service.GED_TIPOS_DOCUMENTO,
+        mapa_ged_counts=mapa_ged_counts,
+        ano_atual_form=datetime.now().year,
     )
 
 
@@ -2666,6 +2756,13 @@ def atualizar_schema():
                     ("ativo", "BOOLEAN DEFAULT TRUE"),
                     ("cpf_limpo", "VARCHAR(11)"),
                     ("remuneracao_valor", "FLOAT DEFAULT 0"),
+                    ("foto_3x4_b64", "TEXT"),
+                    ("numero_portaria", "VARCHAR(80)"),
+                    ("data_portaria", "DATE"),
+                    ("zona_moradia", "VARCHAR(20) DEFAULT 'URBANA'"),
+                    ("povoado_comunidade", "VARCHAR(120)"),
+                    ("gratificacao_valor", "FLOAT DEFAULT 0"),
+                    ("ano_exercicio_atual", "INTEGER DEFAULT 2026"),
                 ],
                 "rescisao_historico": [
                     ("secretaria_id", "INTEGER"),
@@ -6079,6 +6176,8 @@ def _prefeito_models_ctx():
         "RegistroPonto": RegistroPonto,
         "JustificativaFalta": JustificativaFalta,
         "LocalVotacao": LocalVotacao,
+        "DocumentoServidor": DocumentoServidor,
+        "HistoricoVinculoExercicio": HistoricoVinculoExercicio,
         "normalizar_numero_eleitoral": normalizar_numero_eleitoral,
     }
 
@@ -6218,6 +6317,324 @@ def prefeito_relatorio_executivo():
         emitido_por=current_user.nome_completo or current_user.username,
         emitido_ip=request.remote_addr or "N/D",
     )
+
+
+# ==============================================================================
+# MÓDULO FASE 4: FICHA PROFISSIONAL A4, DOSSIÊ DIGITAL (GED) & VIRADA 2027
+# ==============================================================================
+
+@app.route("/ficha/profissional/<int:func_id>", methods=["GET"])
+@login_required
+@security.require_permission("view_rh")
+def ficha_profissional_a4(func_id):
+    f = db.session.get(Funcionario, func_id)
+    if not f or not security.can_access_record(current_user, f):
+        registrar_violacao_acesso(f"Ficha Profissional A4 funcionario_id={func_id}")
+        flash("Acesso negado: servidor não encontrado ou pertence a outra secretaria.", "error")
+        return redirect(url_for("sistema"))
+
+    docs = (
+        DocumentoServidor.query.filter_by(funcionario_id=f.id)
+        .order_by(DocumentoServidor.data_upload.desc())
+        .all()
+    )
+    ged_checklist = ficha_service.get_ged_checklist(docs)
+    exercicios = (
+        HistoricoVinculoExercicio.query.filter_by(funcionario_id=f.id)
+        .order_by(HistoricoVinculoExercicio.ano_exercicio.desc())
+        .all()
+    )
+    pct_comp, faltantes = prefeito_service.calc_completude_servidor(f)
+    rep = obter_dados_representante_secretaria(f.secretaria)
+    fuso_br = pytz.timezone("America/Sao_Paulo")
+    emitido_em = datetime.now(fuso_br).strftime("%d/%m/%Y às %H:%M")
+
+    # URL pública de validação para o QR Code
+    validar_url = url_for("validar_documento", codigo=f.token_validacao, _external=True)
+
+    return render_template(
+        "ficha_profissional_a4.html",
+        f=f,
+        rep=rep,
+        ged_checklist=ged_checklist,
+        documentos=docs,
+        exercicios=exercicios,
+        completude_pct=pct_comp,
+        pendencias=faltantes,
+        emitido_em=emitido_em,
+        emitido_por=current_user.nome_completo or current_user.username,
+        validar_url=validar_url,
+    )
+
+
+@app.route("/api/ged/servidor/<int:func_id>", methods=["GET"])
+@login_required
+@security.require_permission("view_ged", api=True)
+def api_ged_listar(func_id):
+    f = db.session.get(Funcionario, func_id)
+    if not f or not security.can_access_record(current_user, f):
+        registrar_violacao_acesso(f"Listar GED funcionario_id={func_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    docs = (
+        DocumentoServidor.query.filter_by(funcionario_id=f.id)
+        .order_by(DocumentoServidor.data_upload.desc())
+        .all()
+    )
+    checklist = ficha_service.get_ged_checklist(docs)
+    fuso_br = pytz.timezone("America/Sao_Paulo")
+    docs_json = [
+        {
+            "id": d.id,
+            "tipo_documento": d.tipo_documento,
+            "tipo_label": ficha_service.GED_LABELS.get(d.tipo_documento, d.tipo_documento),
+            "nome_arquivo": d.nome_arquivo,
+            "mime_type": d.mime_type,
+            "tamanho_fmt": _formatar_tamanho(d.tamanho_bytes),
+            "observacao": d.observacao or "",
+            "validado": bool(d.validado),
+            "validado_por": d.validado_por.username if d.validado_por else "",
+            "enviado_por": d.enviado_por.username if d.enviado_por else "Sistema",
+            "data_upload_fmt": pytz.utc.localize(d.data_upload).astimezone(fuso_br).strftime("%d/%m/%Y %H:%M") if d.data_upload else "---",
+            "view_url": url_for("ged_baixar_documento", doc_id=d.id),
+            "download_url": url_for("ged_baixar_documento", doc_id=d.id, download=1),
+        }
+        for d in docs
+    ]
+    return jsonify({
+        "success": True,
+        "servidor": {"id": f.id, "nome": f.nome, "cpf": f.cpf or "---"},
+        "checklist": checklist,
+        "documentos": docs_json,
+        "pode_gerenciar": security.has_permission(current_user, "manage_ged"),
+        "pode_validar": security.has_permission(current_user, "validate_ged"),
+    })
+
+
+@app.route("/api/ged/upload/<int:func_id>", methods=["POST"])
+@login_required
+@security.require_permission("manage_ged", api=True)
+def api_ged_upload(func_id):
+    f = db.session.get(Funcionario, func_id)
+    if not f or not security.can_access_record(current_user, f):
+        registrar_violacao_acesso(f"Upload GED funcionario_id={func_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    tipo = request.form.get("tipo_documento") or ""
+    observacao = (request.form.get("observacao") or "").strip()[:250]
+    arquivo = request.files.get("arquivo")
+
+    ok, meta, err = ficha_service.preparar_upload_ged(arquivo, tipo)
+    if not ok:
+        return jsonify({"success": False, "message": err}), 400
+
+    novo_doc = DocumentoServidor(
+        funcionario_id=f.id,
+        secretaria_id=f.secretaria_id,
+        tipo_documento=meta["tipo_documento"],
+        nome_arquivo=meta["nome_arquivo"],
+        mime_type=meta["mime_type"],
+        tamanho_bytes=meta["tamanho_bytes"],
+        sha256=meta["sha256"],
+        conteudo_b64=meta["conteudo_b64"],
+        observacao=observacao or None,
+        validado=False,
+        enviado_por_id=current_user.id,
+        data_upload=datetime.utcnow(),
+    )
+    db.session.add(novo_doc)
+    db.session.commit()
+
+    registrar_log(
+        "ANEXOU DOCUMENTO GED",
+        f"{f.nome} — {meta['tipo_documento']} ({meta['nome_arquivo']})",
+        secretaria_id=f.secretaria_id,
+    )
+    return jsonify({"success": True, "message": "Documento anexado ao dossiê com sucesso!", "id": novo_doc.id})
+
+
+@app.route("/ged/documento/<int:doc_id>", methods=["GET"])
+@login_required
+@security.require_permission("view_ged")
+def ged_baixar_documento(doc_id):
+    doc = db.session.get(DocumentoServidor, doc_id)
+    if not doc or not security.can_access_record(current_user, doc):
+        registrar_violacao_acesso(f"Download GED doc_id={doc_id}")
+        flash("Acesso negado ao documento solicitado.", "error")
+        return redirect(url_for("sistema"))
+
+    raw = base64.b64decode(doc.conteudo_b64)
+    as_att = request.args.get("download") == "1"
+    return send_file(
+        io.BytesIO(raw),
+        mimetype=doc.mime_type,
+        as_attachment=as_att,
+        download_name=doc.nome_arquivo,
+    )
+
+
+@app.route("/api/ged/validar/<int:doc_id>", methods=["POST"])
+@login_required
+@security.require_permission("validate_ged", api=True)
+def api_ged_validar(doc_id):
+    doc = db.session.get(DocumentoServidor, doc_id)
+    if not doc or not security.can_access_record(current_user, doc):
+        registrar_violacao_acesso(f"Validar GED doc_id={doc_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    doc.validado = not bool(doc.validado)
+    doc.validado_por_id = current_user.id if doc.validado else None
+    doc.validado_em = datetime.utcnow() if doc.validado else None
+    db.session.commit()
+
+    registrar_log(
+        "VALIDOU DOCUMENTO GED" if doc.validado else "REVOGOU DOCUMENTO GED",
+        f"Doc #{doc.id} ({doc.tipo_documento}) — {doc.funcionario.nome if doc.funcionario else ''}",
+        secretaria_id=doc.secretaria_id,
+    )
+    return jsonify({"success": True, "validado": doc.validado})
+
+
+@app.route("/api/ged/excluir/<int:doc_id>", methods=["POST"])
+@login_required
+@security.require_permission("manage_ged", api=True)
+def api_ged_excluir(doc_id):
+    doc = db.session.get(DocumentoServidor, doc_id)
+    if not doc or not security.can_access_record(current_user, doc):
+        registrar_violacao_acesso(f"Excluir GED doc_id={doc_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    alvo_txt = f"Doc #{doc.id} ({doc.tipo_documento} — {doc.nome_arquivo}) de {doc.funcionario.nome if doc.funcionario else ''}"
+    sec_doc = doc.secretaria_id
+    db.session.delete(doc)
+    db.session.commit()
+
+    registrar_log("EXCLUIU DOCUMENTO GED", alvo_txt, nivel="WARN", secretaria_id=sec_doc)
+    return jsonify({"success": True, "message": "Documento removido do dossiê."})
+
+
+@app.route("/admin/virada_exercicio", methods=["GET"])
+@login_required
+@security.require_permission("manage_virada_exercicio")
+def virada_exercicio_painel():
+    is_global = security.has_global_scope(current_user)
+    ano_destino_default = max(2027, datetime.now().year + (1 if datetime.now().month >= 9 else 0))
+
+    sec_filtro = request.args.get("secretaria_id", type=int) if is_global else current_user.secretaria_id
+    vinculo_filtro = (request.args.get("tipo_vinculo") or "").strip()
+    ano_filtro = request.args.get("ano_atual", type=int)
+    busca = (request.args.get("busca") or "").strip()
+
+    q = security.scope_query(
+        Funcionario.query.filter((Funcionario.ativo == True) | (Funcionario.ativo.is_(None))),
+        Funcionario,
+        current_user,
+    )
+    if is_global and sec_filtro:
+        q = q.filter(Funcionario.secretaria_id == sec_filtro)
+    if vinculo_filtro:
+        q = q.filter(Funcionario.tipo_vinculo == vinculo_filtro)
+    if ano_filtro:
+        q = q.filter(
+            (Funcionario.ano_exercicio_atual == ano_filtro)
+            | (Funcionario.ano_exercicio_atual.is_(None) if ano_filtro == 2026 else False)
+        )
+    if busca:
+        like_b = f"%{busca}%"
+        q = q.filter((Funcionario.nome.ilike(like_b)) | (Funcionario.cpf.ilike(like_b)))
+
+    servidores = q.order_by(Funcionario.nome).all()
+    secretarias = (
+        Secretaria.query.order_by(Secretaria.nome).all()
+        if is_global
+        else Secretaria.query.filter_by(id=current_user.secretaria_id).all()
+    )
+
+    # Histórico resumido de viradas já registradas
+    hist_q = security.scope_query(HistoricoVinculoExercicio.query, HistoricoVinculoExercicio, current_user)
+    resumo_exercicios = (
+        hist_q.with_entities(
+            HistoricoVinculoExercicio.ano_exercicio,
+            HistoricoVinculoExercicio.status,
+            func.count(HistoricoVinculoExercicio.id),
+        )
+        .group_by(HistoricoVinculoExercicio.ano_exercicio, HistoricoVinculoExercicio.status)
+        .order_by(HistoricoVinculoExercicio.ano_exercicio.desc())
+        .all()
+    )
+
+    return render_template(
+        "virada_exercicio.html",
+        servidores=servidores,
+        secretarias=secretarias,
+        resumo_exercicios=resumo_exercicios,
+        ano_destino_default=ano_destino_default,
+        filtros={
+            "secretaria_id": sec_filtro,
+            "tipo_vinculo": vinculo_filtro,
+            "ano_atual": ano_filtro,
+            "busca": busca,
+        },
+    )
+
+
+@app.route("/admin/virada_exercicio/executar", methods=["POST"])
+@login_required
+@security.require_permission("manage_virada_exercicio")
+def executar_virada_exercicio_rota():
+    func_ids = request.form.getlist("func_ids")
+    ano_destino = request.form.get("ano_destino", type=int) or 2027
+    nova_dt_inicio = parse_date(request.form.get("nova_dt_inicio"))
+    nova_dt_termino = parse_date(request.form.get("nova_dt_termino"))
+    tipo_reajuste = (request.form.get("tipo_reajuste") or "nenhum").strip()
+    valor_reajuste = security.parse_remuneracao_float(request.form.get("valor_reajuste"))
+    numero_portaria = (request.form.get("numero_portaria") or "").strip().upper()
+    data_portaria = parse_date(request.form.get("data_portaria"))
+    observacao = (request.form.get("observacao") or "").strip()[:240]
+
+    if not func_ids:
+        flash("Selecione pelo menos um servidor para renovar para o novo exercício.", "error")
+        return redirect(url_for("virada_exercicio_painel"))
+    if not nova_dt_inicio:
+        flash("Informe a Nova Data de Início do exercício.", "error")
+        return redirect(url_for("virada_exercicio_painel"))
+
+    try:
+        res = ficha_service.executar_virada_exercicio(
+            db=db,
+            models={
+                "Funcionario": Funcionario,
+                "HistoricoVinculoExercicio": HistoricoVinculoExercicio,
+            },
+            user=current_user,
+            func_ids=[int(x) for x in func_ids if str(x).isdigit()],
+            ano_destino=ano_destino,
+            nova_dt_inicio=nova_dt_inicio,
+            nova_dt_termino=nova_dt_termino,
+            tipo_reajuste=tipo_reajuste,
+            valor_reajuste=valor_reajuste,
+            numero_portaria=numero_portaria,
+            data_portaria=data_portaria,
+            observacao=observacao,
+        )
+        if res["ignorados_acesso"] > 0:
+            registrar_violacao_acesso(f"Tentativa de virada em {res['ignorados_acesso']} servidor(es) fora do escopo")
+
+        registrar_log(
+            f"VIRADA EXERCICIO {ano_destino}",
+            f"{res['renovados']} servidor(es) renovado(s) | Folha: R$ {res['folha_antes']:,.2f} -> R$ {res['folha_depois']:,.2f}",
+            nivel="INFO",
+            secretaria_id=None if security.has_global_scope(current_user) else current_user.secretaria_id,
+        )
+        flash(
+            f"Virada para o exercício {ano_destino} concluída com sucesso! {res['renovados']} servidor(es) renovado(s) e histórico anterior 100% preservado.",
+            "success",
+        )
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Erro ao executar virada de exercício: {str(e)}", "error")
+
+    return redirect(url_for("virada_exercicio_painel"))
 
 
 # ==============================================================================

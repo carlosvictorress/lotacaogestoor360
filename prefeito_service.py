@@ -706,9 +706,56 @@ def get_dossie_servidor_360(models: Dict[str, Any], func_id: int) -> Optional[Di
     hoje = _today_br()
     dias_restantes = (f.dt_termino - hoje).days if f.dt_termino else None
 
+    # Dossiê GED e Histórico de Exercícios (Fase 4)
+    DocumentoServidor = models.get("DocumentoServidor")
+    HistoricoVinculoExercicio = models.get("HistoricoVinculoExercicio")
+    ged_docs = []
+    if DocumentoServidor is not None:
+        docs_q = (
+            DocumentoServidor.query.filter_by(funcionario_id=f.id)
+            .order_by(DocumentoServidor.data_upload.desc())
+            .all()
+        )
+        ged_docs = [
+            {
+                "id": doc.id,
+                "tipo": doc.tipo_documento,
+                "nome_arquivo": doc.nome_arquivo,
+                "validado": bool(doc.validado),
+                "view_url": f"/ged/documento/{doc.id}",
+            }
+            for doc in docs_q
+        ]
+
+    exercicios_list = []
+    if HistoricoVinculoExercicio is not None:
+        ex_q = (
+            HistoricoVinculoExercicio.query.filter_by(funcionario_id=f.id)
+            .order_by(HistoricoVinculoExercicio.ano_exercicio.desc())
+            .all()
+        )
+        exercicios_list = [
+            {
+                "ano": ex.ano_exercicio,
+                "funcao": ex.funcao_nome or "---",
+                "remuneracao": ex.remuneracao or "---",
+                "status": ex.status or "---",
+                "portaria": ex.numero_portaria or "---",
+            }
+            for ex in ex_q
+        ]
+
     return {
         "id": f.id,
         "nome": f.nome,
+        "foto_3x4_b64": getattr(f, "foto_3x4_b64", None),
+        "numero_portaria": getattr(f, "numero_portaria", None) or "---",
+        "ano_exercicio_atual": getattr(f, "ano_exercicio_atual", 2026) or 2026,
+        "zona_moradia": getattr(f, "zona_moradia", "URBANA") or "URBANA",
+        "povoado_comunidade": getattr(f, "povoado_comunidade", None) or "",
+        "ged_docs": ged_docs,
+        "historico_exercicios": exercicios_list,
+        "ficha_a4_url": f"/ficha/profissional/{f.id}",
         "cpf": f.cpf or "---",
         "rg": f.rg or "---",
         "orgao_emissor_rg": f.orgao_emissor_rg or "",

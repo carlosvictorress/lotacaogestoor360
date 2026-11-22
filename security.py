@@ -121,6 +121,11 @@ PERMISSIONS: Dict[str, set] = {
     # Organograma
     "view_organograma": {"super_admin", "prefeito", "secretario", "auditor"},
     "manage_organograma": {"super_admin", "prefeito", "secretario"},
+    # Dossiê Digital (GED) & Virada de Exercício 2027
+    "view_ged": {"super_admin", "prefeito", "secretario", "rh_secretaria", "auditor"},
+    "manage_ged": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "validate_ged": {"super_admin", "prefeito", "secretario"},
+    "manage_virada_exercicio": {"super_admin", "prefeito", "secretario"},
     # Módulo Estratégico Eleitoral (100% sigiloso e restrito)
     "view_eleitoral": {"super_admin", "prefeito", "estrategia_eleitoral"},
     "manage_eleitoral": {"super_admin", "prefeito", "estrategia_eleitoral"},

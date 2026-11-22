@@ -61,6 +61,8 @@ TABLE_LABELS = {
     "organograma_servidor": "Organograma — Nomeações / Portarias",
     "organograma_historico": "Organograma — Histórico de Atos",
     "local_votacao": "Locais de Votação (Eleitoral)",
+    "documento_servidor": "Dossiê Digital de Documentos (GED)",
+    "historico_vinculo_exercicio": "Histórico de Exercícios (2026/2027)",
     "log_auditoria": "Logs de Auditoria Forense",
 }
 

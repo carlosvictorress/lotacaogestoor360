@@ -827,6 +827,18 @@
 
                 body.innerHTML = `
                     ${alertaAcumulo}
+                    <div class="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900 text-white">
+                        <div class="flex items-center gap-3">
+                            ${d.foto_3x4_b64 ? `<img src="${d.foto_3x4_b64}" class="w-12 h-14 rounded-lg object-cover border border-slate-600">` : `<div class="w-12 h-14 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-[10px] text-slate-400">3×4</div>`}
+                            <div>
+                                <div class="text-xs font-extrabold">Exercício ${escHtml(d.ano_exercicio_atual || 2026)} • Portaria: ${escHtml(d.numero_portaria || '---')}</div>
+                                <div class="text-[11px] text-slate-300">Zona: ${escHtml(d.zona_moradia || 'URBANA')} ${d.povoado_comunidade ? '— ' + escHtml(d.povoado_comunidade) : ''} • GED: <strong>${(d.ged_docs || []).length} doc(s)</strong></div>
+                            </div>
+                        </div>
+                        <a href="${escHtml(d.ficha_a4_url || '#')}" target="_blank" class="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-[11px] transition">
+                            <i class="ph-fill ph-file-pdf"></i> Abrir Ficha A4 Oficial
+                        </a>
+                    </div>
                     <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
                         <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200">
                             <span class="text-[10px] font-bold uppercase text-slate-400">Remuneração</span>
