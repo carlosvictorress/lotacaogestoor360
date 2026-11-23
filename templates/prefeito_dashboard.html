@@ -60,9 +60,9 @@
                     <i class="ph ph-printer text-base"></i> Relatório A4
                 </a>
                 {% if has_perm('view_eleitoral') %}
-                <a href="{{ url_for('eleitoral_index') }}"
+                <a href="{{ url_for('eleitoral_estrategia') }}"
                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-bold transition">
-                    <i class="ph ph-map-pin-area text-base"></i> Eleitoral
+                    <i class="ph ph-strategy text-base"></i> Central Eleitoral
                 </a>
                 {% endif %}
                 <a href="{{ url_for('admin_dashboard') }}"

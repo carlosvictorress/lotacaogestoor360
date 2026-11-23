@@ -32,11 +32,17 @@
                 </div>
 
                 <div class="flex items-center space-x-3">
+                    <a href="{{ url_for('eleitoral_estrategia') }}" class="flex items-center space-x-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs px-3 py-2 rounded-lg transition font-bold shadow">
+                        <i class="ph ph-strategy"></i>
+                        <span>Central Estratégica v2</span>
+                    </a>
+                    {% if has_perm('view_rh') %}
                     <a href="{{ url_for('sistema') }}" class="flex items-center space-x-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-2 rounded-lg transition font-medium">
                         <i class="ph ph-arrow-left"></i>
                         <span>Voltar ao Sistema</span>
                     </a>
-                    {% if current_user.is_admin %}
+                    {% endif %}
+                    {% if has_perm('view_admin_panel') %}
                     <a href="{{ url_for('admin_dashboard') }}" class="flex items-center space-x-1 bg-blue-600 hover:bg-blue-700 text-white text-xs px-3 py-2 rounded-lg transition font-medium">
                         <i class="ph ph-gauge"></i>
                         <span>Dashboard Admin</span>

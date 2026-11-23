@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Caderno de Campo Eleitoral — Sigiloso</title>
+    <style>
+        @page { size: A4 portrait; margin: 10mm; }
+        body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 0; font-size: 8.5pt; }
+        .watermark {
+            position: fixed; top: 44%; left: 8%; right: 8%; text-align: center;
+            font-size: 22pt; font-weight: 900; color: rgba(15, 23, 42, 0.045);
+            transform: rotate(-30deg); pointer-events: none;
+        }
+        .no-print { background: #0f172a; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; color: #fff; }
+        .no-print button { background: #4f46e5; color: #fff; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 700; cursor: pointer; }
+        .hdr { border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .hdr h1 { margin: 0; font-size: 12pt; text-transform: uppercase; }
+        .hdr p { margin: 2px 0 0; font-size: 7.5pt; color: #475569; }
+        .colegio-box { margin-bottom: 12px; page-break-inside: avoid; }
+        .col-title { background: #0f172a; color: #fff; padding: 5px 8px; font-size: 9pt; font-weight: 800; display: flex; justify-content: space-between; }
+        .sec-title { background: #e2e8f0; padding: 3px 8px; font-size: 8pt; font-weight: 800; border: 1px solid #cbd5e1; border-top: none; }
+        table { width: 100%; border-collapse: collapse; font-size: 7.8pt; margin-bottom: 4px; }
+        th, td { border: 1px solid #cbd5e1; padding: 3.5px 5px; text-align: left; }
+        th { background: #f8fafc; font-size: 7pt; text-transform: uppercase; }
+        .empty { color: #b91c1c; font-weight: 700; font-style: italic; background: #fef2f2; }
+        .footer { margin-top: 10px; border-top: 1px solid #94a3b8; padding-top: 5px; font-size: 7pt; color: #475569; display: flex; justify-content: space-between; }
+        @media print { .no-print { display: none; } }
+    </style>
+</head>
+<body>
+    <div class="no-print">
+        <strong>Caderno de Campo Estratégico ({{ dados.total_geral }} servidores mapeados)</strong>
+        <button onclick="window.print()">Imprimir / Salvar PDF</button>
+    </div>
+    <div class="watermark">ESTRATÉGICO SIGILOSO • {{ emitido_por }} • {{ emitido_ip }}</div>
+
+    <div class="hdr">
+        <div>
+            <h1>Caderno de Campo — Colégios & Seções Eleitorais</h1>
+            <p>Valença do Piauí - PI • Escopo: {{ dados.escopo|upper }} • Total Mapeado: {{ dados.total_geral }} servidores</p>
+        </div>
+        <div style="text-align:right; font-size:7.5pt;">
+            Emitido em {{ dados.gerado_em_fmt }}<br>Por: <strong>{{ emitido_por }}</strong>
+        </div>
+    </div>
+
+    {% for b in dados.blocos %}
+    <div class="colegio-box">
+        <div class="col-title">
+            <span>{{ b.local.nome }} ({{ b.local.bairro or '---' }} • Z{{ b.local.zona_eleitoral }})</span>
+            <span>TOTAL: {{ b.total }}</span>
+        </div>
+        {% for s in b.secoes %}
+        <div class="sec-title">SEÇÃO {{ s.secao }} — {{ s.servidores|length }} servidor(es)</div>
+        {% if s.servidores %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Telefone</th>
+                    <th>Bairro / Povoado</th>
+                    <th>Secretaria</th>
+                    <th>Vínculo</th>
+                    <th>Liderança / Padrinho</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in s.servidores %}
+                <tr>
+                    <td><strong>{{ f.nome }}</strong></td>
+                    <td>{{ f.telefone or '---' }}</td>
+                    <td>{{ f.povoado_comunidade or f.bairro or '---' }}</td>
+                    <td>{{ f.secretaria.sigla or f.secretaria.nome[:14] if f.secretaria else '---' }}</td>
+                    <td>{{ f.tipo_vinculo or '---' }}</td>
+                    <td><strong>{{ f.padrinho.nome if f.padrinho else '---' }}</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <table><tr><td class="empty">SEÇÃO DESCOBERTA (0 servidores vinculados — prioridade de mobilização)</td></tr></table>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endfor %}
+
+    <div class="footer">
+        <span>MATERIAL ESTRATÉGICO SIGILOSO — Gestoor 360</span>
+        <span>Rastreabilidade: {{ emitido_por }} • IP {{ emitido_ip }} • {{ dados.gerado_em_fmt }}</span>
+    </div>
+</body>
+</html>

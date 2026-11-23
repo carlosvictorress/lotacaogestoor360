@@ -237,11 +237,11 @@
                 <p class="sidebar-section-title px-3 text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500">Gestão de Pessoas & RH</p>
 
                 {% if has_perm('view_eleitoral') %}
-                <a href="/eleitoral"
+                <a href="{{ url_for('eleitoral_estrategia') }}"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition-colors dark:text-gray-200 dark:hover:bg-blue-950/40">
                     <div class="flex items-center gap-2.5">
-                        <i class="ph ph-vote text-base text-blue-600"></i>
-                        <span>Mapeamento Eleitoral</span>
+                        <i class="ph ph-strategy text-base text-blue-600"></i>
+                        <span>Central Eleitoral v2</span>
                     </div>
                     <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/60 dark:text-blue-300">Sigiloso</span>
                 </a>

@@ -33,6 +33,7 @@ import backup_service
 import security
 import prefeito_service
 import ficha_service
+import eleitoral_service
 
 load_dotenv()
 
@@ -162,6 +163,12 @@ class LocalTrabalho(db.Model):
 class Padrinho(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(150), unique=True, nullable=False)
+    categoria = db.Column(db.String(50), default="LIDERANCA")  # VEREADOR, EX_VEREADOR, SECRETARIO, LIDERANCA_COMUNITARIA, GABINETE, TECNICO, OUTRO
+    regiao_atuacao = db.Column(db.String(150), nullable=True)
+    telefone = db.Column(db.String(30), nullable=True)
+    meta_base = db.Column(db.Integer, default=0)
+    observacoes = db.Column(db.Text, nullable=True)
+    ativo = db.Column(db.Boolean, default=True)
 
     @property
     def indicados_count(self):
@@ -598,6 +605,8 @@ class LocalVotacao(db.Model):
     uf = db.Column(db.String(2), default="PI")
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
+    tipo_zona = db.Column(db.String(20), default="URBANA")  # URBANA, RURAL
+    meta_cobertura = db.Column(db.Integer, default=0)
     observacoes = db.Column(db.Text, nullable=True)
     data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -2787,6 +2796,18 @@ def atualizar_schema():
                     ("motivo_edicao", "TEXT"),
                     ("data_edicao", "TIMESTAMP"),
                     ("quem_editou_id", "INTEGER"),
+                ],
+                "padrinho": [
+                    ("categoria", "VARCHAR(50) DEFAULT 'LIDERANCA'"),
+                    ("regiao_atuacao", "VARCHAR(150)"),
+                    ("telefone", "VARCHAR(30)"),
+                    ("meta_base", "INTEGER DEFAULT 0"),
+                    ("observacoes", "TEXT"),
+                    ("ativo", "BOOLEAN DEFAULT TRUE"),
+                ],
+                "local_votacao": [
+                    ("tipo_zona", "VARCHAR(20) DEFAULT 'URBANA'"),
+                    ("meta_cobertura", "INTEGER DEFAULT 0"),
                 ],
                 '"user"': [
                     ("nome_completo", "VARCHAR(150)"),
@@ -5902,6 +5923,12 @@ def eleitoral_local_novo():
     bairro = request.form.get("bairro", "").strip()
     endereco = request.form.get("endereco", "").strip()
     observacoes = request.form.get("observacoes", "").strip()
+    tipo_zona = (request.form.get("tipo_zona") or "URBANA").strip().upper()
+    meta_cobertura = request.form.get("meta_cobertura", type=int) or 0
+    lat_raw = (request.form.get("latitude") or "").strip().replace(",", ".")
+    lng_raw = (request.form.get("longitude") or "").strip().replace(",", ".")
+    lat_val = float(lat_raw) if lat_raw else None
+    lng_val = float(lng_raw) if lng_raw else None
 
     if not nome or not secoes:
         flash("Nome do Colégio e Seções são obrigatórios!", "danger")
@@ -5913,7 +5940,11 @@ def eleitoral_local_novo():
         secoes=secoes,
         bairro=bairro,
         endereco=endereco,
-        observacoes=observacoes
+        observacoes=observacoes,
+        tipo_zona=tipo_zona if tipo_zona in ("URBANA", "RURAL") else "URBANA",
+        meta_cobertura=max(0, meta_cobertura),
+        latitude=lat_val,
+        longitude=lng_val,
     )
     db.session.add(novo_local)
 
@@ -5941,6 +5972,18 @@ def eleitoral_local_editar(id):
     local.bairro = request.form.get("bairro", local.bairro).strip()
     local.endereco = request.form.get("endereco", local.endereco).strip()
     local.observacoes = request.form.get("observacoes", local.observacoes).strip()
+    if request.form.get("tipo_zona"):
+        tz = request.form.get("tipo_zona").strip().upper()
+        if tz in ("URBANA", "RURAL"):
+            local.tipo_zona = tz
+    if request.form.get("meta_cobertura") is not None and request.form.get("meta_cobertura") != "":
+        local.meta_cobertura = max(0, request.form.get("meta_cobertura", type=int) or 0)
+    if request.form.get("latitude") is not None:
+        lr = request.form.get("latitude", "").strip().replace(",", ".")
+        local.latitude = float(lr) if lr else None
+    if request.form.get("longitude") is not None:
+        lgr = request.form.get("longitude", "").strip().replace(",", ".")
+        local.longitude = float(lgr) if lgr else None
 
     log = LogAuditoria(
         usuario_id=current_user.id,
@@ -6635,6 +6678,227 @@ def executar_virada_exercicio_rota():
         flash(f"Erro ao executar virada de exercício: {str(e)}", "error")
 
     return redirect(url_for("virada_exercicio_painel"))
+
+
+# ==============================================================================
+# MÓDULO FASE 5: CENTRAL ESTRATÉGICA DE CAMPANHAS ELEITORAIS v2 (SIGILOSO)
+# ==============================================================================
+
+def _eleitoral_models_ctx():
+    return {
+        "Secretaria": Secretaria,
+        "Funcionario": Funcionario,
+        "LocalVotacao": LocalVotacao,
+        "Padrinho": Padrinho,
+        "normalizar_numero_eleitoral": normalizar_numero_eleitoral,
+    }
+
+
+@app.route("/eleitoral/estrategia", methods=["GET"])
+@login_required
+@security.require_permission("view_eleitoral")
+def eleitoral_estrategia():
+    sec_id = request.args.get("secretaria_id", type=int)
+    escopo = (request.args.get("escopo") or "todos").strip()
+    if escopo not in ("todos", "comissionados_contratados", "comissionado", "contratado", "efetivo"):
+        escopo = "todos"
+    tipo_zona = (request.args.get("tipo_zona") or "").strip().upper()
+    if tipo_zona not in ("", "URBANA", "RURAL"):
+        tipo_zona = ""
+    padrinho_id = request.args.get("padrinho_id", type=int)
+    busca = (request.args.get("busca") or "").strip()
+
+    dados = eleitoral_service.build_central_estrategica_data(
+        models=_eleitoral_models_ctx(),
+        user=current_user,
+        filtro_secretaria_id=sec_id,
+        filtro_escopo=escopo,
+        filtro_tipo_zona=tipo_zona,
+        filtro_padrinho_id=padrinho_id,
+        filtro_busca=busca,
+    )
+    return render_template("eleitoral_estrategia.html", dados=dados)
+
+
+@app.route("/api/eleitoral/lideranca/salvar", methods=["POST"])
+@login_required
+@security.require_permission("manage_eleitoral", api=True)
+def api_eleitoral_salvar_lideranca():
+    data = request.get_json(silent=True) or request.form
+    pad_id = data.get("id")
+    nome = (data.get("nome") or "").strip().upper()
+    categoria = (data.get("categoria") or "LIDERANCA").strip().upper()
+    regiao = (data.get("regiao_atuacao") or "").strip().upper() or None
+    telefone = (data.get("telefone") or "").strip() or None
+    observacoes = (data.get("observacoes") or "").strip() or None
+    try:
+        meta_base = max(0, int(data.get("meta_base") or 0))
+    except (TypeError, ValueError):
+        meta_base = 0
+    ativo = str(data.get("ativo", "1")).lower() in ("1", "true", "on", "sim")
+
+    if categoria not in eleitoral_service.CATEGORIA_LABELS:
+        categoria = "LIDERANCA"
+
+    if pad_id:
+        pad = db.session.get(Padrinho, int(pad_id))
+        if not pad:
+            return jsonify({"success": False, "message": "Liderança não encontrada."}), 404
+        if nome and nome != pad.nome:
+            if Padrinho.query.filter(Padrinho.nome == nome, Padrinho.id != pad.id).first():
+                return jsonify({"success": False, "message": "Já existe outra liderança com este nome."}), 400
+            pad.nome = nome
+        pad.categoria = categoria
+        pad.regiao_atuacao = regiao
+        pad.telefone = telefone
+        pad.meta_base = meta_base
+        pad.observacoes = observacoes
+        pad.ativo = ativo
+        acao_log = "EDITOU LIDERANCA ELEITORAL"
+    else:
+        if not nome:
+            return jsonify({"success": False, "message": "Informe o nome da liderança."}), 400
+        if Padrinho.query.filter_by(nome=nome).first():
+            return jsonify({"success": False, "message": "Já existe uma liderança com este nome."}), 400
+        pad = Padrinho(
+            nome=nome,
+            categoria=categoria,
+            regiao_atuacao=regiao,
+            telefone=telefone,
+            meta_base=meta_base,
+            observacoes=observacoes,
+            ativo=ativo,
+        )
+        db.session.add(pad)
+        acao_log = "CRIOU LIDERANCA ELEITORAL"
+
+    db.session.commit()
+    registrar_log(acao_log, f"{pad.nome} [{pad.categoria}] Meta={pad.meta_base}", nivel="SECURITY")
+    return jsonify({"success": True, "id": pad.id, "message": f"Liderança '{pad.nome}' salva com sucesso!"})
+
+
+@app.route("/api/eleitoral/local/coordenadas", methods=["POST"])
+@login_required
+@security.require_permission("manage_eleitoral", api=True)
+def api_eleitoral_salvar_coordenadas():
+    data = request.get_json(silent=True) or request.form
+    try:
+        loc_id = int(data.get("local_id"))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Colégio inválido."}), 400
+
+    loc = db.session.get(LocalVotacao, loc_id)
+    if not loc:
+        return jsonify({"success": False, "message": "Colégio não encontrado."}), 404
+
+    lat_s = str(data.get("latitude") or "").strip().replace(",", ".")
+    lng_s = str(data.get("longitude") or "").strip().replace(",", ".")
+    try:
+        loc.latitude = float(lat_s) if lat_s else None
+        loc.longitude = float(lng_s) if lng_s else None
+    except ValueError:
+        return jsonify({"success": False, "message": "Latitude/Longitude inválidas."}), 400
+
+    tz = str(data.get("tipo_zona") or loc.tipo_zona or "URBANA").strip().upper()
+    if tz in ("URBANA", "RURAL"):
+        loc.tipo_zona = tz
+    try:
+        loc.meta_cobertura = max(0, int(data.get("meta_cobertura") or 0))
+    except (TypeError, ValueError):
+        pass
+
+    db.session.commit()
+    registrar_log("ATUALIZOU COORDENADAS COLEGIO", f"{loc.nome} ({loc.tipo_zona}, Meta={loc.meta_cobertura})", nivel="SECURITY")
+    return jsonify({"success": True, "message": f"Georreferenciamento e meta de '{loc.nome}' atualizados!"})
+
+
+@app.route("/eleitoral/caderno_campo", methods=["GET"])
+@login_required
+@security.require_permission("view_eleitoral")
+def eleitoral_caderno_campo():
+    local_id = request.args.get("local_id", type=int)
+    sec_id = request.args.get("secretaria_id", type=int)
+    escopo = (request.args.get("escopo") or "todos").strip()
+
+    dados = eleitoral_service.build_caderno_campo_data(
+        models=_eleitoral_models_ctx(),
+        local_id=local_id,
+        secretaria_id=sec_id,
+        escopo=escopo,
+    )
+    registrar_log(
+        "IMPRIMIU CADERNO CAMPO ELEITORAL",
+        f"local_id={local_id or 'TODOS'} | escopo={escopo} | total={dados['total_geral']}",
+        nivel="SECURITY",
+    )
+    return render_template(
+        "eleitoral_caderno_campo.html",
+        dados=dados,
+        emitido_por=current_user.nome_completo or current_user.username,
+        emitido_ip=request.remote_addr or "N/D",
+    )
+
+
+@app.route("/eleitoral/dossie_lideranca/<int:padrinho_id>", methods=["GET"])
+@login_required
+@security.require_permission("view_eleitoral")
+def eleitoral_dossie_lideranca(padrinho_id):
+    pode_ver_folha = security.has_permission(current_user, "view_folha")
+    dados = eleitoral_service.build_dossie_lideranca_data(
+        models=_eleitoral_models_ctx(),
+        padrinho_id=padrinho_id,
+        pode_ver_folha=pode_ver_folha,
+    )
+    if not dados:
+        flash("Liderança não encontrada.", "error")
+        return redirect(url_for("eleitoral_estrategia"))
+
+    registrar_log(
+        "IMPRIMIU DOSSIE LIDERANCA",
+        f"{dados['lideranca'].nome} ({dados['total_indicados']} indicados)",
+        nivel="SECURITY",
+    )
+    return render_template(
+        "eleitoral_dossie_lideranca.html",
+        dados=dados,
+        emitido_por=current_user.nome_completo or current_user.username,
+        emitido_ip=request.remote_addr or "N/D",
+    )
+
+
+@app.route("/eleitoral/exportar_excel", methods=["GET"])
+@login_required
+@security.require_permission("view_eleitoral")
+def eleitoral_exportar_excel():
+    sec_id = request.args.get("secretaria_id", type=int)
+    escopo = (request.args.get("escopo") or "todos").strip()
+    tipo_zona = (request.args.get("tipo_zona") or "").strip().upper()
+    padrinho_id = request.args.get("padrinho_id", type=int)
+    busca = (request.args.get("busca") or "").strip()
+
+    dados = eleitoral_service.build_central_estrategica_data(
+        models=_eleitoral_models_ctx(),
+        user=current_user,
+        filtro_secretaria_id=sec_id,
+        filtro_escopo=escopo,
+        filtro_tipo_zona=tipo_zona,
+        filtro_padrinho_id=padrinho_id,
+        filtro_busca=busca,
+    )
+    xlsx_bytes = eleitoral_service.export_eleitoral_excel_bytes(dados)
+    registrar_log(
+        "EXPORTOU EXCEL ELEITORAL",
+        f"escopo={escopo} | colegios={dados['kpis']['total_colegios']} | liderancas={dados['kpis']['total_liderancas']}",
+        nivel="SECURITY",
+    )
+    stamp = datetime.now().strftime("%Y%m%d_%H%M")
+    return Response(
+        xlsx_bytes,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment;filename=central_eleitoral_{stamp}.xlsx"
+        },
+    )
 
 
 # ==============================================================================

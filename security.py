@@ -185,7 +185,7 @@ def get_default_home_endpoint(user) -> str:
     if role == "prefeito":
         return "painel_prefeito"
     if role == "estrategia_eleitoral":
-        return "eleitoral_index"
+        return "eleitoral_estrategia"
     if role in ("super_admin", "secretario", "auditor"):
         return "admin_dashboard"
     if role == "chefe_unidade":

@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Central Estratégica Eleitoral v2 — Gestoor 360</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .e-tab { display: none; }
+        .e-tab.active { display: block; animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        #mapaCalorEleitoral { height: 380px; width: 100%; border-radius: 14px; z-index: 1; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+
+    <!-- CABEÇALHO SIGILOSO -->
+    <header class="bg-slate-950 text-white border-b border-slate-800 sticky top-0 z-40 shadow-lg">
+        <div class="max-w-[1480px] mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                    <i class="ph-fill ph-strategy text-white text-xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h1 class="text-base sm:text-lg font-extrabold tracking-tight">Central Estratégica Eleitoral v2</h1>
+                        <span class="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/30">Acesso Sigiloso</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400">Inteligência Territorial, Lideranças & Operação Regularização 2027 • Atualizado em {{ dados.gerado_em_fmt }}</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+                <a href="{{ url_for('eleitoral_exportar_excel', secretaria_id=dados.filtros.secretaria_id or '', escopo=dados.filtros.escopo, tipo_zona=dados.filtros.tipo_zona, padrinho_id=dados.filtros.padrinho_id or '', busca=dados.filtros.busca) }}"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition">
+                    <i class="ph ph-microsoft-excel-logo text-base"></i> Excel Estratégico
+                </a>
+                <a href="{{ url_for('eleitoral_caderno_campo', secretaria_id=dados.filtros.secretaria_id or '', escopo=dados.filtros.escopo) }}" target="_blank"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition">
+                    <i class="ph ph-notebook text-base"></i> Caderno de Campo A4
+                </a>
+                <a href="{{ url_for('eleitoral_index') }}"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-blue-300 border border-slate-700 text-xs font-bold transition">
+                    <i class="ph ph-buildings text-base"></i> Cadastro Colégios
+                </a>
+                {% if has_perm('view_prefeito_panel') %}
+                <a href="{{ url_for('painel_prefeito') }}"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-400/30 text-xs font-bold transition">
+                    <i class="ph-fill ph-crown text-base"></i> Prefeito
+                </a>
+                {% endif %}
+                {% if has_perm('view_admin_panel') %}
+                <a href="{{ url_for('admin_dashboard') }}"
+                   class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition">
+                    Admin
+                </a>
+                {% endif %}
+                <a href="{{ url_for('logout') }}" class="px-2.5 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800/60 text-xs font-bold" title="Sair">
+                    <i class="ph ph-sign-out text-base"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-[1480px] mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <!-- 5 KPIs ESTRATÉGICOS -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div class="bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-2xl p-5 shadow-md border border-slate-800">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-blue-300">Base Mapeada nos Colégios</span>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <span class="text-3xl font-black">{{ dados.kpis.total_mapeados }}</span>
+                    <span class="text-xs font-bold text-emerald-400">{{ dados.kpis.pct_mapeados }}%</span>
+                </div>
+                <p class="text-[11px] text-slate-300 mt-2">Base filtrada: <strong>{{ dados.kpis.total_base }}</strong> • Comiss./Contr.: <strong class="text-amber-300">{{ dados.kpis.total_com_e_cont }}</strong></p>
+            </div>
+
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Cobertura de Seções</span>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <span class="text-3xl font-black text-slate-900">{{ dados.kpis.pct_secoes_cobertas }}%</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2"><strong>{{ dados.kpis.secoes_cobertas }}</strong> de <strong>{{ dados.kpis.total_secoes }}</strong> seções com presença</p>
+            </div>
+
+            <button type="button" onclick="ativarAbaEleitoral('etab-descobertas')" class="text-left bg-white hover:border-rose-400 transition rounded-2xl p-5 shadow-sm border border-slate-200">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-rose-700">Seções Descobertas (Zero)</span>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <span class="text-3xl font-black {{ 'text-rose-600' if dados.kpis.secoes_descobertas > 0 else 'text-emerald-600' }}">{{ dados.kpis.secoes_descobertas }}</span>
+                    <span class="text-xs text-slate-400">vazias</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">Colégios silenciosos: <strong class="text-rose-600">{{ dados.kpis.colegios_silenciosos }}</strong> de {{ dados.kpis.total_colegios }}</p>
+            </button>
+
+            <button type="button" onclick="ativarAbaEleitoral('etab-regularizacao')" class="text-left bg-white hover:border-amber-400 transition rounded-2xl p-5 shadow-sm border border-slate-200">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700">Operação Regularização 2027</span>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <span class="text-3xl font-black text-amber-600">{{ dados.kpis.total_pendentes }}</span>
+                    <span class="text-xs text-slate-400">pendentes</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">Sem título, sem seção ou fora da Zona 018</p>
+            </button>
+
+            <button type="button" onclick="ativarAbaEleitoral('etab-liderancas')" class="text-left bg-white hover:border-indigo-400 transition rounded-2xl p-5 shadow-sm border border-slate-200">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Rede de Lideranças</span>
+                <div class="flex items-baseline gap-2 mt-1">
+                    <span class="text-3xl font-black text-indigo-700">{{ dados.kpis.total_liderancas }}</span>
+                    <span class="text-xs text-slate-400">cadastradas</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">Colégios no mapa GPS: <strong>{{ dados.kpis.colegios_georreferenciados }}/{{ dados.kpis.total_colegios }}</strong></p>
+            </button>
+        </section>
+
+        <!-- FILTROS ESTRATÉGICOS -->
+        <section class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+            <form method="GET" action="{{ url_for('eleitoral_estrategia') }}" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Foco de Vínculo</label>
+                    <select name="escopo" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-xs font-bold">
+                        <option value="todos" {{ 'selected' if dados.filtros.escopo == 'todos' }}>Todos os Servidores</option>
+                        <option value="comissionados_contratados" {{ 'selected' if dados.filtros.escopo == 'comissionados_contratados' }}>Comissionados + Contratados</option>
+                        <option value="comissionado" {{ 'selected' if dados.filtros.escopo == 'comissionado' }}>Somente Comissionados</option>
+                        <option value="contratado" {{ 'selected' if dados.filtros.escopo == 'contratado' }}>Somente Contratados</option>
+                        <option value="efetivo" {{ 'selected' if dados.filtros.escopo == 'efetivo' }}>Somente Efetivos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Secretaria</label>
+                    <select name="secretaria_id" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-xs font-semibold">
+                        <option value="">Todas as Secretarias</option>
+                        {% for s in dados.secretarias %}
+                        <option value="{{ s.id }}" {{ 'selected' if dados.filtros.secretaria_id == s.id }}>{{ s.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Zona (Urbana/Rural)</label>
+                    <select name="tipo_zona" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-xs font-semibold">
+                        <option value="">Urbana + Rural</option>
+                        <option value="URBANA" {{ 'selected' if dados.filtros.tipo_zona == 'URBANA' }}>Somente Zona Urbana</option>
+                        <option value="RURAL" {{ 'selected' if dados.filtros.tipo_zona == 'RURAL' }}>Somente Zona Rural</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Liderança / Padrinho</label>
+                    <select name="padrinho_id" class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-xs font-semibold">
+                        <option value="">Todas as Lideranças</option>
+                        {% for p in dados.padrinhos %}
+                        <option value="{{ p.id }}" {{ 'selected' if dados.filtros.padrinho_id == p.id }}>{{ p.nome }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Buscar Colégio / Bairro / Seção</label>
+                    <input type="text" name="busca" value="{{ dados.filtros.busca }}" placeholder="Ex: Centro, 0012..." class="w-full border border-slate-200 bg-slate-50 rounded-xl px-3 py-2 text-xs">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="flex-1 bg-slate-900 hover:bg-indigo-700 text-white text-xs font-bold py-2 px-3 rounded-xl transition">Filtrar</button>
+                    <a href="{{ url_for('eleitoral_estrategia') }}" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold" title="Limpar"><i class="ph ph-arrows-counter-clockwise"></i></a>
+                </div>
+            </form>
+        </section>
+
+        <!-- ABAS ESTRATÉGICAS -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1">
+            <button type="button" data-etab="etab-mapa" onclick="ativarAbaEleitoral('etab-mapa')" class="etab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap bg-slate-900 text-white shadow-sm">
+                <i class="ph ph-map-trifold text-base"></i> Mapa de Calor & Matriz Colégios
+            </button>
+            <button type="button" data-etab="etab-descobertas" onclick="ativarAbaEleitoral('etab-descobertas')" class="etab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">
+                <i class="ph ph-warning-circle text-base"></i> Seções Descobertas ({{ dados.kpis.secoes_descobertas }})
+            </button>
+            <button type="button" data-etab="etab-liderancas" onclick="ativarAbaEleitoral('etab-liderancas')" class="etab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">
+                <i class="ph ph-users-four text-base"></i> Lideranças & Metas ({{ dados.liderancas_ranking|length }})
+            </button>
+            <button type="button" data-etab="etab-regularizacao" onclick="ativarAbaEleitoral('etab-regularizacao')" class="etab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">
+                <i class="ph ph-clipboard-text text-base"></i> Operação Regularização 2027 ({{ dados.kpis.total_pendentes }})
+            </button>
+            <button type="button" data-etab="etab-bairros" onclick="ativarAbaEleitoral('etab-bairros')" class="etab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap bg-white text-slate-600 border border-slate-200 hover:bg-slate-100">
+                <i class="ph ph-house-line text-base"></i> Força por Bairro & Povoado
+            </button>
+        </div>
+
+        <!-- ABA 1: MAPA DE CALOR + MATRIZ COLÉGIOS -->
+        <section id="etab-mapa" class="e-tab active space-y-6">
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <div>
+                        <h2 class="text-sm font-extrabold text-slate-900">Mapa de Calor Geográfico — Colégios Eleitorais</h2>
+                        <p class="text-[11px] text-slate-400">Verde = Base Forte • Âmbar = Moderado • Vermelho = Zona Silenciosa (0 servidores). Use o botão <strong>GPS / Meta</strong> na tabela abaixo para posicionar cada colégio.</p>
+                    </div>
+                    <span class="text-[11px] font-bold px-3 py-1 rounded-full bg-indigo-50 text-indigo-700">{{ dados.kpis.colegios_georreferenciados }} colégio(s) no mapa</span>
+                </div>
+                <div id="mapaCalorEleitoral"></div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100">
+                    <h2 class="text-sm font-extrabold text-slate-900">Matriz de Cobertura: Colégio × Seções Eleitorais</h2>
+                    <p class="text-[11px] text-slate-400">Cada pílula representa uma seção (em vermelho = seção descoberta com 0 servidores vinculados)</p>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-[10px] font-bold uppercase text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">Colégio / Bairro / Zona</th>
+                                <th class="px-3 py-3 text-center">Servidores</th>
+                                <th class="px-3 py-3 text-center">Cobertura Seções</th>
+                                <th class="px-4 py-3 min-w-[260px]">Seções (Verde = Coberta • Vermelho = 0)</th>
+                                <th class="px-4 py-3">Lideranças Presentes</th>
+                                <th class="px-4 py-3 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for c in dados.matriz_colegios %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-3">
+                                    <div class="font-bold text-slate-900">{{ c.nome }}</div>
+                                    <div class="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                        <span class="px-1.5 py-0.5 rounded {{ 'bg-emerald-50 text-emerald-700' if c.tipo_zona == 'RURAL' else 'bg-blue-50 text-blue-700' }} font-bold">{{ c.tipo_zona }}</span>
+                                        <span>{{ c.bairro }} • Z{{ c.zona_eleitoral }}</span>
+                                        {% if c.latitude %}<span class="text-indigo-600 font-bold">• GPS ✓</span>{% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3 text-center">
+                                    <span class="inline-block px-2.5 py-1 rounded-lg font-black text-white {{ 'bg-rose-600' if c.nivel == 'CRITICO' else ('bg-emerald-600' if c.nivel == 'FORTE' else 'bg-amber-500') }}">{{ c.total_servidores }}</span>
+                                    <div class="text-[10px] text-slate-400 mt-0.5">C/T: {{ c.com_e_cont }} • Ef: {{ c.efetivos }}</div>
+                                    {% if c.meta_cobertura > 0 %}<div class="text-[10px] font-bold text-indigo-600">Meta: {{ c.meta_cobertura }}</div>{% endif %}
+                                </td>
+                                <td class="px-3 py-3 text-center">
+                                    <div class="font-extrabold {{ 'text-emerald-700' if c.pct_cobertura >= 75 else ('text-amber-600' if c.pct_cobertura > 0 else 'text-rose-600') }}">{{ c.pct_cobertura }}%</div>
+                                    <div class="text-[10px] text-slate-400">{{ c.secoes_cobertas }}/{{ c.qtd_secoes }}</div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-wrap gap-1">
+                                        {% for sd in c.secoes_detalhe %}
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold {{ 'bg-emerald-50 text-emerald-800 border border-emerald-200' if sd.qtd > 0 else 'bg-rose-50 text-rose-700 border border-rose-200' }}">
+                                            {{ sd.secao }} ({{ sd.qtd }})
+                                        </span>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-wrap gap-1">
+                                        {% for lid in c.liderancas[:4] %}
+                                        <span class="px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold">{{ lid }}</span>
+                                        {% else %}
+                                        <span class="text-[10px] text-slate-400 italic">Nenhuma liderança</span>
+                                        {% endfor %}
+                                        {% if c.liderancas|length > 4 %}<span class="text-[10px] text-slate-400">+{{ c.liderancas|length - 4 }}</span>{% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap">
+                                    <button type="button" onclick='abrirModalGeo({{ c.id }}, {{ c.nome|tojson }}, {{ (c.latitude if c.latitude is not none else "")|tojson }}, {{ (c.longitude if c.longitude is not none else "")|tojson }}, {{ c.tipo_zona|tojson }}, {{ c.meta_cobertura }})'
+                                            class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px]">GPS / Meta</button>
+                                    <a href="{{ url_for('eleitoral_caderno_campo', local_id=c.id, escopo=dados.filtros.escopo) }}" target="_blank"
+                                       class="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] ml-1">Caderno</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" class="px-6 py-8 text-center text-slate-400">Nenhum colégio encontrado.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ABA 2: SEÇÕES DESCOBERTAS (ZERO SERVIDORES) -->
+        <section id="etab-descobertas" class="e-tab">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-sm font-extrabold text-rose-700">Radar de Seções Descobertas (0 Servidores Vinculados)</h2>
+                        <p class="text-[11px] text-slate-400">Prioridades para mobilização de base e alocação de lideranças</p>
+                    </div>
+                    <span class="px-3 py-1 rounded-full bg-rose-100 text-rose-800 font-extrabold text-xs">{{ dados.secoes_descobertas|length }} seção(ões)</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-[10px] font-bold uppercase text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">Colégio Eleitoral</th>
+                                <th class="px-4 py-3">Zona / Tipo</th>
+                                <th class="px-4 py-3">Bairro / Localidade</th>
+                                <th class="px-4 py-3 text-center">Seção Descoberta</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for sd in dados.secoes_descobertas %}
+                            <tr class="hover:bg-rose-50/40">
+                                <td class="px-4 py-2.5 font-bold text-slate-900">{{ sd.colegio }}</td>
+                                <td class="px-4 py-2.5">Z{{ sd.zona }} • <span class="font-bold text-slate-600">{{ sd.tipo_zona }}</span></td>
+                                <td class="px-4 py-2.5 text-slate-600">{{ sd.bairro }}</td>
+                                <td class="px-4 py-2.5 text-center"><span class="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-mono font-extrabold">Seção {{ sd.secao }}</span></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="px-6 py-10 text-center text-emerald-700 font-bold">Todas as seções cadastradas possuem cobertura ativa!</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ABA 3: REDE DE LIDERANÇAS / PADRINHOS v2 -->
+        <section id="etab-liderancas" class="e-tab">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h2 class="text-sm font-extrabold text-slate-900">Gestão Profissional de Lideranças / Padrinhos v2</h2>
+                        <p class="text-[11px] text-slate-400">Categoria, região de atuação, metas de base, top colégios eleitorais e dossiê individual</p>
+                    </div>
+                    <button type="button" onclick="abrirModalLideranca()" class="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-indigo-600 text-white text-xs font-bold transition">
+                        <i class="ph ph-plus mr-1"></i> Nova Liderança
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-[10px] font-bold uppercase text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">Liderança / Categoria / Região</th>
+                                <th class="px-3 py-3 text-center">Indicados / Meta</th>
+                                {% if dados.pode_ver_folha %}<th class="px-3 py-3 text-right">Impacto Folha</th>{% endif %}
+                                <th class="px-3 py-3 text-center">Z018 Regular</th>
+                                <th class="px-4 py-3">Principais Colégios Eleitorais</th>
+                                <th class="px-4 py-3 text-right">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for p in dados.liderancas_ranking %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-3">
+                                    <div class="font-extrabold text-slate-900 uppercase">{{ p.nome }}</div>
+                                    <div class="text-[10px] text-slate-500 flex flex-wrap items-center gap-1.5 mt-0.5">
+                                        <span class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 font-bold">{{ p.categoria_label }}</span>
+                                        {% if p.regiao_atuacao %}<span>• {{ p.regiao_atuacao }}</span>{% endif %}
+                                        {% if p.telefone %}<span>• {{ p.telefone }}</span>{% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-3 py-3 text-center">
+                                    <div class="font-black text-slate-900">{{ p.total_indicados }} <span class="text-[10px] font-normal text-slate-400">(C/T: {{ p.com_e_cont }})</span></div>
+                                    {% if p.meta_base > 0 %}
+                                    <div class="w-24 mx-auto h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1">
+                                        <div class="h-full {{ 'bg-emerald-500' if p.pct_meta >= 100 else 'bg-indigo-500' }}" style="width: {{ [p.pct_meta, 100]|min }}%;"></div>
+                                    </div>
+                                    <div class="text-[10px] text-slate-500">Meta {{ p.meta_base }} ({{ p.pct_meta }}%)</div>
+                                    {% endif %}
+                                </td>
+                                {% if dados.pode_ver_folha %}
+                                <td class="px-3 py-3 text-right font-extrabold text-emerald-700 whitespace-nowrap">{{ p.folha_mensal_fmt }}</td>
+                                {% endif %}
+                                <td class="px-3 py-3 text-center">
+                                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ 'bg-emerald-50 text-emerald-700' if p.pct_regularizados >= 80 else 'bg-amber-50 text-amber-800' }}">{{ p.pct_regularizados }}%</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex flex-wrap gap-1">
+                                        {% for tc in p.top_colegios %}
+                                        <span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold">{{ tc.nome }} (<strong>{{ tc.qtd }}</strong>)</span>
+                                        {% else %}
+                                        <span class="text-[10px] text-slate-400">Sem mapeamento</span>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap">
+                                    <button type="button" onclick='abrirModalLideranca({{ p.id }}, {{ p.nome|tojson }}, {{ p.categoria|tojson }}, {{ p.regiao_atuacao|tojson }}, {{ p.telefone|tojson }}, {{ p.meta_base }}, {{ p.observacoes|tojson }})'
+                                            class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px]">Editar</button>
+                                    <a href="{{ url_for('eleitoral_dossie_lideranca', padrinho_id=p.id) }}" target="_blank"
+                                       class="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-indigo-600 text-white font-bold text-[11px] ml-1">Dossiê A4</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ABA 4: OPERAÇÃO REGULARIZAÇÃO 2027 -->
+        <section id="etab-regularizacao" class="e-tab space-y-5">
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                <h2 class="text-sm font-extrabold text-slate-900 mb-3">Placar de Regularização Eleitoral 2027 por Secretaria</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {% for rs in dados.regularizacao_secretarias %}
+                    <div class="p-3.5 rounded-xl border border-slate-200 bg-slate-50">
+                        <div class="flex justify-between items-center mb-1">
+                            <strong class="text-xs text-slate-900 truncate">{{ rs.sigla }} — {{ rs.nome }}</strong>
+                            <span class="text-xs font-black {{ 'text-emerald-700' if rs.pct_regular >= 85 else 'text-amber-700' }}">{{ rs.pct_regular }}%</span>
+                        </div>
+                        <div class="w-full h-2 bg-slate-200 rounded-full overflow-hidden mb-2">
+                            <div class="h-full {{ 'bg-emerald-500' if rs.pct_regular >= 85 else 'bg-amber-500' }}" style="width: {{ rs.pct_regular }}%;"></div>
+                        </div>
+                        <div class="text-[10px] text-slate-500 flex justify-between">
+                            <span>Regular: <strong>{{ rs.mapeados }}/{{ rs.total }}</strong></span>
+                            <span>Sem título: <strong>{{ rs.sem_titulo }}</strong> • Fora Z18: <strong class="text-rose-600">{{ rs.fora_zona18 }}</strong></span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100">
+                    <h2 class="text-sm font-extrabold text-slate-900">Lista Nominal de Pendências Eleitorais ({{ dados.pendentes_lista|length }})</h2>
+                </div>
+                <div class="overflow-x-auto max-h-[60vh]">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-[10px] font-bold uppercase text-slate-500 sticky top-0 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-2.5">Servidor / Telefone</th>
+                                <th class="px-3 py-2.5">Secretaria / Vínculo</th>
+                                <th class="px-3 py-2.5">Liderança</th>
+                                <th class="px-3 py-2.5">Título / Z / S</th>
+                                <th class="px-4 py-2.5">Motivo da Pendência</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for p in dados.pendentes_lista %}
+                            <tr class="hover:bg-amber-50/30">
+                                <td class="px-4 py-2.5"><strong class="text-slate-900">{{ p.nome }}</strong><div class="text-[10px] text-slate-500">{{ p.telefone }}</div></td>
+                                <td class="px-3 py-2.5"><strong>{{ p.secretaria }}</strong><div class="text-[10px] text-slate-400">{{ p.tipo_vinculo }}</div></td>
+                                <td class="px-3 py-2.5 text-[11px] font-bold text-indigo-700">{{ p.padrinho }}</td>
+                                <td class="px-3 py-2.5 font-mono text-[11px]">{{ p.titulo }} • Z:{{ p.zona }} • S:{{ p.secao }}</td>
+                                <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px]">{{ p.motivo }}</span></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="px-6 py-8 text-center text-emerald-700 font-bold">Nenhuma pendência eleitoral encontrada!</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ABA 5: FORÇA POR BAIRRO / POVOADO -->
+        <section id="etab-bairros" class="e-tab">
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-slate-100">
+                    <h2 class="text-sm font-extrabold text-slate-900">Distribuição Territorial por Bairro e Povoado (Urbana × Rural)</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-slate-50 text-[10px] font-bold uppercase text-slate-500 border-b border-slate-200">
+                            <tr>
+                                <th class="px-4 py-3">Bairro / Povoado</th>
+                                <th class="px-3 py-3 text-center">Zona</th>
+                                <th class="px-3 py-3 text-center">Total Servidores</th>
+                                <th class="px-3 py-3 text-center">Comiss. + Contrat.</th>
+                                <th class="px-3 py-3 text-center">Mapeados Z018</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for b in dados.bairros_ranking %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="px-4 py-2.5 font-bold text-slate-900">{{ b.nome }}</td>
+                                <td class="px-3 py-2.5 text-center"><span class="px-2 py-0.5 rounded text-[10px] font-bold {{ 'bg-emerald-50 text-emerald-700' if b.zona == 'RURAL' else 'bg-blue-50 text-blue-700' }}">{{ b.zona }}</span></td>
+                                <td class="px-3 py-2.5 text-center font-black">{{ b.total }}</td>
+                                <td class="px-3 py-2.5 text-center font-bold text-amber-700">{{ b.com_e_cont }}</td>
+                                <td class="px-3 py-2.5 text-center font-bold text-emerald-700">{{ b.mapeados }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL: LIDERANÇA v2 -->
+    <div id="modalLideranca" class="fixed inset-0 bg-slate-950/70 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-lg p-6 shadow-2xl border border-slate-200">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="lid_modal_titulo" class="text-base font-extrabold text-slate-900">Perfil Estratégico da Liderança</h3>
+                <button type="button" onclick="document.getElementById('modalLideranca').classList.add('hidden')" class="text-slate-400 hover:text-slate-900"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <input type="hidden" id="lid_id">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Nome da Liderança*</label>
+                        <input type="text" id="lid_nome" class="w-full border border-slate-200 rounded-xl px-3 py-2 uppercase font-bold" required>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Categoria</label>
+                        <select id="lid_categoria" class="w-full border border-slate-200 rounded-xl px-3 py-2 font-semibold">
+                            {% for cod, lbl in dados.categorias_lideranca %}
+                            <option value="{{ cod }}">{{ lbl }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Região / Bairros</label>
+                        <input type="text" id="lid_regiao" placeholder="Ex: Centro, Fumal" class="w-full border border-slate-200 rounded-xl px-3 py-2 uppercase">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Telefone / WhatsApp</label>
+                        <input type="text" id="lid_tel" class="w-full border border-slate-200 rounded-xl px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Meta de Base</label>
+                        <input type="number" min="0" id="lid_meta" value="0" class="w-full border border-slate-200 rounded-xl px-3 py-2 font-bold">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Observações Estratégicas (Sigiloso)</label>
+                    <textarea id="lid_obs" rows="3" class="w-full border border-slate-200 rounded-xl px-3 py-2"></textarea>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="document.getElementById('modalLideranca').classList.add('hidden')" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold">Cancelar</button>
+                    <button type="button" onclick="salvarLideranca()" class="flex-1 py-2.5 rounded-xl bg-slate-900 text-white font-bold hover:bg-indigo-600">Salvar Liderança</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: GPS & META DO COLÉGIO -->
+    <div id="modalGeoColegio" class="fixed inset-0 bg-slate-950/70 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-200">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h3 class="text-base font-extrabold text-slate-900">Georreferenciamento & Meta</h3>
+                    <p id="geo_nome_lbl" class="text-xs text-slate-500"></p>
+                </div>
+                <button type="button" onclick="document.getElementById('modalGeoColegio').classList.add('hidden')" class="text-slate-400 hover:text-slate-900"><i class="ph ph-x text-xl"></i></button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <input type="hidden" id="geo_local_id">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Tipo de Zona</label>
+                        <select id="geo_tipo_zona" class="w-full border border-slate-200 rounded-xl px-3 py-2 font-semibold">
+                            <option value="URBANA">Zona Urbana</option>
+                            <option value="RURAL">Zona Rural</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Meta de Cobertura</label>
+                        <input type="number" min="0" id="geo_meta" class="w-full border border-slate-200 rounded-xl px-3 py-2 font-bold">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Latitude</label>
+                        <input type="text" id="geo_lat" placeholder="-6.407500" class="w-full border border-slate-200 rounded-xl px-3 py-2 font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Longitude</label>
+                        <input type="text" id="geo_lng" placeholder="-41.745600" class="w-full border border-slate-200 rounded-xl px-3 py-2 font-mono">
+                    </div>
+                </div>
+                <div class="flex gap-2 pt-2">
+                    <button type="button" onclick="document.getElementById('modalGeoColegio').classList.add('hidden')" class="flex-1 py-2.5 rounded-xl bg-slate-100 text-slate-700 font-bold">Cancelar</button>
+                    <button type="button" onclick="salvarGeoColegio()" class="flex-1 py-2.5 rounded-xl bg-indigo-600 text-white font-bold hover:bg-indigo-700">Salvar no Mapa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let mapaLeaflet = null;
+        function ativarAbaEleitoral(tabId) {
+            document.querySelectorAll('.e-tab').forEach(t => t.classList.remove('active'));
+            const el = document.getElementById(tabId);
+            if (el) el.classList.add('active');
+            document.querySelectorAll('.etab-btn').forEach(b => {
+                if (b.getAttribute('data-etab') === tabId) {
+                    b.className = 'etab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap bg-slate-900 text-white shadow-sm';
+                } else {
+                    b.className = 'etab-btn px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 whitespace-nowrap bg-white text-slate-600 border border-slate-200 hover:bg-slate-100';
+                }
+            });
+            if (tabId === 'etab-mapa' && mapaLeaflet) setTimeout(() => mapaLeaflet.invalidateSize(), 150);
+        }
+
+        function abrirModalLideranca(id, nome, cat, regiao, tel, meta, obs) {
+            document.getElementById('lid_id').value = id || '';
+            document.getElementById('lid_nome').value = nome || '';
+            document.getElementById('lid_categoria').value = cat || 'LIDERANCA';
+            document.getElementById('lid_regiao').value = regiao || '';
+            document.getElementById('lid_tel').value = tel || '';
+            document.getElementById('lid_meta').value = meta || 0;
+            document.getElementById('lid_obs').value = obs || '';
+            document.getElementById('lid_modal_titulo').innerText = id ? 'Editar Perfil da Liderança' : 'Nova Liderança Estratégica';
+            document.getElementById('modalLideranca').classList.remove('hidden');
+        }
+        async function salvarLideranca() {
+            const resp = await fetch('/api/eleitoral/lideranca/salvar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: document.getElementById('lid_id').value || null,
+                    nome: document.getElementById('lid_nome').value,
+                    categoria: document.getElementById('lid_categoria').value,
+                    regiao_atuacao: document.getElementById('lid_regiao').value,
+                    telefone: document.getElementById('lid_tel').value,
+                    meta_base: document.getElementById('lid_meta').value,
+                    observacoes: document.getElementById('lid_obs').value,
+                })
+            });
+            const d = await resp.json();
+            if (d.success) window.location.reload();
+            else alert(d.message || 'Erro ao salvar liderança.');
+        }
+
+        function abrirModalGeo(id, nome, lat, lng, tz, meta) {
+            document.getElementById('geo_local_id').value = id;
+            document.getElementById('geo_nome_lbl').innerText = nome;
+            document.getElementById('geo_lat').value = lat !== '' ? lat : '';
+            document.getElementById('geo_lng').value = lng !== '' ? lng : '';
+            document.getElementById('geo_tipo_zona').value = tz || 'URBANA';
+            document.getElementById('geo_meta').value = meta || 0;
+            document.getElementById('modalGeoColegio').classList.remove('hidden');
+        }
+        async function salvarGeoColegio() {
+            const resp = await fetch('/api/eleitoral/local/coordenadas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    local_id: document.getElementById('geo_local_id').value,
+                    latitude: document.getElementById('geo_lat').value,
+                    longitude: document.getElementById('geo_lng').value,
+                    tipo_zona: document.getElementById('geo_tipo_zona').value,
+                    meta_cobertura: document.getElementById('geo_meta').value,
+                })
+            });
+            const d = await resp.json();
+            if (d.success) window.location.reload();
+            else alert(d.message || 'Erro ao salvar coordenadas.');
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const pontos = {{ dados.mapa_pontos | tojson }};
+            mapaLeaflet = L.map('mapaCalorEleitoral').setView([-6.4075, -41.7456], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(mapaLeaflet);
+
+            const bounds = [];
+            pontos.forEach(p => {
+                const color = p.nivel === 'FORTE' ? '#10b981' : (p.nivel === 'CRITICO' ? '#ef4444' : '#f59e0b');
+                const radius = Math.min(28, Math.max(9, 8 + p.total * 0.7));
+                L.circleMarker([p.lat, p.lng], {
+                    radius: radius, color: color, fillColor: color, fillOpacity: 0.45, weight: 2
+                }).addTo(mapaLeaflet).bindPopup(`
+                    <strong>${p.nome}</strong><br>
+                    ${p.bairro} (${p.tipo_zona})<br>
+                    Servidores: <b>${p.total}</b> (Comiss./Contr.: ${p.com_e_cont})<br>
+                    Cobertura seções: <b>${p.cobertura_pct}%</b> • Vazias: ${p.descobertas}
+                `);
+                bounds.push([p.lat, p.lng]);
+            });
+            if (bounds.length > 0) mapaLeaflet.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/inactivity.js') }}"></script>
+</body>
+</html>
