@@ -83,12 +83,15 @@
 
     <div id="pdf-content">
         <div class="pdf-container">
-            <div class="pdf-header">
+            <div class="pdf-header" style="gap: 4mm;">
                 <img src="{{ url_for('static', filename='logo.jpg') }}" class="pdf-logo" onerror="this.style.display='none'">
                 <div class="pdf-title-block">
                     <h1>PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h1>
-                    <h2><span id="pdf_nome_secretaria">SECRETARIA MUNICIPAL DE EDUCAÇÃO</span></h2>
-                    <div class="pdf-badge-title">FICHA CADASTRAL DO SERVIDOR</div>
+                    <h2><span id="pdf_nome_secretaria">SECRETARIA MUNICIPAL</span></h2>
+                    <div class="pdf-badge-title">FICHA CADASTRAL DO SERVIDOR — EXERCÍCIO <span id="p_exercicio">2026</span></div>
+                </div>
+                <div id="p_foto_3x4_box" style="width: 22mm; height: 28mm; border: 1.5px solid #000; flex-shrink: 0; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 6pt; font-weight: bold; color: #555; overflow: hidden; background: #fafafa;">
+                    <span>FOTO<br>3×4</span>
                 </div>
             </div>
 
@@ -109,7 +112,8 @@
                         <td colspan="2"><span class="pdf-label">NOME DO PAI</span><span class="pdf-value" id="p_pai"></span></td>
                     </tr>
                     <tr>
-                        <td colspan="4"><span class="pdf-label">ENDEREÇO COMPLETO</span><span class="pdf-value" id="p_endereco_completo"></span></td>
+                        <td colspan="3"><span class="pdf-label">ENDEREÇO COMPLETO</span><span class="pdf-value" id="p_endereco_completo"></span></td>
+                        <td><span class="pdf-label">ZONA / POVOADO</span><span class="pdf-value" id="p_zona_povoado"></span></td>
                     </tr>
                     <tr>
                         <td colspan="2"><span class="pdf-label">EMAIL</span><span class="pdf-value" id="p_email"></span></td>
@@ -151,6 +155,11 @@
                         <td colspan="2"><span class="pdf-label">TIPO VÍNCULO</span><span class="pdf-value" id="p_tipo_vinculo"></span></td>
                         <td colspan="2"><span class="pdf-label">Nº CONTRACHEQUE</span><span class="pdf-value" id="p_contracheque"></span></td>
                     </tr>
+                    <tr>
+                        <td colspan="2"><span class="pdf-label">Nº PORTARIA / DECRETO</span><span class="pdf-value" id="p_portaria"></span></td>
+                        <td><span class="pdf-label">DATA PORTARIA</span><span class="pdf-value" id="p_data_portaria"></span></td>
+                        <td><span class="pdf-label">EXERCÍCIO</span><span class="pdf-value" id="p_exercicio_cel"></span></td>
+                    </tr>
                 </table>
             </div>
 
@@ -159,9 +168,9 @@
                 <table class="pdf-grid-table">
                     <tr>
                         <td><span class="pdf-label">REMUNERAÇÃO</span><span class="pdf-value" id="p_remuneracao"></span></td>
+                        <td><span class="pdf-label">GRATIFICAÇÃO</span><span class="pdf-value" id="p_gratificacao"></span></td>
                         <td><span class="pdf-label">JORNADA</span><span class="pdf-value" id="p_jornada"></span></td>
-                        <td><span class="pdf-label">DATA INÍCIO</span><span class="pdf-value" id="p_inicio"></span></td>
-                        <td><span class="pdf-label">DATA TÉRMINO</span><span class="pdf-value" id="p_termino"></span></td>
+                        <td><span class="pdf-label">INÍCIO / TÉRMINO</span><span class="pdf-value"><span id="p_inicio"></span> a <span id="p_termino"></span></span></td>
                     </tr>
                     <tr>
                         <td><span class="pdf-label">BANCO</span><span class="pdf-value" id="p_banco"></span></td>
@@ -1171,6 +1180,16 @@
             setTxt('p_agencia', data.agencia);
             setTxt('p_conta', data.conta);
             setTxt('p_tipo_conta', data.tipo_conta);
+            setTxt('p_zona_povoado', (data.zona_moradia || 'URBANA') + (data.povoado_comunidade ? ' - ' + data.povoado_comunidade : ''));
+            setTxt('p_portaria', data.numero_portaria || '---');
+            setTxt('p_data_portaria', fmtDate(data.data_portaria));
+            setTxt('p_exercicio', data.ano_exercicio_atual || '2026');
+            setTxt('p_exercicio_cel', data.ano_exercicio_atual || '2026');
+            setTxt('p_gratificacao', data.gratificacao_valor ? 'R$ ' + data.gratificacao_valor : '---');
+            const fotoBox = document.getElementById('p_foto_3x4_box');
+            if (fotoBox) {
+                fotoBox.innerHTML = data.foto_3x4_b64 ? `<img src="${data.foto_3x4_b64}" style="width:100%;height:100%;object-fit:cover;">` : '<span>FOTO<br>3×4</span>';
+            }
 
             setTxt('pdf_nome_secretaria', data.lotacao_nome);
             setTxt('pdf_assinatura_servidor', data.nome);
@@ -1280,8 +1299,19 @@
                 agencia: getVal('agencia'),
                 conta: getVal('conta'),
                 tipo_conta: getVal('tipo_conta'),
+                zona_moradia: getVal('zona_moradia'),
+                povoado_comunidade: getVal('povoado_comunidade'),
+                numero_portaria: getVal('numero_portaria'),
+                data_portaria: getVal('data_portaria'),
+                gratificacao_valor: getVal('gratificacao_valor'),
+                ano_exercicio_atual: getVal('ano_exercicio_atual'),
+                foto_3x4_b64: getVal('foto_3x4_b64'),
                 token_validacao: currentToken
             };
+            if (data.id) {
+                window.open(`/ficha/profissional/${data.id}`, '_blank');
+                return;
+            }
             imprimirHistorico(data);
         }
 

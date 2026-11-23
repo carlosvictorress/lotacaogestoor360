@@ -2,289 +2,339 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <title>Ficha Cadastral Oficial — {{ f.nome }}</title>
+    <title>Ficha Cadastral do Servidor — {{ f.nome }}</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        @page { size: A4 portrait; margin: 10mm; }
+        @page { size: A4 portrait; margin: 6mm; }
         * { box-sizing: border-box; }
-        body { font-family: Arial, Helvetica, sans-serif; color: #0f172a; margin: 0; background: #e2e8f0; font-size: 8.5pt; }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            color: #1a1a1a;
+            margin: 0;
+            background: #e5e7eb;
+        }
         .toolbar {
-            position: sticky; top: 0; z-index: 20; background: #0f172a; color: #fff;
+            position: sticky; top: 0; z-index: 20;
+            background: #111827; color: #fff;
             padding: 10px 20px; display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
         }
         .toolbar button, .toolbar a {
             border: none; border-radius: 6px; padding: 7px 14px; font-weight: 700; font-size: 12px;
             cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
         }
-        .btn-print { background: #10b981; color: #fff; }
-        .btn-back { background: #334155; color: #fff; }
-        .sheet {
-            width: 210mm; min-height: 297mm; margin: 14px auto; background: #fff;
-            padding: 10mm 12mm; box-shadow: 0 8px 30px rgba(15,23,42,0.18);
-            display: flex; flex-direction: column;
+        .btn-print { background: #16a34a; color: #fff; }
+        .btn-back { background: #374151; color: #fff; }
+
+        /* MESMO LAYOUT CLÁSSICO DA FICHA CADASTRAL ORIGINAL + NOVAS INFORMAÇÕES 2.0 */
+        #pdf-content {
+            width: 210mm;
+            margin: 12px auto;
+            padding: 5mm;
+            background: #fff;
+            color: #1a1a1a;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
         }
-        .hdr {
+        .pdf-container {
+            position: relative;
+            z-index: 1;
+            border: 2px solid #000;
+            padding: 2.5mm;
+            min-height: 277mm;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .pdf-header {
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid #000;
+            padding-bottom: 2.5mm;
+            margin-bottom: 3mm;
+            gap: 4mm;
+        }
+        .pdf-logo { width: 20mm; height: auto; flex-shrink: 0; }
+        .pdf-title-block { flex: 1; text-align: center; }
+        .pdf-title-block h1 { font-size: 13.5pt; font-weight: 900; margin: 0; text-transform: uppercase; line-height: 1.2; color: #000; }
+        .pdf-title-block h2 { font-size: 9.5pt; margin: 1mm 0; font-weight: bold; text-transform: uppercase; color: #333; }
+        .pdf-title-sub { font-size: 6.5pt; color: #444; margin: 0.5mm 0 1mm 0; }
+        .pdf-badge-title {
+            background: #000; color: #fff; display: inline-block;
+            padding: 2px 10px; margin-top: 2px; font-size: 8pt; font-weight: bold;
+            text-transform: uppercase; -webkit-print-color-adjust: exact; print-color-adjust: exact;
+        }
+        .pdf-foto-3x4 {
+            width: 22mm; height: 28mm;
+            border: 1.5px solid #000;
+            flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+            text-align: center; font-size: 6pt; font-weight: bold; color: #555;
+            overflow: hidden; background: #fafafa;
+        }
+        .pdf-foto-3x4 img { width: 100%; height: 100%; object-fit: cover; }
+
+        .pdf-section { margin-bottom: 2.5mm; border: 1px solid #000; }
+        .pdf-section-header {
+            background: #e5e5e5; border-bottom: 1px solid #000;
+            padding: 1mm 2mm; font-size: 7.8pt; font-weight: bold; text-transform: uppercase;
             display: flex; justify-content: space-between; align-items: center;
-            border-bottom: 2.5px solid #1e3a8a; padding-bottom: 7px; margin-bottom: 8px; gap: 10px;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
         }
-        .hdr-left { display: flex; align-items: center; gap: 10px; flex: 1; }
-        .hdr-left img { height: 50px; width: auto; }
-        .hdr-org h1 { margin: 0; font-size: 11pt; font-weight: 800; color: #1e3a8a; text-transform: uppercase; }
-        .hdr-org h2 { margin: 1px 0 0; font-size: 9.5pt; font-weight: 700; color: #0f172a; text-transform: uppercase; }
-        .hdr-org p { margin: 2px 0 0; font-size: 7.2pt; color: #475569; }
-        .foto-box {
-            width: 27mm; height: 34mm; border: 1.5px solid #94a3b8; border-radius: 4px;
-            overflow: hidden; display: flex; align-items: center; justify-content: center;
-            background: #f8fafc; flex-shrink: 0; text-align: center; font-size: 7pt; color: #64748b;
+        .pdf-grid-table { width: 100%; border-collapse: collapse; }
+        .pdf-grid-table td, .pdf-grid-table th {
+            border-right: 1px solid #000; border-bottom: 1px solid #000;
+            padding: 1.2mm 2mm; vertical-align: top;
         }
-        .foto-box img { width: 100%; height: 100%; object-fit: cover; }
-        .banner-title {
-            background: #1e3a8a; color: #fff; padding: 5px 10px; border-radius: 4px;
-            display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+        .pdf-grid-table th {
+            background: #f3f4f6; font-size: 6.3pt; text-transform: uppercase; text-align: left;
+            -webkit-print-color-adjust: exact; print-color-adjust: exact;
         }
-        .banner-title span { font-size: 8.5pt; font-weight: 800; letter-spacing: 0.4px; text-transform: uppercase; }
-        .badge {
-            padding: 2px 8px; border-radius: 999px; font-size: 7pt; font-weight: 800;
-            text-transform: uppercase; display: inline-block;
+        .pdf-grid-table tr:last-child td { border-bottom: none; }
+        .pdf-grid-table td:last-child, .pdf-grid-table th:last-child { border-right: none; }
+        .pdf-label { display: block; font-size: 5.8pt; color: #555; text-transform: uppercase; margin-bottom: 1px; font-weight: 600; }
+        .pdf-value { display: block; font-size: 8.5pt; font-weight: bold; min-height: 3.6mm; color: #000; line-height: 1.1; text-transform: uppercase; }
+
+        .ged-checklist-line {
+            display: flex; flex-wrap: wrap; gap: 3px 8px; padding: 1.5mm 2mm; font-size: 6.8pt;
         }
-        .badge-ok { background: #dcfce7; color: #166534; }
-        .badge-pend { background: #fef3c7; color: #92400e; }
-        .sec-title {
-            background: #f1f5f9; border-left: 3.5px solid #1e3a8a; padding: 3.5px 8px;
-            font-size: 8pt; font-weight: 800; color: #1e3a8a; text-transform: uppercase;
-            margin: 8px 0 4px;
-        }
-        table.grid { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-        table.grid td, table.grid th {
-            border: 1px solid #cbd5e1; padding: 3.5px 5.5px; vertical-align: top;
-        }
-        table.grid th { background: #f8fafc; font-size: 7pt; text-transform: uppercase; color: #475569; text-align: left; }
-        .lbl { display: block; font-size: 6.3pt; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 1px; }
-        .val { display: block; font-size: 8.2pt; font-weight: 700; color: #0f172a; min-height: 10px; }
-        .ged-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 4px; }
-        .ged-item {
-            border: 1px solid #cbd5e1; border-radius: 3px; padding: 3px 5px; font-size: 7pt;
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .ged-ok { background: #f0fdf4; border-color: #86efac; color: #166534; font-weight: 700; }
-        .ged-no { background: #fafafa; color: #64748b; }
-        .decl { font-size: 7.5pt; color: #334155; text-align: center; margin: 10px 0 18px; }
-        .sigs { display: flex; justify-content: space-between; gap: 10mm; margin-top: 12px; }
-        .sig-col { flex: 1; border-top: 1px solid #0f172a; text-align: center; padding-top: 3px; font-size: 7.2pt; }
-        .sig-col strong { display: block; font-size: 7.5pt; text-transform: uppercase; }
-        .auth-footer {
-            margin-top: auto; padding-top: 8px; border-top: 1px dashed #94a3b8;
-            display: flex; justify-content: space-between; align-items: flex-end; gap: 10px;
-        }
-        .auth-info p { margin: 1.5px 0; font-size: 6.8pt; color: #475569; }
+        .ged-pill-ok { font-weight: bold; color: #000; }
+        .ged-pill-pend { color: #666; }
+
         @media print {
             body { background: #fff; }
             .toolbar { display: none; }
-            .sheet { width: auto; min-height: auto; margin: 0; padding: 0; box-shadow: none; }
+            #pdf-content { width: auto; margin: 0; padding: 0; box-shadow: none; }
+            .pdf-container { min-height: 280mm; }
         }
     </style>
 </head>
 <body>
     <div class="toolbar">
-        <div style="font-size: 13px; font-weight: 700;">Ficha Cadastral Profissional 2.0 (Vetorial A4) — {{ f.nome }}</div>
+        <div style="font-size: 13px; font-weight: 700;">Ficha Cadastral do Servidor — {{ f.nome }}</div>
         <div style="display:flex; gap:8px;">
             <a href="{{ url_for('sistema') }}" class="btn-back">Voltar</a>
             <button type="button" onclick="window.print()" class="btn-print">Imprimir / Salvar PDF A4</button>
         </div>
     </div>
 
-    <div class="sheet">
-        <!-- CABEÇALHO INSTITUCIONAL DINÂMICO POR SECRETARIA + FOTO 3X4 -->
-        <div class="hdr">
-            <div class="hdr-left">
-                <img src="{{ url_for('static', filename='logo.jpg') }}" alt="Brasão" onerror="this.style.display='none'">
-                <div class="hdr-org">
-                    <h1>Prefeitura Municipal de Valença do Piauí — PI</h1>
-                    <h2>{{ f.secretaria.nome if f.secretaria else (f.lotacao or 'ADMINISTRAÇÃO MUNICIPAL') }} {% if f.secretaria and f.secretaria.sigla %}({{ f.secretaria.sigla }}){% endif %}</h2>
-                    <p>
-                        {% if f.secretaria and f.secretaria.cnpj %}CNPJ: {{ f.secretaria.cnpj }} • {% endif %}
-                        {% if f.secretaria and f.secretaria.endereco %}{{ f.secretaria.endereco }} • {% endif %}
-                        {% if f.secretaria and f.secretaria.telefone %}Tel: {{ f.secretaria.telefone }}{% endif %}
-                    </p>
+    <div id="pdf-content">
+        <div class="pdf-container">
+            <div>
+                <!-- CABEÇALHO CLÁSSICO PRESERVADO + FOTO 3x4 + DADOS DA SECRETARIA -->
+                <div class="pdf-header">
+                    <img src="{{ url_for('static', filename='logo.jpg') }}" class="pdf-logo" onerror="this.style.display='none'">
+                    <div class="pdf-title-block">
+                        <h1>PREFEITURA MUNICIPAL DE VALENÇA DO PIAUÍ</h1>
+                        <h2>{{ f.secretaria.nome if f.secretaria else (f.lotacao or 'ADMINISTRAÇÃO MUNICIPAL') }}{% if f.secretaria and f.secretaria.sigla %} ({{ f.secretaria.sigla }}){% endif %}</h2>
+                        {% if f.secretaria and (f.secretaria.cnpj or f.secretaria.endereco or f.secretaria.telefone) %}
+                        <div class="pdf-title-sub">
+                            {% if f.secretaria.cnpj %}CNPJ: {{ f.secretaria.cnpj }}{% endif %}
+                            {% if f.secretaria.endereco %} • {{ f.secretaria.endereco }}{% endif %}
+                            {% if f.secretaria.telefone %} • Tel: {{ f.secretaria.telefone }}{% endif %}
+                        </div>
+                        {% endif %}
+                        <div class="pdf-badge-title">
+                            FICHA CADASTRAL DO SERVIDOR — EXERCÍCIO {{ f.ano_exercicio_atual or 2026 }}
+                            • {{ 'VALIDADO RH' if f.validado else 'PENDENTE VALIDAÇÃO' }}
+                        </div>
+                    </div>
+                    <div class="pdf-foto-3x4">
+                        {% if f.foto_3x4_b64 %}
+                        <img src="{{ f.foto_3x4_b64 }}" alt="Foto 3x4">
+                        {% else %}
+                        <span>FOTO<br>3×4</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 1. DADOS PESSOAIS (ESTRUTURA ORIGINAL + ZONA/POVOADO) -->
+                <div class="pdf-section">
+                    <div class="pdf-section-header">
+                        <span>1. DADOS PESSOAIS</span>
+                        <span style="font-size:6.5pt; font-weight:600;">COMPLETUDE: {{ completude_pct }}%</span>
+                    </div>
+                    <table class="pdf-grid-table">
+                        <tr>
+                            <td colspan="3"><span class="pdf-label">NOME COMPLETO</span><span class="pdf-value">{{ f.nome }}</span></td>
+                            <td><span class="pdf-label">CPF</span><span class="pdf-value">{{ f.cpf or '---' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"><span class="pdf-label">RG / DATA EXPEDIÇÃO / ÓRGÃO</span><span class="pdf-value">{{ f.rg or '---' }} / {{ f.data_expedicao_rg.strftime('%d/%m/%Y') if f.data_expedicao_rg else '---' }} / {{ f.orgao_emissor_rg or '---' }}</span></td>
+                            <td><span class="pdf-label">DATA NASC.</span><span class="pdf-value">{{ f.data_nasc.strftime('%d/%m/%Y') if f.data_nasc else '---' }}</span></td>
+                            <td><span class="pdf-label">GÊNERO</span><span class="pdf-value">{{ f.genero or '---' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"><span class="pdf-label">NOME DA MÃE</span><span class="pdf-value">{{ f.mae or '---' }}</span></td>
+                            <td colspan="2"><span class="pdf-label">NOME DO PAI</span><span class="pdf-value">{{ f.pai or '---' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td colspan="3">
+                                <span class="pdf-label">ENDEREÇO COMPLETO</span>
+                                <span class="pdf-value">{{ f.endereco or '' }}{% if f.bairro %}, {{ f.bairro }}{% endif %}{% if f.cep %} - CEP: {{ f.cep }}{% endif %}{% if f.cidade %} - {{ f.cidade }}/{{ f.uf or 'PI' }}{% endif %}</span>
+                            </td>
+                            <td>
+                                <span class="pdf-label">ZONA / POVOADO</span>
+                                <span class="pdf-value">{{ f.zona_moradia or 'URBANA' }}{% if f.povoado_comunidade %} - {{ f.povoado_comunidade }}{% endif %}</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"><span class="pdf-label">EMAIL</span><span class="pdf-value">{{ f.email or '---' }}</span></td>
+                            <td><span class="pdf-label">TELEFONE</span><span class="pdf-value">{{ f.telefone or '---' }}</span></td>
+                            <td><span class="pdf-label">ESTADO CIVIL</span><span class="pdf-value">{{ f.estado_civil or '---' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="pdf-label">PIS/PASEP</span><span class="pdf-value">{{ f.pis or '---' }}</span></td>
+                            <td><span class="pdf-label">TÍTULO ELEITOR</span><span class="pdf-value">{{ f.titulo_eleitor or '---' }}</span></td>
+                            <td><span class="pdf-label">ZONA / SEÇÃO</span><span class="pdf-value">{{ f.zona_eleitoral or '-' }} / {{ f.secao_eleitoral or '-' }}</span></td>
+                            <td><span class="pdf-label">ESCOLARIDADE</span><span class="pdf-value">{{ f.escolaridade or '---' }}{% if f.especialidade %} - {{ f.especialidade }}{% endif %}</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="pdf-label">CTPS</span><span class="pdf-value">{{ f.ctps or '---' }}</span></td>
+                            <td><span class="pdf-label">CNH</span><span class="pdf-value">{{ f.cnh or '---' }}</span></td>
+                            <td><span class="pdf-label">DEPENDENTES</span><span class="pdf-value">{{ f.qtd_dependentes or 0 }}</span></td>
+                            <td><span class="pdf-label">TIPO SANGUÍNEO</span><span class="pdf-value">{{ f.tipo_sanguineo or '---' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"><span class="pdf-label">PCD / DEFICIÊNCIA</span><span class="pdf-value">{{ ('SIM - ' ~ (f.tipo_deficiencia or '')) if f.is_pcd else 'NÃO' }}</span></td>
+                            <td colspan="2"><span class="pdf-label">EMERGÊNCIA (NOME / TEL)</span><span class="pdf-value">{{ f.contato_emergencia_nome or '---' }} - {{ f.contato_emergencia_tel or '---' }}</span></td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- 2. DADOS FUNCIONAIS (ESTRUTURA ORIGINAL + PORTARIA/DECRETO E EXERCÍCIO) -->
+                <div class="pdf-section">
+                    <div class="pdf-section-header"><span>2. DADOS FUNCIONAIS</span></div>
+                    <table class="pdf-grid-table">
+                        <tr>
+                            <td colspan="2"><span class="pdf-label">LOTAÇÃO (SECRETARIA)</span><span class="pdf-value">{{ f.secretaria.nome if f.secretaria else (f.lotacao or '---') }}</span></td>
+                            <td colspan="2"><span class="pdf-label">FUNÇÃO / CARGO</span><span class="pdf-value">{{ f.funcao.nome if f.funcao else '---' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"><span class="pdf-label">LOCAL DE TRABALHO</span><span class="pdf-value">{{ f.local_trabalho.nome if f.local_trabalho else '---' }}</span></td>
+                            <td><span class="pdf-label">CLASSE / REFERÊNCIA</span><span class="pdf-value">{{ f.classe or '---' }}</span></td>
+                            <td><span class="pdf-label">Nº MATRÍCULA / VÍNCULO</span><span class="pdf-value">{{ f.num_vinculo or '---' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"><span class="pdf-label">TIPO VÍNCULO</span><span class="pdf-value">{{ f.tipo_vinculo or '---' }}</span></td>
+                            <td colspan="2"><span class="pdf-label">Nº CONTRACHEQUE</span><span class="pdf-value">{{ f.contracheque or '---' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2"><span class="pdf-label">Nº PORTARIA / DECRETO</span><span class="pdf-value">{{ f.numero_portaria or '---' }}</span></td>
+                            <td><span class="pdf-label">DATA PORTARIA</span><span class="pdf-value">{{ f.data_portaria.strftime('%d/%m/%Y') if f.data_portaria else '---' }}</span></td>
+                            <td><span class="pdf-label">EXERCÍCIO VIGENTE</span><span class="pdf-value">{{ f.ano_exercicio_atual or 2026 }}</span></td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- 3. DADOS FINANCEIROS (ESTRUTURA ORIGINAL + GRATIFICAÇÃO) -->
+                <div class="pdf-section">
+                    <div class="pdf-section-header"><span>3. DADOS FINANCEIROS</span></div>
+                    <table class="pdf-grid-table">
+                        <tr>
+                            <td><span class="pdf-label">REMUNERAÇÃO BASE</span><span class="pdf-value">{{ f.remuneracao or '---' }}</span></td>
+                            <td><span class="pdf-label">GRATIFICAÇÃO</span><span class="pdf-value">{{ ('R$ %.2f'|format(f.gratificacao_valor))|replace('.', ',') if f.gratificacao_valor else '---' }}</span></td>
+                            <td><span class="pdf-label">JORNADA</span><span class="pdf-value">{{ (f.jornada_trabalho ~ ' HORAS') if f.jornada_trabalho and 'HORA' not in (f.jornada_trabalho|upper) else (f.jornada_trabalho or '---') }}</span></td>
+                            <td><span class="pdf-label">VIGÊNCIA (INÍCIO / TÉRMINO)</span><span class="pdf-value">{{ f.dt_inicio.strftime('%d/%m/%Y') if f.dt_inicio else '---' }} a {{ f.dt_termino.strftime('%d/%m/%Y') if f.dt_termino else 'INDET.' }}</span></td>
+                        </tr>
+                        <tr>
+                            <td><span class="pdf-label">BANCO</span><span class="pdf-value">{{ f.banco or '---' }}</span></td>
+                            <td><span class="pdf-label">AGÊNCIA</span><span class="pdf-value">{{ f.agencia or '---' }}</span></td>
+                            <td><span class="pdf-label">CONTA</span><span class="pdf-value">{{ f.conta or '---' }}</span></td>
+                            <td><span class="pdf-label">TIPO CONTA</span><span class="pdf-value">{{ f.tipo_conta or '---' }}</span></td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- 4. CHECKLIST DO DOSSIÊ DIGITAL (GED) — NOVO EM ESTILO CLÁSSICO COMPACTO -->
+                <div class="pdf-section">
+                    <div class="pdf-section-header">
+                        <span>4. DOSSIÊ DIGITAL (GED) — DOCUMENTOS COMPROBATÓRIOS</span>
+                        <span style="font-size:6.5pt;">{{ ged_checklist.entregues_obrigatorios }}/{{ ged_checklist.total_obrigatorios }} OBRIGATÓRIOS • {{ ged_checklist.total_documentos }} ARQUIVO(S)</span>
+                    </div>
+                    <div class="ged-checklist-line">
+                        {% for item in ged_checklist.itens %}
+                        {% if item.obrigatorio or item.entregue %}
+                        <span class="{{ 'ged-pill-ok' if item.entregue else 'ged-pill-pend' }}">
+                            [{{ '✓' if item.entregue else ' ' }}] {{ item.label }}{% if item.validado %} (VALIDADO){% endif %}
+                        </span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% if exercicios %}
+                <!-- 5. HISTÓRICO DE EXERCÍCIOS (EXIBIDO QUANDO HÁ RENOVAÇÕES 2026/2027) -->
+                <div class="pdf-section">
+                    <div class="pdf-section-header"><span>5. HISTÓRICO DE EXERCÍCIOS / RENOVAÇÕES</span></div>
+                    <table class="pdf-grid-table">
+                        <thead>
+                            <tr>
+                                <th>ANO</th>
+                                <th>FUNÇÃO / CARGO</th>
+                                <th>VÍNCULO</th>
+                                <th>VIGÊNCIA</th>
+                                <th>REMUNERAÇÃO</th>
+                                <th>PORTARIA</th>
+                                <th>STATUS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ex in exercicios %}
+                            <tr>
+                                <td><span class="pdf-value" style="font-size:7.5pt;">{{ ex.ano_exercicio }}</span></td>
+                                <td><span class="pdf-value" style="font-size:7.5pt;">{{ ex.funcao_nome or '---' }}</span></td>
+                                <td><span class="pdf-value" style="font-size:7.5pt;">{{ ex.tipo_vinculo or '---' }}</span></td>
+                                <td><span class="pdf-value" style="font-size:7.5pt;">{{ ex.dt_inicio.strftime('%d/%m/%Y') if ex.dt_inicio else '?' }} - {{ ex.dt_termino.strftime('%d/%m/%Y') if ex.dt_termino else 'INDET.' }}</span></td>
+                                <td><span class="pdf-value" style="font-size:7.5pt;">{{ ex.remuneracao or '---' }}</span></td>
+                                <td><span class="pdf-value" style="font-size:7.5pt;">{{ ex.numero_portaria or '---' }}</span></td>
+                                <td><span class="pdf-value" style="font-size:7.5pt;">{{ ex.status }}</span></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+
+                <!-- DECLARAÇÃO E 3 ASSINATURAS CLÁSSICAS -->
+                <div style="margin-top: 3mm; text-align: center; font-size: 8.5pt;">
+                    <p style="margin: 2px 0;">Declaro que as informações acima são verdadeiras.</p>
+                    <p style="margin: 2px 0;">Valença do Piauí - PI, {{ emitido_em }}</p>
+
+                    <div style="display: flex; justify-content: space-between; gap: 4mm; margin-top: 12mm;">
+                        <div style="flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 1.5mm;">
+                            <span style="font-weight: bold; display: block; text-transform: uppercase; font-size: 7.8pt;">{{ f.nome }}</span>
+                            <span style="font-size: 7.5pt;">Assinatura do Servidor</span>
+                        </div>
+                        <div style="flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 1.5mm;">
+                            <span style="font-weight: bold; display: block; text-transform: uppercase; font-size: 7.8pt;">{{ emitido_por }}</span>
+                            <span style="font-size: 7.5pt;">RH / Responsável</span>
+                        </div>
+                        <div style="flex: 1; text-align: center; border-top: 1px solid #000; padding-top: 1.5mm;">
+                            <span style="font-weight: bold; display: block; text-transform: uppercase; font-size: 7.8pt;">{{ rep.nome or (f.secretaria.nome if f.secretaria else 'SECRETARIA MUNICIPAL') }}</span>
+                            <span style="font-size: 7.5pt;">{{ rep.cargo or 'Secretário(a)' }}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="foto-box">
-                {% if f.foto_3x4_b64 %}
-                <img src="{{ f.foto_3x4_b64 }}" alt="Foto 3x4">
-                {% else %}
-                <span>FOTO 3×4<br>OFICIAL</span>
-                {% endif %}
+
+            <!-- RODAPÉ DE AUTENTICIDADE CLÁSSICO COM QR CODE -->
+            <div style="margin-top: 4mm; border-top: 1px dashed #999; padding-top: 2.5mm; display: flex; justify-content: space-between; align-items: flex-end;">
+                <div>
+                    <p style="font-size: 8pt; font-weight: bold; margin: 0;">VALIDAÇÃO DE AUTENTICIDADE</p>
+                    <p style="font-size: 7pt; margin: 1px 0;">Acesse: {{ validar_url }}</p>
+                    <p style="font-size: 7pt; margin: 1px 0;">Código: <strong style="font-family: monospace;">{{ f.token_validacao }}</strong></p>
+                    <p style="font-size: 7pt; margin: 1px 0;">Gerado por <strong>gestoor</strong> em {{ emitido_em }}</p>
+                </div>
+                <div id="qrcode_container"></div>
             </div>
-        </div>
-
-        <div class="banner-title">
-            <span>FICHA CADASTRAL FUNCIONAL — EXERCÍCIO {{ f.ano_exercicio_atual or 2026 }}</span>
-            <div style="display:flex; align-items:center; gap:6px;">
-                <span style="font-size:7pt; font-weight:700;">Vínculo Nº {{ f.num_vinculo or '---' }}</span>
-                <span class="badge {{ 'badge-ok' if f.validado else 'badge-pend' }}">{{ 'VALIDADO RH' if f.validado else 'PENDENTE VALIDAÇÃO' }}</span>
-                <span class="badge" style="background:rgba(255,255,255,0.2); color:#fff;">{{ completude_pct }}% COMPLETO</span>
-            </div>
-        </div>
-
-        <!-- 1. IDENTIFICAÇÃO E DOCUMENTAÇÃO -->
-        <div class="sec-title">1. Identificação Civil e Documentação (e-Social)</div>
-        <table class="grid">
-            <tr>
-                <td colspan="3"><span class="lbl">Nome Completo</span><span class="val">{{ f.nome }}</span></td>
-                <td><span class="lbl">CPF</span><span class="val">{{ f.cpf or '---' }}</span></td>
-            </tr>
-            <tr>
-                <td><span class="lbl">RG</span><span class="val">{{ f.rg or '---' }}</span></td>
-                <td><span class="lbl">Órgão Emissor</span><span class="val">{{ f.orgao_emissor_rg or '---' }}</span></td>
-                <td><span class="lbl">Data Expedição</span><span class="val">{{ f.data_expedicao_rg.strftime('%d/%m/%Y') if f.data_expedicao_rg else '---' }}</span></td>
-                <td><span class="lbl">Data Nascimento</span><span class="val">{{ f.data_nasc.strftime('%d/%m/%Y') if f.data_nasc else '---' }}</span></td>
-            </tr>
-            <tr>
-                <td><span class="lbl">PIS / PASEP</span><span class="val">{{ f.pis or '---' }}</span></td>
-                <td><span class="lbl">CTPS</span><span class="val">{{ f.ctps or '---' }}</span></td>
-                <td><span class="lbl">CNH</span><span class="val">{{ f.cnh or '---' }}</span></td>
-                <td><span class="lbl">Estado Civil / Gênero</span><span class="val">{{ f.estado_civil or '-' }} / {{ f.genero or '-' }}</span></td>
-            </tr>
-            <tr>
-                <td colspan="2"><span class="lbl">Filiação (Mãe)</span><span class="val">{{ f.mae or '---' }}</span></td>
-                <td colspan="2"><span class="lbl">Filiação (Pai)</span><span class="val">{{ f.pai or '---' }}</span></td>
-            </tr>
-            <tr>
-                <td colspan="2"><span class="lbl">Escolaridade / Formação</span><span class="val">{{ f.escolaridade or '---' }}{% if f.especialidade %} ({{ f.especialidade }}){% endif %}</span></td>
-                <td><span class="lbl">Título / Zona / Seção</span><span class="val">{{ f.titulo_eleitor or '-' }} • Z:{{ f.zona_eleitoral or '-' }} • S:{{ f.secao_eleitoral or '-' }}</span></td>
-                <td><span class="lbl">PCD / Dep. / Sangue</span><span class="val">{{ ('SIM - ' ~ (f.tipo_deficiencia or '')) if f.is_pcd else 'NÃO' }} • Dep:{{ f.qtd_dependentes or 0 }} • {{ f.tipo_sanguineo or '-' }}</span></td>
-            </tr>
-        </table>
-
-        <!-- 2. ENDEREÇO E CONTATO -->
-        <div class="sec-title">2. Endereço, Moradia e Contatos</div>
-        <table class="grid">
-            <tr>
-                <td colspan="2"><span class="lbl">Logradouro / Número</span><span class="val">{{ f.endereco or '---' }}</span></td>
-                <td><span class="lbl">Bairro</span><span class="val">{{ f.bairro or '---' }}</span></td>
-                <td><span class="lbl">CEP</span><span class="val">{{ f.cep or '---' }}</span></td>
-            </tr>
-            <tr>
-                <td><span class="lbl">Cidade / UF</span><span class="val">{{ f.cidade or 'VALENÇA DO PIAUÍ' }} / {{ f.uf or 'PI' }}</span></td>
-                <td><span class="lbl">Zona / Povoado</span><span class="val">{{ f.zona_moradia or 'URBANA' }}{% if f.povoado_comunidade %} — {{ f.povoado_comunidade }}{% endif %}</span></td>
-                <td><span class="lbl">Telefone / WhatsApp</span><span class="val">{{ f.telefone or '---' }}</span></td>
-                <td><span class="lbl">E-mail</span><span class="val">{{ f.email or '---' }}</span></td>
-            </tr>
-            <tr>
-                <td colspan="2"><span class="lbl">Contato de Emergência</span><span class="val">{{ f.contato_emergencia_nome or '---' }}</span></td>
-                <td colspan="2"><span class="lbl">Telefone de Emergência</span><span class="val">{{ f.contato_emergencia_tel or '---' }}</span></td>
-            </tr>
-        </table>
-
-        <!-- 3. DADOS FUNCIONAIS, PORTARIA E FINANCEIRO -->
-        <div class="sec-title">3. Vínculo Funcional, Lotação, Remuneração e Dados Bancários</div>
-        <table class="grid">
-            <tr>
-                <td colspan="2"><span class="lbl">Secretaria (Lotação)</span><span class="val">{{ f.secretaria.nome if f.secretaria else (f.lotacao or '---') }}</span></td>
-                <td colspan="2"><span class="lbl">Unidade / Local de Trabalho</span><span class="val">{{ f.local_trabalho.nome if f.local_trabalho else '---' }}</span></td>
-            </tr>
-            <tr>
-                <td colspan="2"><span class="lbl">Função / Cargo</span><span class="val">{{ f.funcao.nome if f.funcao else '---' }}</span></td>
-                <td><span class="lbl">Tipo de Vínculo</span><span class="val">{{ f.tipo_vinculo or '---' }}</span></td>
-                <td><span class="lbl">Jornada / Classe</span><span class="val">{{ f.jornada_trabalho or '-' }}h • {{ f.classe or '-' }}</span></td>
-            </tr>
-            <tr>
-                <td><span class="lbl">Nº Portaria / Decreto</span><span class="val">{{ f.numero_portaria or '---' }}</span></td>
-                <td><span class="lbl">Data Portaria</span><span class="val">{{ f.data_portaria.strftime('%d/%m/%Y') if f.data_portaria else '---' }}</span></td>
-                <td><span class="lbl">Início do Vínculo</span><span class="val">{{ f.dt_inicio.strftime('%d/%m/%Y') if f.dt_inicio else '---' }}</span></td>
-                <td><span class="lbl">Término Previsto</span><span class="val">{{ f.dt_termino.strftime('%d/%m/%Y') if f.dt_termino else 'Indeterminado' }}</span></td>
-            </tr>
-            <tr>
-                <td><span class="lbl">Remuneração Base</span><span class="val">{{ ('R$ ' ~ f.remuneracao) if f.remuneracao else '---' }}</span></td>
-                <td><span class="lbl">Gratificação</span><span class="val">{{ 'R$ %.2f'|format(f.gratificacao_valor or 0)|replace('.', ',') if f.gratificacao_valor else '---' }}</span></td>
-                <td><span class="lbl">Banco / Agência</span><span class="val">{{ f.banco or '-' }} • Ag: {{ f.agencia or '-' }}</span></td>
-                <td><span class="lbl">Conta / Tipo</span><span class="val">{{ f.conta or '-' }} ({{ f.tipo_conta or '-' }})</span></td>
-            </tr>
-        </table>
-
-        <!-- 4. CHECKLIST DOSSIÊ DIGITAL (GED) -->
-        <div class="sec-title">4. Checklist do Dossiê Digital (GED) — {{ ged_checklist.entregues_obrigatorios }}/{{ ged_checklist.total_obrigatorios }} obrigatórios anexados ({{ ged_checklist.total_documentos }} arquivo(s) no total)</div>
-        <div class="ged-grid">
-            {% for item in ged_checklist.itens %}
-            {% if item.obrigatorio or item.entregue %}
-            <div class="ged-item {{ 'ged-ok' if item.entregue else 'ged-no' }}">
-                <span>{{ item.label }}</span>
-                <span>{{ '✓ VALIDADO' if item.validado else ('✓ ANEXADO' if item.entregue else '○ PENDENTE') }}</span>
-            </div>
-            {% endif %}
-            {% endfor %}
-        </div>
-
-        {% if exercicios %}
-        <!-- 5. HISTÓRICO DE EXERCÍCIOS -->
-        <div class="sec-title">5. Histórico de Exercícios / Renovações Anuais</div>
-        <table class="grid">
-            <thead>
-                <tr>
-                    <th>Exercício</th>
-                    <th>Cargo / Função</th>
-                    <th>Vínculo</th>
-                    <th>Vigência</th>
-                    <th>Remuneração</th>
-                    <th>Portaria</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for ex in exercicios %}
-                <tr>
-                    <td><strong>{{ ex.ano_exercicio }}</strong></td>
-                    <td>{{ ex.funcao_nome or '---' }}</td>
-                    <td>{{ ex.tipo_vinculo or '---' }}</td>
-                    <td>{{ ex.dt_inicio.strftime('%d/%m/%Y') if ex.dt_inicio else '?' }} a {{ ex.dt_termino.strftime('%d/%m/%Y') if ex.dt_termino else 'Indet.' }}</td>
-                    <td>{{ ('R$ ' ~ ex.remuneracao) if ex.remuneracao else '---' }}</td>
-                    <td>{{ ex.numero_portaria or '---' }}</td>
-                    <td><strong>{{ ex.status }}</strong></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% endif %}
-
-        <!-- DECLARAÇÃO E ASSINATURAS -->
-        <div class="decl">
-            Declaro, sob as penas da lei, que as informações prestadas nesta Ficha Cadastral são verdadeiras e que assumo o compromisso de manter meus dados atualizados perante a Administração Municipal.<br>
-            <strong>Valença do Piauí - PI, {{ emitido_em }}</strong>
-        </div>
-
-        <div class="sigs">
-            <div class="sig-col">
-                <strong>{{ f.nome }}</strong>
-                Assinatura do(a) Servidor(a)
-            </div>
-            <div class="sig-col">
-                <strong>{{ emitido_por }}</strong>
-                Responsável RH / Conferência
-            </div>
-            <div class="sig-col">
-                <strong>{{ rep.nome or 'TITULAR DA SECRETARIA' }}</strong>
-                {{ rep.cargo or 'Secretário(a) Municipal' }}
-            </div>
-        </div>
-
-        <!-- RODAPÉ DE AUTENTICIDADE COM QR CODE -->
-        <div class="auth-footer">
-            <div class="auth-info">
-                <p><strong>AUTENTICIDADE VERIFICÁVEL ONLINE — SISTEMA GESTOOR 360</strong></p>
-                <p>Código Verificador: <strong style="font-family:monospace;">{{ f.token_validacao }}</strong></p>
-                <p>Valide apontando a câmera para o QR Code ou acessando: {{ validar_url }}</p>
-                <p>Emitido por <strong>{{ emitido_por }}</strong> em {{ emitido_em }}</p>
-            </div>
-            <div id="qrcode_a4" style="padding:3px; background:#fff; border:1px solid #cbd5e1; border-radius:4px;"></div>
         </div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const el = document.getElementById('qrcode_a4');
-            if (el && typeof QRCode !== 'undefined') {
-                new QRCode(el, { text: {{ validar_url|tojson }}, width: 64, height: 64 });
+            const containerQR = document.getElementById('qrcode_container');
+            if (containerQR && typeof QRCode !== 'undefined') {
+                new QRCode(containerQR, { text: {{ validar_url|tojson }}, width: 72, height: 72 });
             }
         });
     </script>
