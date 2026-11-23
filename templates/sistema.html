@@ -284,27 +284,16 @@
                     <input type="hidden" name="foto_3x4_b64" id="foto_3x4_b64">
                     <input type="hidden" name="remover_foto_3x4" id="remover_foto_3x4" value="0">
 
-                    <!-- BARRA DE COMPLETUDE & FOTO 3x4 OFICIAL (FICHA 2.0) -->
-                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 dark:bg-gray-700/40 dark:border-gray-600">
-                        <div class="flex items-center gap-4">
-                            <div id="preview_foto_3x4_box" class="w-16 h-20 rounded-xl border-2 border-dashed border-slate-300 bg-white overflow-hidden flex items-center justify-center text-[10px] text-slate-400 text-center shrink-0">
-                                <span>Foto<br>3×4</span>
-                            </div>
-                            <div class="space-y-1.5">
-                                <p class="text-xs font-bold text-slate-800 dark:text-white">Foto 3×4 Oficial do Servidor</p>
-                                <p class="text-[11px] text-slate-500 dark:text-gray-300">Exibida na Ficha A4 Profissional e no Raio-X 360° (salva no backup).</p>
-                                <div class="flex items-center gap-2">
-                                    <label class="cursor-pointer px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-indigo-600 text-white text-[11px] font-bold transition">
-                                        <i class="ph ph-camera mr-1"></i> Selecionar Foto
-                                        <input type="file" id="input_foto_3x4_file" accept="image/jpeg,image/png,image/webp" onchange="processarFoto3x4(this)" class="hidden">
-                                    </label>
-                                    <button type="button" id="btn_remover_foto_3x4" onclick="removerFoto3x4()" class="hidden px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold transition">Remover</button>
-                                </div>
-                            </div>
+                    <!-- BARRA DE COMPLETUDE DA FICHA -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 dark:bg-gray-700/40 dark:border-gray-600">
+                        <div class="flex items-center gap-2.5">
+                            <i class="ph-fill ph-sparkle text-indigo-600 text-lg"></i>
+                            <span class="text-xs font-semibold text-slate-700 dark:text-gray-200">A Foto 3×4 será solicitada automaticamente ao clicar em <strong>Salvar Cadastro</strong> (câmera ou arquivo).</span>
+                            <span id="badge_foto_salva_form" class="hidden text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Foto 3×4 Salva ✓</span>
                         </div>
-                        <div class="w-full sm:w-56">
+                        <div class="w-full sm:w-52 shrink-0">
                             <div class="flex justify-between text-[11px] font-bold mb-1">
-                                <span class="text-slate-600 dark:text-gray-300">Completude da Ficha</span>
+                                <span class="text-slate-600 dark:text-gray-300">Completude</span>
                                 <span id="lbl_completude_form" class="text-indigo-700 dark:text-indigo-400">0%</span>
                             </div>
                             <div class="w-full h-2 bg-slate-200 dark:bg-gray-600 rounded-full overflow-hidden">
@@ -982,8 +971,8 @@
             document.getElementById('tituloFormulario').innerText = "Nova Ficha Cadastral";
             if (document.getElementById('foto_3x4_b64')) document.getElementById('foto_3x4_b64').value = '';
             if (document.getElementById('remover_foto_3x4')) document.getElementById('remover_foto_3x4').value = '0';
-            if (document.getElementById('preview_foto_3x4_box')) document.getElementById('preview_foto_3x4_box').innerHTML = '<span>Foto<br>3×4</span>';
-            if (document.getElementById('btn_remover_foto_3x4')) document.getElementById('btn_remover_foto_3x4').classList.add('hidden');
+            if (typeof servidorTemFotoSalva !== 'undefined') servidorTemFotoSalva = false;
+            if (document.getElementById('badge_foto_salva_form')) document.getElementById('badge_foto_salva_form').classList.add('hidden');
             if (document.getElementById('cpf_validacao_msg')) document.getElementById('cpf_validacao_msg').classList.add('hidden');
             if (typeof resetCorCampoCpf === 'function') resetCorCampoCpf();
             if (typeof ultimoCpfVerificado !== 'undefined') ultimoCpfVerificado = "";
@@ -1071,9 +1060,10 @@
             if (document.getElementById('povoado_comunidade')) document.getElementById('povoado_comunidade').value = data.povoado_comunidade || '';
             if (document.getElementById('gratificacao_valor')) document.getElementById('gratificacao_valor').value = data.gratificacao_valor ? Number(data.gratificacao_valor).toFixed(2).replace('.', ',') : '';
             if (document.getElementById('ano_exercicio_atual')) document.getElementById('ano_exercicio_atual').value = data.ano_exercicio_atual || 2026;
-            if (data.tem_foto_3x4 && document.getElementById('preview_foto_3x4_box')) {
-                document.getElementById('preview_foto_3x4_box').innerHTML = '<span class="text-emerald-600 font-bold text-[10px]">Foto 3×4<br>Salva ✓</span>';
-                if (document.getElementById('btn_remover_foto_3x4')) document.getElementById('btn_remover_foto_3x4').classList.remove('hidden');
+            if (typeof servidorTemFotoSalva !== 'undefined') servidorTemFotoSalva = !!data.tem_foto_3x4;
+            if (document.getElementById('badge_foto_salva_form')) {
+                if (data.tem_foto_3x4) document.getElementById('badge_foto_salva_form').classList.remove('hidden');
+                else document.getElementById('badge_foto_salva_form').classList.add('hidden');
             }
             document.getElementById('banco').value = data.banco; 
             document.getElementById('agencia').value = data.agencia; 
@@ -1895,11 +1885,225 @@
         </div>
     </div>
 
+    <!-- MODAL: FOTO 3x4 AO SALVAR CADASTRO (CÂMERA NA HORA OU ANEXAR ARQUIVO) -->
+    <div id="modalFotoCadastro" class="fixed inset-0 bg-slate-950/75 hidden flex items-center justify-center z-[70] p-4 backdrop-blur-sm">
+        <div class="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-lg shadow-2xl border border-slate-200 dark:border-gray-700 overflow-hidden">
+            <div class="bg-slate-900 text-white px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center">
+                        <i class="ph-fill ph-camera text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-extrabold">Foto 3×4 do Servidor</h3>
+                        <p id="foto_modal_nome_srv" class="text-[11px] text-slate-400">Tire uma foto na hora ou anexe uma imagem para concluir o cadastro</p>
+                    </div>
+                </div>
+                <button type="button" onclick="fecharModalFotoCadastro()" class="text-slate-400 hover:text-white p-1"><i class="ph ph-x text-xl"></i></button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <!-- AVISO QUANDO JÁ EXISTE FOTO SALVA NA EDIÇÃO -->
+                <div id="box_foto_existente_aviso" class="hidden p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                        <i class="ph-fill ph-check-circle text-emerald-600 text-lg shrink-0"></i>
+                        <span>Este servidor <strong>já possui uma Foto 3×4 salva</strong>. Você pode mantê-la ou substituir abaixo.</span>
+                    </div>
+                    <button type="button" onclick="removerFotoExistenteESalvar()" class="text-[11px] font-bold text-rose-600 hover:underline shrink-0">Remover</button>
+                </div>
+
+                <!-- ESCOLHA DE MODO: CÂMERA OU ANEXAR -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" id="btnModoCamera" onclick="iniciarCameraFoto3x4()" class="py-3 px-4 rounded-2xl border-2 border-indigo-600 bg-indigo-50 text-indigo-900 font-extrabold text-xs flex items-center justify-center gap-2 hover:bg-indigo-100 transition">
+                        <i class="ph-fill ph-video-camera text-lg"></i> Tirar Foto na Hora
+                    </button>
+                    <label class="cursor-pointer py-3 px-4 rounded-2xl border-2 border-slate-200 bg-slate-50 text-slate-800 font-extrabold text-xs flex items-center justify-center gap-2 hover:bg-slate-100 transition dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <i class="ph-fill ph-upload-simple text-lg"></i> Anexar Foto
+                        <input type="file" id="input_foto_3x4_modal" accept="image/jpeg,image/png,image/webp" onchange="processarFoto3x4Modal(this)" class="hidden">
+                    </label>
+                </div>
+
+                <!-- ÁREA DE CÂMERA AO VIVO -->
+                <div id="area_camera_foto" class="hidden flex flex-col items-center space-y-3">
+                    <div class="relative w-56 h-72 rounded-2xl overflow-hidden bg-black border-2 border-slate-900 shadow-inner">
+                        <video id="video_foto_3x4" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                        <!-- Guia visual de enquadramento 3x4 -->
+                        <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+                            <div class="w-36 h-48 border-2 border-dashed border-white/75 rounded-[50%] shadow-[0_0_0_9999px_rgba(0,0,0,0.28)]"></div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="alternarCameraFoto3x4()" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center gap-1.5">
+                            <i class="ph ph-camera-rotate text-base"></i> Virar Câmera
+                        </button>
+                        <button type="button" onclick="capturarFotoCamera3x4()" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold flex items-center gap-1.5 shadow-md">
+                            <i class="ph-fill ph-aperture text-base"></i> Capturar Foto 3×4
+                        </button>
+                    </div>
+                    <p id="camera_erro_msg" class="hidden text-xs font-bold text-rose-600 text-center"></p>
+                </div>
+
+                <!-- ÁREA DE PREVIEW DA FOTO CAPTURADA / ANEXADA -->
+                <div id="area_preview_foto" class="hidden flex flex-col items-center space-y-3">
+                    <div class="w-44 h-56 rounded-2xl overflow-hidden border-2 border-emerald-500 shadow-md bg-slate-100">
+                        <img id="img_preview_foto_modal" src="" alt="Preview Foto 3x4" class="w-full h-full object-cover">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="limparPreviewFotoModal()" class="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold">
+                            Trocar Foto
+                        </button>
+                        <span class="text-xs font-bold text-emerald-700 flex items-center gap-1"><i class="ph-fill ph-check-circle"></i> Pronta em formato 3×4</span>
+                    </div>
+                </div>
+
+                <!-- ESTADO INICIAL (QUANDO AINDA NÃO TIROU NEM ANEXOU) -->
+                <div id="area_placeholder_foto" class="py-6 px-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-gray-600 text-center text-slate-400">
+                    <i class="ph ph-user-focus text-4xl mb-1"></i>
+                    <p class="text-xs font-semibold text-slate-500 dark:text-gray-300">Escolha acima entre <strong>Tirar Foto na Hora</strong> ou <strong>Anexar Foto</strong></p>
+                    <p class="text-[11px] text-slate-400 mt-0.5">A imagem é ajustada automaticamente para o padrão 3×4 da ficha.</p>
+                </div>
+
+                <!-- AÇÕES FINAIS -->
+                <div class="pt-3 border-t border-slate-100 dark:border-gray-700 flex flex-col sm:flex-row gap-2">
+                    <button type="button" onclick="confirmarESalvarCadastroComFoto()" id="btnConfirmarSalvarFoto" class="flex-1 py-3 px-4 rounded-xl bg-black hover:bg-gray-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-extrabold text-xs shadow-lg transition flex items-center justify-center gap-2">
+                        <i class="ph-fill ph-floppy-disk text-base"></i> <span id="lblBtnConfirmarSalvarFoto">Confirmar e Salvar Cadastro</span>
+                    </button>
+                    <button type="button" id="btnSalvarSemFoto" onclick="salvarCadastroSemFoto()" class="py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-gray-700 dark:text-gray-200 text-slate-700 font-bold text-xs transition">
+                        Salvar Sem Foto
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // --- FICHA 2.0: FOTO 3x4, VALIDAÇÃO CPF & COMPLETUDE ---
-        function processarFoto3x4(input) {
+        // --- FICHA 2.0: MODAL DE FOTO 3x4 AO SALVAR (WEBCAM + UPLOAD), CPF & COMPLETUDE ---
+        let servidorTemFotoSalva = false;
+        let permitirEnvioDiretoForm = false;
+        let streamCamera3x4 = null;
+        let facingModeAtual = 'user';
+
+        function pararCameraFoto3x4() {
+            if (streamCamera3x4) {
+                streamCamera3x4.getTracks().forEach(t => t.stop());
+                streamCamera3x4 = null;
+            }
+            const video = document.getElementById('video_foto_3x4');
+            if (video) video.srcObject = null;
+        }
+
+        function fecharModalFotoCadastro() {
+            pararCameraFoto3x4();
+            document.getElementById('modalFotoCadastro').classList.add('hidden');
+        }
+
+        function atualizarBotoesModalFoto() {
+            const temNovaFoto = Boolean((document.getElementById('foto_3x4_b64').value || '').trim());
+            const btnConf = document.getElementById('btnConfirmarSalvarFoto');
+            const lblConf = document.getElementById('lblBtnConfirmarSalvarFoto');
+            const btnSem = document.getElementById('btnSalvarSemFoto');
+            const avisoEx = document.getElementById('box_foto_existente_aviso');
+
+            if (servidorTemFotoSalva && !temNovaFoto) {
+                avisoEx.classList.remove('hidden');
+                btnConf.classList.remove('hidden');
+                lblConf.innerText = 'Manter Foto Atual e Salvar';
+                btnSem.classList.add('hidden');
+            } else if (temNovaFoto) {
+                avisoEx.classList.add('hidden');
+                btnConf.classList.remove('hidden');
+                lblConf.innerText = 'Confirmar Foto e Salvar Cadastro';
+                btnSem.classList.add('hidden');
+            } else {
+                avisoEx.classList.add('hidden');
+                btnConf.classList.add('hidden');
+                btnSem.classList.remove('hidden');
+            }
+        }
+
+        function abrirModalFotoAoSalvar() {
+            const nomeSrv = (document.getElementById('nome').value || '').trim();
+            document.getElementById('foto_modal_nome_srv').innerText = nomeSrv
+                ? `Servidor(a): ${nomeSrv}`
+                : 'Tire uma foto na hora ou anexe uma imagem para concluir o cadastro';
+
+            document.getElementById('camera_erro_msg').classList.add('hidden');
+            const temNovaFoto = Boolean((document.getElementById('foto_3x4_b64').value || '').trim());
+            if (temNovaFoto) {
+                document.getElementById('img_preview_foto_modal').src = document.getElementById('foto_3x4_b64').value;
+                document.getElementById('area_preview_foto').classList.remove('hidden');
+                document.getElementById('area_camera_foto').classList.add('hidden');
+                document.getElementById('area_placeholder_foto').classList.add('hidden');
+            } else {
+                document.getElementById('area_preview_foto').classList.add('hidden');
+                document.getElementById('area_camera_foto').classList.add('hidden');
+                document.getElementById('area_placeholder_foto').classList.remove('hidden');
+            }
+            atualizarBotoesModalFoto();
+            document.getElementById('modalFotoCadastro').classList.remove('hidden');
+        }
+
+        async function iniciarCameraFoto3x4() {
+            pararCameraFoto3x4();
+            const errEl = document.getElementById('camera_erro_msg');
+            errEl.classList.add('hidden');
+            document.getElementById('area_placeholder_foto').classList.add('hidden');
+            document.getElementById('area_preview_foto').classList.add('hidden');
+            document.getElementById('area_camera_foto').classList.remove('hidden');
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                errEl.innerText = 'Câmera indisponível neste navegador/dispositivo. Use a opção "Anexar Foto".';
+                errEl.classList.remove('hidden');
+                return;
+            }
+            try {
+                streamCamera3x4 = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: facingModeAtual, width: { ideal: 640 }, height: { ideal: 800 } },
+                    audio: false
+                });
+                const video = document.getElementById('video_foto_3x4');
+                video.srcObject = streamCamera3x4;
+            } catch (err) {
+                errEl.innerText = 'Não foi possível acessar a câmera (verifique a permissão). Você pode usar "Anexar Foto".';
+                errEl.classList.remove('hidden');
+            }
+        }
+
+        function alternarCameraFoto3x4() {
+            facingModeAtual = (facingModeAtual === 'user') ? 'environment' : 'user';
+            iniciarCameraFoto3x4();
+        }
+
+        function capturarFotoCamera3x4() {
+            const video = document.getElementById('video_foto_3x4');
+            if (!video || !video.videoWidth || !video.videoHeight) return;
+
+            // Recorte centralizado proporcional 3:4 (360 x 480)
+            const targetW = 360, targetH = 480;
+            const targetRatio = targetW / targetH;
+            const vw = video.videoWidth, vh = video.videoHeight;
+            const srcRatio = vw / vh;
+            let sx = 0, sy = 0, sw = vw, sh = vh;
+            if (srcRatio > targetRatio) {
+                sw = vh * targetRatio;
+                sx = (vw - sw) / 2;
+            } else {
+                sh = vw / targetRatio;
+                sy = (vh - sh) / 2;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = targetW;
+            canvas.height = targetH;
+            canvas.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, targetW, targetH);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.84);
+
+            pararCameraFoto3x4();
+            aplicarPreviewFotoModal(dataUrl);
+        }
+
+        function processarFoto3x4Modal(input) {
             const file = input.files && input.files[0];
             if (!file) return;
+            pararCameraFoto3x4();
             const reader = new FileReader();
             reader.onload = function(ev) {
                 const img = new Image();
@@ -1912,25 +2116,71 @@
                     const canvas = document.createElement('canvas');
                     canvas.width = w; canvas.height = h;
                     canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-                    document.getElementById('foto_3x4_b64').value = dataUrl;
-                    document.getElementById('remover_foto_3x4').value = '0';
-                    document.getElementById('preview_foto_3x4_box').innerHTML = `<img src="${dataUrl}" class="w-full h-full object-cover">`;
-                    document.getElementById('btn_remover_foto_3x4').classList.remove('hidden');
+                    aplicarPreviewFotoModal(canvas.toDataURL('image/jpeg', 0.84));
                 };
                 img.src = ev.target.result;
             };
             reader.readAsDataURL(file);
         }
 
-        function removerFoto3x4() {
+        function aplicarPreviewFotoModal(dataUrl) {
+            document.getElementById('foto_3x4_b64').value = dataUrl;
+            document.getElementById('remover_foto_3x4').value = '0';
+            document.getElementById('img_preview_foto_modal').src = dataUrl;
+            document.getElementById('area_camera_foto').classList.add('hidden');
+            document.getElementById('area_placeholder_foto').classList.add('hidden');
+            document.getElementById('area_preview_foto').classList.remove('hidden');
+            atualizarBotoesModalFoto();
+        }
+
+        function limparPreviewFotoModal() {
+            document.getElementById('foto_3x4_b64').value = '';
+            const inp = document.getElementById('input_foto_3x4_modal');
+            if (inp) inp.value = '';
+            document.getElementById('area_preview_foto').classList.add('hidden');
+            document.getElementById('area_placeholder_foto').classList.remove('hidden');
+            atualizarBotoesModalFoto();
+        }
+
+        function submeterFormularioFinal() {
+            pararCameraFoto3x4();
+            document.getElementById('modalFotoCadastro').classList.add('hidden');
+            permitirEnvioDiretoForm = true;
+            const form = document.getElementById('employeeForm');
+            if (form) form.submit();
+        }
+
+        function confirmarESalvarCadastroComFoto() {
+            document.getElementById('remover_foto_3x4').value = '0';
+            submeterFormularioFinal();
+        }
+
+        function salvarCadastroSemFoto() {
+            document.getElementById('foto_3x4_b64').value = '';
+            submeterFormularioFinal();
+        }
+
+        function removerFotoExistenteESalvar() {
             document.getElementById('foto_3x4_b64').value = '';
             document.getElementById('remover_foto_3x4').value = '1';
-            document.getElementById('preview_foto_3x4_box').innerHTML = '<span>Foto<br>3×4</span>';
-            document.getElementById('btn_remover_foto_3x4').classList.add('hidden');
-            const inp = document.getElementById('input_foto_3x4_file');
-            if (inp) inp.value = '';
+            submeterFormularioFinal();
         }
+
+        // Intercepta o submit do formulário para abrir o modal da Foto 3x4 primeiro
+        document.addEventListener('DOMContentLoaded', () => {
+            const empForm = document.getElementById('employeeForm');
+            if (empForm) {
+                empForm.addEventListener('submit', function(e) {
+                    if (permitirEnvioDiretoForm) return;
+                    e.preventDefault();
+                    if (!empForm.checkValidity()) {
+                        empForm.reportValidity();
+                        return;
+                    }
+                    abrirModalFotoAoSalvar();
+                });
+            }
+        });
 
         function validarCpfVisual(raw) {
             const msg = document.getElementById('cpf_validacao_msg');

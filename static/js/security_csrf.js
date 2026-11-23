@@ -23,6 +23,7 @@
                     form.appendChild(input);
                 }
                 input.value = token;
+                input.setAttribute('value', token);
             }
         });
     }
