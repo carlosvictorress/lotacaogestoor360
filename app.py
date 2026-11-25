@@ -713,9 +713,12 @@ class ConfiguracaoGestoorSign(db.Model):
     otp_cooldown_reenvio_segundos = db.Column(db.Integer, default=60)
     bloqueio_minutos = db.Column(db.Integer, default=30)
 
-    # Provedor SMS (Comtele padrão) & Integração GED
+    # Provedor SMS (Comtele Painel Novo V4 padrão) & Integração GED
     sms_provider = db.Column(db.String(30), default="comtele")
     sms_remetente = db.Column(db.String(40), default="GESTOOR360")
+    comtele_panel_mode = db.Column(db.String(20), default="novo")  # novo (x-api-key) | antigo (auth-key)
+    comtele_route_id = db.Column(db.Integer, default=17)
+    comtele_api_key_enc = db.Column(db.Text, nullable=True)  # Cifrada em AES-256-GCM
     arquivar_ged_automatico = db.Column(db.Boolean, default=True)
 
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -3103,6 +3106,11 @@ def atualizar_schema():
                 ],
                 "assinatura_contrato": [
                     ("local_assinatura_json", "TEXT"),
+                ],
+                "configuracao_gestoor_sign": [
+                    ("comtele_panel_mode", "VARCHAR(20) DEFAULT 'novo'"),
+                    ("comtele_route_id", "INTEGER DEFAULT 17"),
+                    ("comtele_api_key_enc", "TEXT"),
                 ],
                 '"user"': [
                     ("municipio_id", "INTEGER"),
@@ -7963,7 +7971,12 @@ def gestoor_sign_painel():
 
     mun_id = security.get_user_municipio_id(current_user)
     cfg = gestoor_sign_service.obter_ou_criar_config_municipio(db, _gestoor_sign_models_ctx(), mun_id)
-    sms_diag = sms_service.diagnostico_provedor_sms(cfg.sms_provider)
+    sms_diag = sms_service.diagnostico_provedor_sms(
+        cfg.sms_provider,
+        has_db_comtele_key=bool(cfg.comtele_api_key_enc),
+        comtele_panel_mode=cfg.comtele_panel_mode,
+        comtele_route_id=cfg.comtele_route_id,
+    )
 
     return render_template(
         "gestoor_sign_painel.html",
@@ -8025,7 +8038,12 @@ def gestoor_sign_assinar(contrato_id):
     etapa_atual = gestoor_sign_service.calcular_etapa_atual(sessao)
     tel_servidor = (funcionario.telefone if funcionario else "") or ""
     ok_tel, _, _, _ = sms_service.normalizar_celular_br(tel_servidor)
-    sms_diag = sms_service.diagnostico_provedor_sms(cfg.sms_provider)
+    sms_diag = sms_service.diagnostico_provedor_sms(
+        cfg.sms_provider,
+        has_db_comtele_key=bool(cfg.comtele_api_key_enc),
+        comtele_panel_mode=cfg.comtele_panel_mode,
+        comtele_route_id=cfg.comtele_route_id,
+    )
 
     qrcode_uri = None
     validar_url = None
@@ -8529,6 +8547,20 @@ def gestoor_sign_configuracoes():
                 else:
                     cfg.sms_provider = prov
             cfg.sms_remetente = (request.form.get("sms_remetente") or "GESTOOR360").strip()[:20]
+            panel_mode_form = (request.form.get("comtele_panel_mode") or "novo").strip().lower()
+            cfg.comtele_panel_mode = "antigo" if panel_mode_form == "antigo" else "novo"
+            cfg.comtele_route_id = max(1, request.form.get("comtele_route_id", type=int) or 17)
+
+            # Chave x-api-key Comtele salva cifrada (AES-256-GCM) — só sobrescreve se preenchida ou se marcar limpar
+            nova_chave_comtele = (request.form.get("comtele_api_key") or "").strip()
+            limpar_chave_comtele = request.form.get("limpar_comtele_api_key") == "1"
+            if limpar_chave_comtele:
+                cfg.comtele_api_key_enc = None
+            elif nova_chave_comtele:
+                cfg.comtele_api_key_enc = gestoor_sign_service.cifrar_dado_sensivel(
+                    nova_chave_comtele, app.config["SECRET_KEY"]
+                )
+
             cfg.arquivar_ged_automatico = request.form.get("arquivar_ged_automatico") == "1"
             cfg.atualizado_por_id = current_user.id
             cfg.atualizado_em = datetime.utcnow()
@@ -8536,7 +8568,7 @@ def gestoor_sign_configuracoes():
             db.session.commit()
             registrar_log(
                 "CONFIG_GESTOOR_SIGN",
-                f"Configurações do Gestoor Sign atualizadas para {mun.nome if mun else 'Município'} (Provedor: {cfg.sms_provider}, Modalidade padrão: {cfg.modalidade_minima_padrao})",
+                f"Configurações do Gestoor Sign atualizadas para {mun.nome if mun else 'Município'} (Provedor: {cfg.sms_provider}/{cfg.comtele_panel_mode}, Rota: {cfg.comtele_route_id}, Modalidade padrão: {cfg.modalidade_minima_padrao})",
             )
             flash("Configurações do Gestoor Sign salvas com sucesso!", "success")
             return redirect(url_for("gestoor_sign_configuracoes"))
@@ -8555,8 +8587,76 @@ def gestoor_sign_configuracoes():
         config=cfg,
         regras_atual=regras_atual,
         tipos_contrato=gestoor_sign_service.TIPOS_CONTRATO_PADRAO,
-        sms_diag=sms_service.diagnostico_provedor_sms(cfg.sms_provider),
+        sms_diag=sms_service.diagnostico_provedor_sms(
+            cfg.sms_provider,
+            has_db_comtele_key=bool(cfg.comtele_api_key_enc),
+            comtele_panel_mode=cfg.comtele_panel_mode,
+            comtele_route_id=cfg.comtele_route_id,
+        ),
     )
+
+
+@app.route("/api/gestoor-sign/comtele/rotas", methods=["POST"])
+@login_required
+@security.require_permission("config_gestoor_sign", api=True)
+def api_gestoor_sign_comtele_rotas():
+    """Consulta rotas SMS disponíveis no Painel Novo Comtele (GET https://api.comtele.com.br/routes)."""
+    data = request.get_json(silent=True) or {}
+    mun_id = security.get_user_municipio_id(current_user)
+    cfg = gestoor_sign_service.obter_ou_criar_config_municipio(db, _gestoor_sign_models_ctx(), mun_id)
+    api_key = (data.get("api_key") or "").strip() or gestoor_sign_service.obter_comtele_api_key(
+        cfg, app.config["SECRET_KEY"]
+    )
+    try:
+        rotas = sms_service.listar_rotas_comtele(api_key=api_key)
+        return jsonify({"success": True, "rotas": rotas})
+    except sms_service.SMSProviderError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+
+
+@app.route("/api/gestoor-sign/comtele/testar-sms", methods=["POST"])
+@login_required
+@security.require_permission("config_gestoor_sign", api=True)
+def api_gestoor_sign_comtele_testar_sms():
+    """Dispara um SMS de teste real via Comtele para validar x-api-key e rota antes de operar."""
+    data = request.get_json(silent=True) or {}
+    telefone = (data.get("telefone") or "").strip()
+    mun_id = security.get_user_municipio_id(current_user)
+    cfg = gestoor_sign_service.obter_ou_criar_config_municipio(db, _gestoor_sign_models_ctx(), mun_id)
+    mun = db.session.get(Municipio, cfg.municipio_id) if cfg.municipio_id else None
+
+    api_key = (data.get("api_key") or "").strip() or gestoor_sign_service.obter_comtele_api_key(
+        cfg, app.config["SECRET_KEY"]
+    )
+    panel_mode = (data.get("panel_mode") or cfg.comtele_panel_mode or "novo").strip().lower()
+    try:
+        route_id = int(data.get("route_id") or cfg.comtele_route_id or 17)
+    except (TypeError, ValueError):
+        route_id = 17
+
+    try:
+        res = sms_service.enviar_sms_teste(
+            telefone_raw=telefone,
+            municipio_nome=mun.nome if mun else "Gestoor360",
+            comtele_api_key=api_key,
+            comtele_panel_mode=panel_mode,
+            comtele_route_id=route_id,
+            sender=cfg.sms_remetente or "GESTOOR360",
+        )
+        registrar_log(
+            "COMTELE_TESTE_SMS",
+            f"SMS de teste enviado via Comtele ({panel_mode}, rota {route_id}) para {sms_service.mascarar_telefone(telefone)} • ID: {res.message_id}",
+        )
+        return jsonify(
+            {
+                "success": True,
+                "message": f"SMS de teste aceito pela Comtele! Protocolo: {res.message_id}",
+                "message_id": res.message_id,
+                "detail": res.detail,
+            }
+        )
+    except sms_service.SMSProviderError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
 
 
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===

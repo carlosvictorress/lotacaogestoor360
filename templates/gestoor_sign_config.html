@@ -149,7 +149,7 @@
                     <div>
                         <label class="block font-bold text-slate-600 mb-1">Provedor SMS</label>
                         <select name="sms_provider" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold text-[#0B3D2E]">
-                            <option value="comtele" {% if config.sms_provider == 'comtele' %}selected{% endif %}>Comtele API v2 (Produção — Padrão)</option>
+                            <option value="comtele" {% if config.sms_provider == 'comtele' %}selected{% endif %}>Comtele (Produção — Padrão)</option>
                             <option value="twilio" {% if config.sms_provider == 'twilio' %}selected{% endif %}>Twilio (Alternativo)</option>
                             <option value="zenvia" {% if config.sms_provider == 'zenvia' %}selected{% endif %}>Zenvia (Alternativo)</option>
                             {% if not sms_diag.ambiente_producao %}
@@ -158,9 +158,77 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block font-bold text-slate-600 mb-1">Remetente / Identificador (Sender)</label>
+                        <label class="block font-bold text-slate-600 mb-1">Painel / API Comtele</label>
+                        <select name="comtele_panel_mode" id="comtele_panel_mode" class="w-full px-3 py-2 rounded-xl border border-emerald-300 bg-emerald-50/50 font-bold text-[#0B3D2E]">
+                            <option value="novo" {% if (config.comtele_panel_mode or 'novo') == 'novo' %}selected{% endif %}>Painel Novo — portal.comtele.com.br (x-api-key • V4)</option>
+                            <option value="antigo" {% if config.comtele_panel_mode == 'antigo' %}selected{% endif %}>Painel Antigo — sms.comtele.com.br (auth-key • v2)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Tag / Remetente (Sender)</label>
                         <input type="text" name="sms_remetente" value="{{ config.sms_remetente or 'GESTOOR360' }}" maxlength="20" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-semibold">
                     </div>
+                </div>
+
+                <!-- BLOCO DEDICADO: CREDENCIAIS COMTELE (CIFRADAS EM AES-256-GCM) + ROTAS + SMS DE TESTE -->
+                <div class="rounded-2xl bg-emerald-50/70 border border-emerald-200 p-4 space-y-4 text-xs">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h3 class="font-extrabold text-[#0B3D2E] flex items-center gap-1.5">
+                                <i class="ph ph-key text-base text-[#10B981]"></i> Integração Comtele (Painel Novo: Configurações → Chaves de API)
+                            </h3>
+                            <p class="text-[11px] text-slate-600 mt-0.5">
+                                A chave <code>x-api-key</code> é armazenada <strong>cifrada (AES-256-GCM)</strong> no banco ou pode ser definida na variável de ambiente <code>COMTELE_API_KEY</code>.
+                            </p>
+                        </div>
+                        <span class="text-[10px] font-extrabold px-2.5 py-1 rounded-full {{ 'bg-[#0B3D2E] text-[#FACC15]' if sms_diag.comtele_pronto else 'bg-amber-200 text-amber-950' }}">
+                            {% if sms_diag.comtele_has_db_key %}Chave Cifrada Salva no Painel{% elif sms_diag.comtele_has_env_key %}Chave via Variável COMTELE_API_KEY{% else %}Chave Pendente{% endif %}
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                        <div class="md:col-span-6">
+                            <label class="block font-bold text-[#0B3D2E] mb-1">Chave de API Comtele (<code>x-api-key</code>)</label>
+                            <input type="password" name="comtele_api_key" id="comtele_api_key" autocomplete="new-password"
+                                   placeholder="{{ '•••••••••••• (mantém a chave atual salva se deixar em branco)' if sms_diag.comtele_has_db_key else 'Cole aqui sua x-api-key obtida em portal.comtele.com.br' }}"
+                                   class="w-full px-3 py-2 rounded-xl border border-emerald-300 bg-white font-mono text-xs focus:outline-none focus:ring-2 focus:ring-[#10B981]">
+                            {% if sms_diag.comtele_has_db_key %}
+                            <label class="inline-flex items-center gap-1.5 mt-1.5 text-[11px] text-rose-700 font-semibold cursor-pointer">
+                                <input type="checkbox" name="limpar_comtele_api_key" value="1" class="accent-rose-600"> Remover chave salva no banco
+                            </label>
+                            {% endif %}
+                        </div>
+                        <div class="md:col-span-3">
+                            <label class="block font-bold text-[#0B3D2E] mb-1">ID da Rota SMS (<code>route</code>)</label>
+                            <input type="number" name="comtele_route_id" id="comtele_route_id" value="{{ config.comtele_route_id or 17 }}" min="1"
+                                   class="w-full px-3 py-2 rounded-xl border border-emerald-300 bg-white font-bold text-[#0B3D2E]">
+                        </div>
+                        <div class="md:col-span-3">
+                            <button type="button" onclick="consultarRotasComtele()" id="btnConsultarRotas"
+                                    class="w-full py-2 px-3 rounded-xl g360-bg-dark hover:bg-[#14532D] text-white font-extrabold text-xs inline-flex items-center justify-center gap-1.5 transition">
+                                <i class="ph ph-plugs-connected text-base text-[#FACC15]"></i> Listar Rotas
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="boxRotasComtele" class="hidden p-3 rounded-xl bg-white border border-emerald-200 space-y-2"></div>
+
+                    <!-- TESTE REAL DE ENVIO SMS -->
+                    <div class="pt-3 border-t border-emerald-200/80 flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5">
+                        <div class="flex-1">
+                            <label class="block font-bold text-[#0B3D2E] mb-1">Testar Envio Real de SMS (Celular com DDD)</label>
+                            <input type="text" id="inputTelefoneTeste" placeholder="(89) 99999-1234"
+                                   class="w-full px-3 py-2 rounded-xl border border-emerald-300 bg-white font-semibold">
+                        </div>
+                        <button type="button" onclick="enviarSmsTesteComtele()" id="btnTestarSms"
+                                class="py-2 px-4 rounded-xl bg-[#10B981] hover:bg-emerald-600 text-white font-extrabold text-xs inline-flex items-center justify-center gap-1.5 transition">
+                            <i class="ph ph-paper-plane-tilt text-base"></i> Enviar SMS de Teste
+                        </button>
+                    </div>
+                    <div id="boxResultadoTesteSms" class="hidden p-3 rounded-xl text-xs font-bold"></div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
                     <div>
                         <label class="block font-bold text-slate-600 mb-1">Tamanho do Código OTP (dígitos)</label>
                         <input type="number" name="otp_tamanho" value="{{ config.otp_tamanho or 6 }}" min="6" max="8" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold">
@@ -201,6 +269,91 @@
             </div>
         </form>
     </main>
+    <script>
+        function consultarRotasComtele() {
+            const box = document.getElementById('boxRotasComtele');
+            const btn = document.getElementById('btnConsultarRotas');
+            const apiKey = (document.getElementById('comtele_api_key').value || '').trim();
+            btn.disabled = true;
+            box.classList.remove('hidden');
+            box.innerHTML = '<span class="text-slate-500"><i class="ph ph-spinner animate-spin"></i> Consultando rotas na API Comtele (GET /routes)...</span>';
+
+            fetch('/api/gestoor-sign/comtele/rotas', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ api_key: apiKey })
+            })
+            .then(r => r.json())
+            .then(res => {
+                btn.disabled = false;
+                if (!res.success) {
+                    box.innerHTML = '<div class="text-rose-700 font-bold"><i class="ph ph-x-circle"></i> ' + (res.message || 'Erro ao consultar rotas.') + '</div>';
+                    return;
+                }
+                if (!res.rotas || res.rotas.length === 0) {
+                    box.innerHTML = '<div class="text-amber-800 font-bold">Chave autenticada, mas nenhuma rota SMS foi retornada pela conta.</div>';
+                    return;
+                }
+                let html = '<div class="font-extrabold text-[#0B3D2E]">Rotas disponíveis na sua conta Comtele (clique para selecionar):</div><div class="flex flex-wrap gap-2">';
+                res.rotas.forEach(rt => {
+                    html += `<button type="button" onclick="document.getElementById('comtele_route_id').value='${rt.id}'" class="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-[#0B3D2E] hover:text-white border border-emerald-300 text-[#0B3D2E] font-bold transition">
+                        ID ${rt.id} — ${rt.displayName} (${rt.productName})
+                    </button>`;
+                });
+                html += '</div>';
+                box.innerHTML = html;
+            })
+            .catch(err => {
+                btn.disabled = false;
+                box.innerHTML = '<div class="text-rose-700 font-bold">Erro de conexão: ' + err + '</div>';
+            });
+        }
+
+        function enviarSmsTesteComtele() {
+            const tel = (document.getElementById('inputTelefoneTeste').value || '').trim();
+            const apiKey = (document.getElementById('comtele_api_key').value || '').trim();
+            const panelMode = document.getElementById('comtele_panel_mode').value;
+            const routeId = document.getElementById('comtele_route_id').value;
+            const box = document.getElementById('boxResultadoTesteSms');
+            const btn = document.getElementById('btnTestarSms');
+
+            if (!tel) {
+                box.className = 'p-3 rounded-xl text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300';
+                box.textContent = 'Informe um número de celular com DDD para receber o SMS de teste.';
+                return;
+            }
+            btn.disabled = true;
+            box.className = 'p-3 rounded-xl text-xs font-bold bg-slate-100 text-slate-600';
+            box.textContent = 'Enviando SMS de teste via Comtele...';
+
+            fetch('/api/gestoor-sign/comtele/testar-sms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    telefone: tel,
+                    api_key: apiKey,
+                    panel_mode: panelMode,
+                    route_id: routeId
+                })
+            })
+            .then(r => r.json())
+            .then(res => {
+                btn.disabled = false;
+                if (res.success) {
+                    box.className = 'p-3 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300';
+                    box.textContent = '✓ ' + res.message;
+                } else {
+                    box.className = 'p-3 rounded-xl text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300';
+                    box.textContent = '✕ ' + (res.message || 'Falha ao enviar SMS de teste.');
+                }
+            })
+            .catch(err => {
+                btn.disabled = false;
+                box.className = 'p-3 rounded-xl text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300';
+                box.textContent = 'Erro de conexão: ' + err;
+            });
+        }
+    </script>
     <script src="{{ url_for('static', filename='js/inactivity.js') }}"></script>
 </body>
 </html>

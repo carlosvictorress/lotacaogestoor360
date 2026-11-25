@@ -196,6 +196,16 @@ def decifrar_dado_sensivel(payload: str, secret_key: str) -> str:
         return ""
 
 
+def obter_comtele_api_key(config, secret_key: str) -> str:
+    """Resolve a API Key Comtele (prioriza chave municipal cifrada no banco; fallback para variável COMTELE_API_KEY)."""
+    enc = getattr(config, "comtele_api_key_enc", None) if config else None
+    if enc:
+        dec = decifrar_dado_sensivel(enc, secret_key)
+        if dec:
+            return dec.strip()
+    return (os.getenv("COMTELE_API_KEY") or "").strip()
+
+
 def sha256_texto(texto: str, pepper: str = "") -> str:
     return hashlib.sha256(f"{pepper}:{texto}".encode("utf-8")).hexdigest()
 
@@ -763,7 +773,8 @@ def enviar_codigo_sms_sessao(
     mun = db.session.get(Municipio, contrato.municipio_id) if contrato.municipio_id else None
     mun_nome = mun.nome if mun else "Prefeitura Municipal"
 
-    # Dispara SMS pelo provedor configurado (Comtele em produção)
+    # Dispara SMS pelo provedor configurado (Comtele Painel Novo V4 padrão em produção)
+    comtele_key = obter_comtele_api_key(config, secret_key)
     try:
         sms_res = sms_service.enviar_sms_otp(
             telefone_raw=tel_e164,
@@ -773,6 +784,9 @@ def enviar_codigo_sms_sessao(
             provider_name=config.sms_provider,
             sender=config.sms_remetente or "GESTOOR360",
             expiracao_minutos=max(1, ttl_segundos // 60),
+            comtele_api_key=comtele_key,
+            comtele_panel_mode=getattr(config, "comtele_panel_mode", None) or "novo",
+            comtele_route_id=getattr(config, "comtele_route_id", None) or 17,
         )
     except sms_service.SMSProviderError as exc:
         registrar_evento_assinatura(
