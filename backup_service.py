@@ -63,6 +63,12 @@ TABLE_LABELS = {
     "local_votacao": "Locais de Votação (Eleitoral)",
     "documento_servidor": "Dossiê Digital de Documentos (GED)",
     "historico_vinculo_exercicio": "Histórico de Exercícios (2026/2027)",
+    "municipio": "Municípios (Multi-Tenant)",
+    "configuracao_gestoor_sign": "Gestoor Sign — Configurações Municipais",
+    "assinatura_contrato": "Gestoor Sign — Assinaturas Eletrônicas",
+    "assinatura_sms_otp": "Gestoor Sign — Desafios OTP SMS",
+    "assinatura_evento": "Gestoor Sign — Trilha de Eventos",
+    "assinatura_documento_arquivo": "Gestoor Sign — PDFs Selados e Evidências",
     "log_auditoria": "Logs de Auditoria Forense",
 }
 

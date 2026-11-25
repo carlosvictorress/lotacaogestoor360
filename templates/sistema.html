@@ -245,6 +245,9 @@
                 {% if has_perm('view_contratos') %}
                 <a href="{{ url_for('pagina_contratos') }}" class="text-xs font-medium text-purple-600 hover:bg-purple-50 px-3 py-2 rounded-lg transition border border-purple-100 flex items-center gap-1" title="Contratos Gerados"><i class="ph ph-files text-sm"></i> Contratos Gerados</a>
                 {% endif %}
+                {% if has_perm('view_gestoor_sign') %}
+                <a href="{{ url_for('gestoor_sign_painel') }}" class="text-xs font-extrabold text-white bg-[#0B3D2E] hover:bg-[#14532D] px-3 py-2 rounded-lg transition border border-emerald-900 flex items-center gap-1 shadow-sm" title="Gestoor Sign — Assinatura Eletrônica Presencial"><i class="ph ph-signature text-[#FACC15] text-sm"></i> Gestoor Sign</a>
+                {% endif %}
                 {% if has_perm('view_eleitoral') %}
                 <a href="{{ url_for('eleitoral_index') }}" class="text-xs font-medium text-blue-700 hover:bg-blue-50 px-3 py-2 rounded-lg transition border border-blue-200 flex items-center gap-1" title="Mapeamento Eleitoral"><i class="ph ph-vote text-sm"></i> Eleitoral</a>
                 {% endif %}
@@ -353,7 +356,7 @@
                         <h3 class="section-title dark:text-white mt-6"><i class="ph ph-map-pin text-green-500 text-xl"></i> Contato & Endereço</h3>
                         <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
                             <div class="md:col-span-2"><label class="form-label">Email</label><input type="email" id="email" name="email" class="form-input"></div>
-                            <div class="md:col-span-2"><label class="form-label">Telefone</label><input type="text" id="telefone" name="telefone" class="form-input"></div>
+                            <div class="md:col-span-2"><label class="form-label">Telefone Celular <span class="text-[10px] font-bold text-emerald-700">(SMS • Gestoor Sign)</span></label><input type="text" id="telefone" name="telefone" placeholder="(89) 99999-1234" class="form-input"></div>
                             
                             <div><label class="form-label">CEP</label><input type="text" id="cep" name="cep" class="form-input" onblur="buscarCEP()"></div>
                             <div class="md:col-span-3"><label class="form-label">Endereço (Rua, Número, Complemento)</label><input type="text" id="endereco" name="endereco" class="form-input uppercase"></div>

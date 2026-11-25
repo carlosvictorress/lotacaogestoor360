@@ -107,10 +107,15 @@ PERMISSIONS: Dict[str, set] = {
     "export_rh": {"super_admin", "prefeito", "secretario", "auditor"},
     "scan_duplicados": {"super_admin", "prefeito", "secretario", "auditor"},
     # Contratos & Rescisões
-    "view_contratos": {"super_admin", "prefeito", "secretario", "auditor"},
-    "manage_contratos": {"super_admin", "prefeito", "secretario"},
+    "view_contratos": {"super_admin", "prefeito", "secretario", "rh_secretaria", "auditor"},
+    "manage_contratos": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "view_rescisoes": {"super_admin", "prefeito", "secretario", "auditor"},
     "manage_rescisoes": {"super_admin", "prefeito", "secretario"},
+    # Gestoor Sign (Assinatura Eletrônica Presencial de Contratos)
+    "view_gestoor_sign": {"super_admin", "prefeito", "secretario", "rh_secretaria", "auditor"},
+    "operate_gestoor_sign": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "cancel_gestoor_sign": {"super_admin", "prefeito", "secretario"},
+    "config_gestoor_sign": {"super_admin", "prefeito"},
     # Folha & Relatórios
     "view_folha": {"super_admin", "prefeito", "secretario", "auditor"},
     # Ponto & Atestados
@@ -197,13 +202,39 @@ def get_default_home_endpoint(user) -> str:
 # 2. GUARDIÃO DE ISOLAMENTO MULTI-SECRETARIAS (ANTI-IDOR)
 # ==============================================================================
 
+def get_user_municipio_id(user) -> Optional[int]:
+    """Retorna o municipio_id efetivo do usuário (direto ou via secretaria vinculada)."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return None
+    mun_id = getattr(user, "municipio_id", None)
+    if mun_id is not None:
+        return int(mun_id)
+    sec = getattr(user, "secretaria", None)
+    if sec is not None and getattr(sec, "municipio_id", None) is not None:
+        return int(sec.municipio_id)
+    return None
+
+
 def scope_query(query, model, user):
     """
-    Aplica filtro automático de isolamento por Secretaria (ou Unidade) na query SQLAlchemy.
-    - Usuários globais (super_admin, prefeito, auditor, estrategia_eleitoral) veem tudo.
+    Aplica filtro automático de isolamento multi-tenant:
+    Município -> Secretaria -> Unidade.
+    - super_admin sem municipio_id (Master plataforma) vê todos os municípios.
+    - Demais usuários com municipio_id ficam estritamente isolados ao seu município.
     - Secretários e RH veem APENAS registros da sua secretaria_id.
     - Chefe de Unidade vê APENAS registros da sua secretaria_id e local_trabalho_id.
     """
+    role = normalize_role(user)
+    user_mun_id = get_user_municipio_id(user)
+
+    if hasattr(model, "municipio_id"):
+        if role == "super_admin" and user_mun_id is None:
+            pass
+        elif user_mun_id is not None:
+            query = query.filter(model.municipio_id == user_mun_id)
+        elif role != "super_admin":
+            return query.filter(model.municipio_id == -1)
+
     scope = get_role_scope(user)
     if scope == "global":
         return query
@@ -232,10 +263,29 @@ def scope_query(query, model, user):
 def can_access_record(user, record) -> bool:
     """
     Verifica se o usuário tem direito de acessar/modificar um registro específico.
-    Garante isolamento estrito entre secretarias (e unidades).
+    Garante isolamento estrito entre municípios, secretarias e unidades.
     """
     if not user or not getattr(user, "is_authenticated", False) or record is None:
         return False
+
+    role = normalize_role(user)
+    user_mun_id = get_user_municipio_id(user)
+
+    # 1. Isolamento Multi-Tenant por Município
+    rec_mun_id = getattr(record, "municipio_id", None)
+    if rec_mun_id is None and hasattr(record, "secretaria") and record.secretaria is not None:
+        rec_mun_id = getattr(record.secretaria, "municipio_id", None)
+    if rec_mun_id is None and hasattr(record, "contrato") and record.contrato is not None:
+        rec_mun_id = getattr(record.contrato, "municipio_id", None)
+    if rec_mun_id is None and hasattr(record, "funcionario") and record.funcionario is not None:
+        rec_mun_id = getattr(record.funcionario, "municipio_id", None)
+
+    if role != "super_admin" or user_mun_id is not None:
+        if rec_mun_id is not None:
+            if user_mun_id is None or int(rec_mun_id) != int(user_mun_id):
+                return False
+        elif hasattr(record, "municipio_id") and role != "super_admin":
+            return False
 
     scope = get_role_scope(user)
     if scope == "global":
@@ -245,8 +295,10 @@ def can_access_record(user, record) -> bool:
     if user_sec_id is None:
         return False
 
-    # Descobre a secretaria_id do registro (diretamente ou via relacionamento funcionario/node)
+    # 2. Descobre a secretaria_id do registro (diretamente ou via relacionamento)
     rec_sec_id = getattr(record, "secretaria_id", None)
+    if rec_sec_id is None and hasattr(record, "contrato") and record.contrato is not None:
+        rec_sec_id = getattr(record.contrato, "secretaria_id", None)
     if rec_sec_id is None and hasattr(record, "funcionario") and record.funcionario is not None:
         rec_sec_id = getattr(record.funcionario, "secretaria_id", None)
     if rec_sec_id is None and hasattr(record, "exercicio") and record.exercicio is not None:

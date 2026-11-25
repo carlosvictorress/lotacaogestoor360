@@ -48,7 +48,49 @@
 
         <hr class="border-gray-100 mb-8 dark:border-gray-700">
 
-        {% if funcionario %}
+        {% if assinatura %}
+        {% set st_c = contrato_val.status_assinatura if contrato_val else assinatura.status %}
+        {% if st_c == 'ASSINADO_ELETRONICAMENTE' %}
+        <div class="bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-6 text-center animate-fade-in shadow-sm dark:bg-emerald-900/20 dark:border-emerald-700">
+            <div class="w-16 h-16 bg-[#0B3D2E] text-[#FACC15] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md">
+                <i class="ph ph-seal-check text-3xl"></i>
+            </div>
+            <span class="text-[10px] font-extrabold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-[#0B3D2E] text-[#FACC15]">GESTOOR SIGN</span>
+            <h3 class="text-lg font-extrabold text-[#0B3D2E] mt-2 mb-1 dark:text-emerald-300">Contrato Autêntico</h3>
+            <p class="text-xs text-emerald-800 mb-5 font-semibold dark:text-emerald-200">Assinado eletronicamente de forma presencial (Assinatura Eletrônica Simples — Lei nº 14.063/2020).</p>
+            <div class="text-left space-y-2.5 bg-white rounded-xl p-4 border border-emerald-200 text-xs dark:bg-gray-800/70 dark:border-emerald-800">
+                <div class="flex justify-between gap-2">
+                    <div>
+                        <span class="text-[10px] text-emerald-700 font-bold uppercase block">Contrato / Versão</span>
+                        <span class="font-extrabold text-[#0B3D2E] dark:text-white">Nº {{ contrato_val.num_contrato if contrato_val else '—' }} (v{{ assinatura.contrato_versao }})</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] text-emerald-700 font-bold uppercase block">Data Assinatura</span>
+                        <span class="font-mono font-bold text-gray-800 dark:text-gray-200">{{ assinatura.assinado_em | format_brt }}</span>
+                    </div>
+                </div>
+                <div class="border-t border-emerald-100 pt-2">
+                    <span class="text-[10px] text-emerald-700 font-bold uppercase block">Signatário</span>
+                    <span class="font-bold text-gray-900 dark:text-white">{{ assinatura.servidor_nome }}</span>
+                    <span class="block font-mono text-[11px] text-gray-500">CPF: {{ assinatura.servidor_cpf_mascarado }}</span>
+                </div>
+                <div class="border-t border-emerald-100 pt-2">
+                    <span class="text-[10px] text-emerald-700 font-bold uppercase block">Hash SHA-256 do Documento Assinado</span>
+                    <span class="font-mono text-[10px] text-gray-700 break-all dark:text-gray-300">{{ assinatura.hash_documento_final_sha256 }}</span>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="bg-amber-50 border-2 border-amber-400 rounded-2xl p-6 text-center animate-fade-in shadow-sm">
+            <div class="w-16 h-16 bg-amber-100 text-amber-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="ph ph-warning-circle text-3xl"></i>
+            </div>
+            <h3 class="text-lg font-extrabold text-amber-900 mb-1">Versão Não Vigente ({{ st_c }})</h3>
+            <p class="text-xs text-amber-800 font-medium">Este código pertence a uma versão contratual que foi substituída ou cancelada no Gestoor Sign. Solicite a versão vigente ao setor de RH.</p>
+        </div>
+        {% endif %}
+
+        {% elif funcionario %}
         {% if funcionario.validado %}
         <div class="bg-green-50 border border-green-200 rounded-2xl p-6 text-center animate-fade-in shadow-sm dark:bg-green-900/20 dark:border-green-800">
             <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-inner">

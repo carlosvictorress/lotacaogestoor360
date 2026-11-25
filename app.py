@@ -34,6 +34,9 @@ import security
 import prefeito_service
 import ficha_service
 import eleitoral_service
+import sms_service
+import gestoor_sign_pdf
+import gestoor_sign_service
 
 load_dotenv()
 
@@ -123,8 +126,24 @@ login_manager.login_view = "login"
 # --- MODELOS ---
 
 
+class Municipio(db.Model):
+    __tablename__ = "municipio"
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(120), unique=True, nullable=False)
+    uf = db.Column(db.String(2), default="PI", nullable=False)
+    cnpj = db.Column(db.String(25), nullable=True)
+    codigo_ibge = db.Column(db.String(15), nullable=True)
+    endereco = db.Column(db.String(255), nullable=True)
+    timbre_path = db.Column(db.String(255), default="static/timbre.jpg")
+    logo_path = db.Column(db.String(255), default="static/logo.png")
+    ativo = db.Column(db.Boolean, default=True)
+    data_criacao = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class Secretaria(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), nullable=True, index=True)
+    municipio = db.relationship("Municipio", backref="secretarias", foreign_keys=[municipio_id])
     nome = db.Column(db.String(100), unique=True, nullable=False)
     sigla = db.Column(db.String(20), nullable=True)
     cnpj = db.Column(db.String(25), nullable=True)
@@ -185,6 +204,8 @@ class User(UserMixin, db.Model):
     role = db.Column(
         db.String(40), default="rh_secretaria"
     )  # super_admin, prefeito, estrategia_eleitoral, auditor, secretario, rh_secretaria, chefe_unidade
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), nullable=True, index=True)
+    municipio = db.relationship("Municipio", foreign_keys=[municipio_id])
     secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=True)
     local_trabalho_id = db.Column(db.Integer, db.ForeignKey("local_trabalho.id"), nullable=True)
     local_trabalho = db.relationship("LocalTrabalho", foreign_keys=[local_trabalho_id])
@@ -269,6 +290,8 @@ class Funcionario(db.Model):
         db.String(36), unique=True, nullable=False, default=lambda: str(uuid.uuid4())
     )
     validado = db.Column(db.Boolean, default=False)
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), nullable=True, index=True)
+    municipio = db.relationship("Municipio", foreign_keys=[municipio_id])
     secretaria_id = db.Column(
         db.Integer, db.ForeignKey("secretaria.id"), nullable=False
     )
@@ -353,6 +376,10 @@ class Funcionario(db.Model):
     povoado_comunidade = db.Column(db.String(120), nullable=True)
     gratificacao_valor = db.Column(db.Float, default=0.0)
     ano_exercicio_atual = db.Column(db.Integer, default=2026)
+
+    # --- GESTOOR SIGN: CONFIRMAÇÃO PRESENCIAL DE CELULAR ---
+    telefone_confirmado_em = db.Column(db.DateTime, nullable=True)
+    telefone_confirmado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
 
 class DocumentoServidor(db.Model):
@@ -440,12 +467,28 @@ class RescisaoHistorico(db.Model):
 class ContratoGerado(db.Model):
     __tablename__ = "contrato_gerado"
     id = db.Column(db.Integer, primary_key=True)
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), nullable=True, index=True)
+    municipio = db.relationship("Municipio", foreign_keys=[municipio_id])
     secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=True)
     secretaria = db.relationship("Secretaria", foreign_keys=[secretaria_id])
     num_contrato = db.Column(db.String(50), nullable=False)
     ano_exercicio = db.Column(db.Integer, nullable=False)
     funcionario_id = db.Column(db.Integer, db.ForeignKey("funcionario.id"), nullable=True)
     funcionario = db.relationship("Funcionario", backref="contratos_gerados")
+
+    # Versionamento & Ciclo Gestoor Sign
+    versao = db.Column(db.Integer, default=1, nullable=False)
+    contrato_origem_id = db.Column(db.Integer, db.ForeignKey("contrato_gerado.id"), nullable=True)
+    versao_anterior_id = db.Column(db.Integer, db.ForeignKey("contrato_gerado.id"), nullable=True)
+    tipo_contrato = db.Column(db.String(50), default="TEMPORARIO")
+    status_assinatura = db.Column(db.String(40), default="AGUARDANDO_ASSINATURA", index=True)
+    modalidade_assinatura = db.Column(db.String(60), nullable=True)
+    data_assinatura_eletronica = db.Column(db.DateTime, nullable=True)
+    codigo_validacao = db.Column(db.String(40), unique=True, nullable=True, index=True)
+    hash_documento_sha256 = db.Column(db.String(64), nullable=True)
+    cancelado_em = db.Column(db.DateTime, nullable=True)
+    cancelado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    motivo_cancelamento = db.Column(db.Text, nullable=True)
 
     # Contratado (Snapshot dos dados do Servidor)
     contratado_nome = db.Column(db.String(150), nullable=False)
@@ -645,6 +688,200 @@ class BackupHistorico(db.Model):
     data_hora = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+# --- MODELOS DO MÓDULO GESTOOR SIGN (ASSINATURA PRESENCIAL POR SMS) ---
+
+
+class ConfiguracaoGestoorSign(db.Model):
+    __tablename__ = "configuracao_gestoor_sign"
+
+    id = db.Column(db.Integer, primary_key=True)
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), unique=True, nullable=False, index=True)
+    municipio = db.relationship("Municipio", backref=db.backref("config_gestoor_sign", uselist=False))
+
+    # Governança Jurídica Municipal (Lei nº 14.063/2020)
+    modalidade_minima_padrao = db.Column(db.String(30), default="SIMPLES", nullable=False)
+    regras_modalidade_json = db.Column(db.Text, nullable=True)
+    ato_normativo_referencia = db.Column(db.String(255), nullable=True)
+    validacao_juridica_status = db.Column(db.String(30), default="PENDENTE")  # PENDENTE, APROVADO_JURIDICO
+    validacao_juridica_obs = db.Column(db.Text, nullable=True)
+
+    # Parâmetros de Segurança OTP SMS
+    otp_tamanho = db.Column(db.Integer, default=6)
+    otp_expiracao_segundos = db.Column(db.Integer, default=300)
+    otp_max_tentativas = db.Column(db.Integer, default=3)
+    otp_max_reenvios = db.Column(db.Integer, default=3)
+    otp_cooldown_reenvio_segundos = db.Column(db.Integer, default=60)
+    bloqueio_minutos = db.Column(db.Integer, default=30)
+
+    # Provedor SMS (Comtele padrão) & Integração GED
+    sms_provider = db.Column(db.String(30), default="comtele")
+    sms_remetente = db.Column(db.String(40), default="GESTOOR360")
+    arquivar_ged_automatico = db.Column(db.Boolean, default=True)
+
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    atualizado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+
+class AssinaturaContrato(db.Model):
+    __tablename__ = "assinatura_contrato"
+
+    id = db.Column(db.Integer, primary_key=True)
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), nullable=True, index=True)
+    secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=True, index=True)
+    contrato_id = db.Column(db.Integer, db.ForeignKey("contrato_gerado.id"), nullable=False, index=True)
+    contrato_versao = db.Column(db.Integer, default=1, nullable=False)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey("funcionario.id"), nullable=True, index=True)
+
+    status = db.Column(db.String(40), default="INICIADA", nullable=False, index=True)
+    modalidade_juridica = db.Column(db.String(60), default="ASSINATURA_ELETRONICA_SIMPLES", nullable=False)
+
+    # Dados do Servidor (LGPD: mascarados + hash/cifragem em repouso)
+    servidor_nome = db.Column(db.String(150), nullable=False)
+    servidor_cpf_mascarado = db.Column(db.String(20), nullable=False)
+    servidor_cpf_hash = db.Column(db.String(64), nullable=True)
+    telefone_mascarado = db.Column(db.String(30), nullable=False)
+    telefone_e164_hash = db.Column(db.String(64), nullable=True)
+    telefone_e164_enc = db.Column(db.Text, nullable=True)
+
+    # Técnico do RH Condutor
+    tecnico_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    tecnico_nome = db.Column(db.String(150), nullable=False)
+    tecnico_username = db.Column(db.String(60), nullable=False)
+    presenca_confirmada_em = db.Column(db.DateTime, nullable=True)
+    contrato_conferido_em = db.Column(db.DateTime, nullable=True)
+
+    # Autenticação SMS
+    sms_enviado_em = db.Column(db.DateTime, nullable=True)
+    sms_validado_em = db.Column(db.DateTime, nullable=True)
+    sms_provider_utilizado = db.Column(db.String(30), nullable=True)
+    sms_provider_message_id = db.Column(db.String(120), nullable=True)
+    bloqueado_ate = db.Column(db.DateTime, nullable=True)
+
+    # Manifestação Expressa de Vontade (Etapa 5 — Servidor)
+    termo_manifestacao_texto = db.Column(db.Text, nullable=False)
+    manifestacao_confirmada = db.Column(db.Boolean, default=False)
+    manifestacao_confirmada_em = db.Column(db.DateTime, nullable=True)
+    metodo_confirmacao_servidor = db.Column(db.String(80), nullable=True)
+
+    # Selo Criptográfico & Integridade
+    codigo_validacao = db.Column(db.String(40), unique=True, nullable=True, index=True)
+    hash_contrato_base_sha256 = db.Column(db.String(64), nullable=True)
+    hash_documento_final_sha256 = db.Column(db.String(64), nullable=True)
+    hash_evidencias_sha256 = db.Column(db.String(64), nullable=True)
+    assinado_em = db.Column(db.DateTime, nullable=True)
+
+    # Metadados Técnicos da Sessão
+    ip_origem = db.Column(db.String(50), nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+    session_fingerprint = db.Column(db.String(64), nullable=True)
+    timezone_referencia = db.Column(db.String(40), default="America/Sao_Paulo")
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow)
+
+    contrato = db.relationship("ContratoGerado", backref=db.backref("assinaturas", lazy=True))
+    funcionario = db.relationship("Funcionario", foreign_keys=[funcionario_id])
+    tecnico = db.relationship("User", foreign_keys=[tecnico_id])
+    secretaria = db.relationship("Secretaria", foreign_keys=[secretaria_id])
+    municipio = db.relationship("Municipio", foreign_keys=[municipio_id])
+    otps = db.relationship("AssinaturaSmsOtp", backref="assinatura", lazy=True)
+    eventos = db.relationship("AssinaturaEvento", backref="assinatura", lazy=True, order_by="AssinaturaEvento.id.asc()")
+    arquivos = db.relationship("AssinaturaDocumentoArquivo", backref="assinatura", lazy=True)
+
+
+class AssinaturaSmsOtp(db.Model):
+    __tablename__ = "assinatura_sms_otp"
+
+    id = db.Column(db.Integer, primary_key=True)
+    assinatura_id = db.Column(db.Integer, db.ForeignKey("assinatura_contrato.id"), nullable=False, index=True)
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), nullable=True, index=True)
+
+    # NUNCA armazena o código em texto puro — apenas salt + HMAC-SHA256
+    codigo_salt = db.Column(db.String(64), nullable=False)
+    codigo_hash = db.Column(db.String(64), nullable=False)
+
+    telefone_mascarado = db.Column(db.String(30), nullable=False)
+    telefone_hash = db.Column(db.String(64), nullable=True)
+    enviado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    expira_em = db.Column(db.DateTime, nullable=False)
+    tentativas_realizadas = db.Column(db.Integer, default=0, nullable=False)
+    max_tentativas = db.Column(db.Integer, default=3, nullable=False)
+    usado = db.Column(db.Boolean, default=False, nullable=False)
+    usado_em = db.Column(db.DateTime, nullable=True)
+    invalidado = db.Column(db.Boolean, default=False, nullable=False)
+    motivo_invalidacao = db.Column(db.String(100), nullable=True)
+
+    provider_name = db.Column(db.String(30), nullable=True)
+    provider_message_id = db.Column(db.String(120), nullable=True)
+    provider_status = db.Column(db.String(40), nullable=True)
+    solicitado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    ip_origem = db.Column(db.String(50), nullable=True)
+
+
+class AssinaturaEvento(db.Model):
+    __tablename__ = "assinatura_evento"
+
+    id = db.Column(db.Integer, primary_key=True)
+    assinatura_id = db.Column(db.Integer, db.ForeignKey("assinatura_contrato.id"), nullable=False, index=True)
+    contrato_id = db.Column(db.Integer, db.ForeignKey("contrato_gerado.id"), nullable=False, index=True)
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), nullable=True, index=True)
+
+    tipo_evento = db.Column(db.String(50), nullable=False)
+    descricao = db.Column(db.String(500), nullable=False)
+    ator_tipo = db.Column(db.String(30), default="TECNICO_RH", nullable=False)  # TECNICO_RH, SERVIDOR, SISTEMA
+    usuario_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    ip_origem = db.Column(db.String(50), nullable=True)
+    user_agent = db.Column(db.String(255), nullable=True)
+    detalhes_json = db.Column(db.Text, nullable=True)
+    data_hora = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    hash_evento_anterior = db.Column(db.String(64), nullable=False)
+    hash_evento_atual = db.Column(db.String(64), nullable=False)
+
+
+class AssinaturaDocumentoArquivo(db.Model):
+    __tablename__ = "assinatura_documento_arquivo"
+
+    id = db.Column(db.Integer, primary_key=True)
+    assinatura_id = db.Column(db.Integer, db.ForeignKey("assinatura_contrato.id"), nullable=False, index=True)
+    contrato_id = db.Column(db.Integer, db.ForeignKey("contrato_gerado.id"), nullable=False, index=True)
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), nullable=True, index=True)
+
+    tipo_arquivo = db.Column(db.String(40), nullable=False)  # CONTRATO_BASE_PDF, CONTRATO_ASSINADO_PDF, RELATORIO_EVIDENCIAS_PDF
+    nome_arquivo = db.Column(db.String(220), nullable=False)
+    mime_type = db.Column(db.String(80), default="application/pdf", nullable=False)
+    tamanho_bytes = db.Column(db.Integer, default=0, nullable=False)
+    sha256 = db.Column(db.String(64), nullable=False, index=True)
+    conteudo_b64 = db.Column(db.Text, nullable=False)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+# --- PROTEÇÃO DE IMUTABILIDADE DOS REGISTROS DE ASSINATURA (SEÇÃO 6) ---
+
+
+@event.listens_for(AssinaturaContrato, "before_update")
+def _proteger_assinatura_selada(mapper, connection, target):
+    state = db.inspect(target)
+    hist_status = state.attrs.status.history
+    status_anterior = hist_status.deleted[0] if hist_status.deleted else target.status
+    if status_anterior == gestoor_sign_service.SESSAO_ASSINADA:
+        raise ValueError("VIOLAÇÃO DE INTEGRIDADE: Registro de assinatura eletrônica selada é imutável.")
+
+
+@event.listens_for(AssinaturaContrato, "before_delete")
+def _bloquear_exclusao_assinatura(mapper, connection, target):
+    raise ValueError("VIOLAÇÃO DE INTEGRIDADE: Registros de assinatura eletrônica não podem ser excluídos.")
+
+
+@event.listens_for(AssinaturaEvento, "before_update")
+@event.listens_for(AssinaturaEvento, "before_delete")
+def _proteger_trilha_eventos(mapper, connection, target):
+    raise ValueError("VIOLAÇÃO DE INTEGRIDADE: A trilha de eventos do Gestoor Sign é append-only e imutável.")
+
+
+@event.listens_for(AssinaturaDocumentoArquivo, "before_update")
+@event.listens_for(AssinaturaDocumentoArquivo, "before_delete")
+def _proteger_arquivos_selados(mapper, connection, target):
+    raise ValueError("VIOLAÇÃO DE INTEGRIDADE: PDFs selados do Gestoor Sign não podem ser alterados ou excluídos.")
+
+
 def normalizar_numero_eleitoral(val):
     if not val:
         return ""
@@ -774,6 +1011,16 @@ def mask_cpf(value):
     if len(digits) == 11:
         return f"***.{digits[3:6]}.{digits[6:9]}-**"
     return value
+
+
+@app.template_filter("mask_phone")
+def mask_phone(value):
+    return sms_service.mascarar_telefone(value)
+
+
+@app.template_filter("format_brt")
+def format_brt_filter(value):
+    return gestoor_sign_service.format_brt(value)
 
 
 def registrar_log(acao, alvo, nivel="INFO", secretaria_id=None):
@@ -1003,15 +1250,36 @@ def ping_session():
 
 @app.route("/validar", methods=["GET"])
 def validar_documento():
-    token = request.args.get("codigo")
+    token = (request.args.get("codigo") or "").strip()
     funcionario = None
+    assinatura = None
+    contrato_val = None
     erro = None
     if token:
-        funcionario = Funcionario.query.filter_by(token_validacao=token).first()
-        if not funcionario:
-            erro = "Documento Inválido ou Não Encontrado."
+        # 1. Tenta validar como código único do GESTOOR SIGN (Contrato Eletrônico)
+        assinatura = AssinaturaContrato.query.filter_by(codigo_validacao=token).first()
+        if not assinatura:
+            contrato_tmp = ContratoGerado.query.filter_by(codigo_validacao=token).first()
+            if contrato_tmp:
+                assinatura = (
+                    AssinaturaContrato.query.filter_by(contrato_id=contrato_tmp.id)
+                    .order_by(AssinaturaContrato.id.desc())
+                    .first()
+                )
+        if assinatura:
+            contrato_val = db.session.get(ContratoGerado, assinatura.contrato_id)
+        else:
+            # 2. Fallback: validação de Ficha Cadastral de Servidor
+            funcionario = Funcionario.query.filter_by(token_validacao=token).first()
+            if not funcionario:
+                erro = "Documento Inválido ou Não Encontrado."
     return render_template(
-        "validar.html", funcionario=funcionario, erro=erro, codigo_digitado=token
+        "validar.html",
+        funcionario=funcionario,
+        assinatura=assinatura,
+        contrato_val=contrato_val,
+        erro=erro,
+        codigo_digitado=token,
     )
 
 
@@ -2526,6 +2794,12 @@ def sistema():
             flash("O Grau de Escolaridade é obrigatório!", "error")
             return redirect(url_for("sistema"))
 
+        dados_form["municipio_id"] = (
+            sec_obj.municipio_id
+            if is_global and sec_obj
+            else (current_user.secretaria.municipio_id if current_user.secretaria else current_user.municipio_id)
+        )
+
         func_id = request.form.get("id")
 
         if not func_id:
@@ -2714,6 +2988,7 @@ def atualizar_schema():
             # 1. Novas colunas por tabela (100% aditivas)
             migracoes_colunas = {
                 "secretaria": [
+                    ("municipio_id", "INTEGER"),
                     ("sigla", "VARCHAR(20)"),
                     ("cnpj", "VARCHAR(25)"),
                     ("endereco", "VARCHAR(255)"),
@@ -2772,6 +3047,9 @@ def atualizar_schema():
                     ("povoado_comunidade", "VARCHAR(120)"),
                     ("gratificacao_valor", "FLOAT DEFAULT 0"),
                     ("ano_exercicio_atual", "INTEGER DEFAULT 2026"),
+                    ("municipio_id", "INTEGER"),
+                    ("telefone_confirmado_em", "TIMESTAMP"),
+                    ("telefone_confirmado_por_id", "INTEGER"),
                 ],
                 "rescisao_historico": [
                     ("secretaria_id", "INTEGER"),
@@ -2791,7 +3069,20 @@ def atualizar_schema():
                     ("rota_acessada", "VARCHAR(255)"),
                 ],
                 "contrato_gerado": [
+                    ("municipio_id", "INTEGER"),
                     ("secretaria_id", "INTEGER"),
+                    ("versao", "INTEGER DEFAULT 1"),
+                    ("contrato_origem_id", "INTEGER"),
+                    ("versao_anterior_id", "INTEGER"),
+                    ("tipo_contrato", "VARCHAR(50) DEFAULT 'TEMPORARIO'"),
+                    ("status_assinatura", "VARCHAR(40) DEFAULT 'AGUARDANDO_ASSINATURA'"),
+                    ("modalidade_assinatura", "VARCHAR(60)"),
+                    ("data_assinatura_eletronica", "TIMESTAMP"),
+                    ("codigo_validacao", "VARCHAR(40)"),
+                    ("hash_documento_sha256", "VARCHAR(64)"),
+                    ("cancelado_em", "TIMESTAMP"),
+                    ("cancelado_por_id", "INTEGER"),
+                    ("motivo_cancelamento", "TEXT"),
                     ("editado", "BOOLEAN DEFAULT FALSE"),
                     ("motivo_edicao", "TEXT"),
                     ("data_edicao", "TIMESTAMP"),
@@ -2810,6 +3101,7 @@ def atualizar_schema():
                     ("meta_cobertura", "INTEGER DEFAULT 0"),
                 ],
                 '"user"': [
+                    ("municipio_id", "INTEGER"),
                     ("nome_completo", "VARCHAR(150)"),
                     ("email", "VARCHAR(120)"),
                     ("local_trabalho_id", "INTEGER"),
@@ -2994,6 +3286,70 @@ def atualizar_schema():
                 for org in orgs_orfaos:
                     org.secretaria_id = default_sec_id
                 db.session.commit()
+
+            # 6. Garante Município padrão (Multi-Tenant) e vincula registros legados
+            mun_padrao = Municipio.query.order_by(Municipio.id.asc()).first()
+            if not mun_padrao:
+                mun_padrao = Municipio(
+                    nome=os.getenv("DEFAULT_MUNICIPIO_NOME", "Município de Valença do Piauí"),
+                    uf=os.getenv("DEFAULT_MUNICIPIO_UF", "PI"),
+                    cnpj=os.getenv("DEFAULT_MUNICIPIO_CNPJ", "06.095.146/0001-44"),
+                    endereco=os.getenv(
+                        "DEFAULT_MUNICIPIO_ENDERECO",
+                        "Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco, Valença do Piauí-PI",
+                    ),
+                    ativo=True,
+                )
+                db.session.add(mun_padrao)
+                db.session.commit()
+
+            secs_sem_mun = Secretaria.query.filter(Secretaria.municipio_id.is_(None)).all()
+            if secs_sem_mun:
+                for s in secs_sem_mun:
+                    s.municipio_id = mun_padrao.id
+                db.session.commit()
+
+            funcs_sem_mun = Funcionario.query.filter(Funcionario.municipio_id.is_(None)).all()
+            if funcs_sem_mun:
+                for f in funcs_sem_mun:
+                    sec_f = db.session.get(Secretaria, f.secretaria_id) if f.secretaria_id else None
+                    f.municipio_id = (sec_f.municipio_id if sec_f and sec_f.municipio_id else mun_padrao.id)
+                db.session.commit()
+
+            users_sem_mun = User.query.filter(User.municipio_id.is_(None)).all()
+            if users_sem_mun:
+                for u in users_sem_mun:
+                    # Super Admin Master mantém escopo multi-município se desejado, ou herda município padrão se tiver secretaria
+                    if security.normalize_role(u) != "super_admin":
+                        sec_u = db.session.get(Secretaria, u.secretaria_id) if u.secretaria_id else None
+                        u.municipio_id = (sec_u.municipio_id if sec_u and sec_u.municipio_id else mun_padrao.id)
+                db.session.commit()
+
+            contratos_backfill = ContratoGerado.query.filter(
+                (ContratoGerado.municipio_id.is_(None))
+                | (ContratoGerado.versao.is_(None))
+                | (ContratoGerado.status_assinatura.is_(None))
+                | (ContratoGerado.tipo_contrato.is_(None))
+            ).all()
+            if contratos_backfill:
+                for cg in contratos_backfill:
+                    if cg.municipio_id is None:
+                        sec_c = db.session.get(Secretaria, cg.secretaria_id) if cg.secretaria_id else None
+                        cg.municipio_id = (sec_c.municipio_id if sec_c and sec_c.municipio_id else mun_padrao.id)
+                    if cg.versao is None:
+                        cg.versao = 1
+                    if not cg.status_assinatura:
+                        cg.status_assinatura = gestoor_sign_service.STATUS_AGUARDANDO
+                    if not cg.tipo_contrato:
+                        cg.tipo_contrato = "TEMPORARIO"
+                db.session.commit()
+
+            # Garante configuração padrão do Gestoor Sign para o município
+            gestoor_sign_service.obter_ou_criar_config_municipio(
+                db,
+                {"ConfiguracaoGestoorSign": ConfiguracaoGestoorSign, "Municipio": Municipio},
+                mun_padrao.id,
+            )
         except Exception as e:
             db.session.rollback()
             print(f"Aviso backfill seguro: {e}")
@@ -3080,14 +3436,24 @@ def processar_gerar_contrato():
         sec_obj = db.session.get(Secretaria, sec_id_contrato) if sec_id_contrato else None
         rep_padrao = obter_dados_representante_secretaria(sec_obj)
 
-        # Verifica duplicidade de contrato no mesmo exercício/servidor
+        # Verifica duplicidade de contrato ATIVO no mesmo exercício/servidor (ignora cancelados/substituídos)
+        status_inativos = [gestoor_sign_service.STATUS_CANCELADO, gestoor_sign_service.STATUS_SUBSTITUIDO]
         existente = None
         if funcionario_id:
-            existente = ContratoGerado.query.filter_by(funcionario_id=funcionario_id).first()
+            existente = ContratoGerado.query.filter(
+                ContratoGerado.funcionario_id == funcionario_id,
+                ContratoGerado.status_assinatura.notin_(status_inativos),
+            ).first()
         if not existente and contratado_cpf:
-            existente = ContratoGerado.query.filter_by(contratado_cpf=contratado_cpf).first()
+            existente = ContratoGerado.query.filter(
+                ContratoGerado.contratado_cpf == contratado_cpf,
+                ContratoGerado.status_assinatura.notin_(status_inativos),
+            ).first()
         if not existente and contratado_nome:
-            existente = ContratoGerado.query.filter(db.func.upper(ContratoGerado.contratado_nome) == contratado_nome.upper()).first()
+            existente = ContratoGerado.query.filter(
+                db.func.upper(ContratoGerado.contratado_nome) == contratado_nome.upper(),
+                ContratoGerado.status_assinatura.notin_(status_inativos),
+            ).first()
 
         if existente:
             return {
@@ -3127,11 +3493,30 @@ def processar_gerar_contrato():
         if not num_contrato:
             num_contrato = gerar_proximo_numero_contrato(ano_exercicio, secretaria_id=sec_id_contrato)
 
+        mun_id_contrato = (
+            sec_obj.municipio_id
+            if sec_obj and sec_obj.municipio_id
+            else (
+                func_obj.municipio_id
+                if func_obj and func_obj.municipio_id
+                else security.get_user_municipio_id(current_user)
+            )
+        )
+        if not mun_id_contrato:
+            mun_def = Municipio.query.order_by(Municipio.id.asc()).first()
+            mun_id_contrato = mun_def.id if mun_def else None
+
+        tipo_contrato_form = (request.form.get("tipo_contrato") or "TEMPORARIO").strip().upper()
+
         novo_contrato = ContratoGerado(
+            municipio_id=mun_id_contrato,
             secretaria_id=sec_id_contrato,
             num_contrato=num_contrato,
             ano_exercicio=ano_exercicio,
             funcionario_id=funcionario_id,
+            versao=1,
+            tipo_contrato=tipo_contrato_form,
+            status_assinatura=gestoor_sign_service.STATUS_AGUARDANDO,
             contratado_nome=contratado_nome,
             contratado_cpf=contratado_cpf,
             contratado_rg=contratado_rg,
@@ -3180,6 +3565,16 @@ def alterar_data_assinatura_contrato(id):
         registrar_violacao_acesso(f"Alterar assinatura contrato_id={id}")
         return {"success": False, "message": "Acesso negado: contrato pertence a outra secretaria."}, 403
 
+    if contrato.status_assinatura in (
+        gestoor_sign_service.STATUS_ASSINADO,
+        gestoor_sign_service.STATUS_CANCELADO,
+        gestoor_sign_service.STATUS_SUBSTITUIDO,
+    ):
+        return {
+            "success": False,
+            "message": "Contratos já assinados eletronicamente, substituídos ou cancelados não podem ter sua data alterada diretamente. Gere uma nova versão se necessário.",
+        }, 400
+
     data_json = request.get_json(silent=True) or {}
     dt_assinatura_str = (
         request.form.get("dt_assinatura")
@@ -3216,6 +3611,18 @@ def editar_contrato(id):
     if not security.can_access_record(current_user, contrato):
         registrar_violacao_acesso(f"Editar contrato_id={id}")
         return {"success": False, "message": "Acesso negado: contrato pertence a outra secretaria."}, 403
+
+    if contrato.status_assinatura in (
+        gestoor_sign_service.STATUS_CANCELADO,
+        gestoor_sign_service.STATUS_SUBSTITUIDO,
+    ):
+        return {
+            "success": False,
+            "message": "Contratos cancelados ou substituídos não podem ser editados.",
+        }, 400
+
+    # Integridade Gestoor Sign: editar contrato JÁ ASSINADO cria obrigatoriamente uma NOVA VERSÃO (v+1)
+    gerar_versao_por_assinatura = contrato.status_assinatura == gestoor_sign_service.STATUS_ASSINADO
 
     motivo = request.form.get("motivo_edicao", "").strip()
 
@@ -3266,8 +3673,51 @@ def editar_contrato(id):
             novo_rep_end != (contrato.representante_endereco or "").strip(),
         ])
 
-        if alterou_outros_campos and not motivo:
-            return {"success": False, "message": "É obrigatório informar o motivo da edição ao alterar dados cadastrais ou cláusulas do contrato."}, 400
+        if (alterou_outros_campos or gerar_versao_por_assinatura) and not motivo:
+            return {"success": False, "message": "É obrigatório informar o motivo da edição/retificação ao alterar dados de um contrato."}, 400
+
+        if gerar_versao_por_assinatura:
+            novo_v = gestoor_sign_service.gerar_nova_versao_contrato(
+                db=db,
+                models=_gestoor_sign_models_ctx(),
+                contrato_anterior=contrato,
+                user=current_user,
+                motivo=motivo,
+                req_info=_get_req_info(),
+                overrides={
+                    "contratado_nome": novo_nome,
+                    "contratado_cpf": novo_cpf,
+                    "contratado_rg": novo_rg,
+                    "contratado_nacionalidade": novo_nac,
+                    "contratado_naturalidade": novo_nat,
+                    "contratado_estado_civil": novo_ec,
+                    "contratado_endereco": novo_end,
+                    "funcao_nome": nova_funcao,
+                    "jornada_trabalho": nova_jornada,
+                    "remuneracao": nova_rem,
+                    "remuneracao_extenso": nova_rem_ext,
+                    "dt_inicio": novo_dt_inicio,
+                    "dt_termino": novo_dt_termino,
+                    "dt_assinatura": novo_dt_assinatura,
+                    "representante_nome": novo_rep_nome,
+                    "representante_cargo": novo_rep_cargo,
+                    "representante_rg_cpf": novo_rep_cpf,
+                    "representante_endereco": novo_rep_end,
+                },
+            )
+            registrar_log(
+                "Gerou Nova Versão Contrato",
+                f"Contrato Nº {novo_v.num_contrato} v{novo_v.versao} ({novo_v.contratado_nome}) - Motivo: {motivo}",
+                secretaria_id=novo_v.secretaria_id,
+            )
+            return {
+                "success": True,
+                "nova_versao": True,
+                "versao": novo_v.versao,
+                "contrato_id": novo_v.id,
+                "message": f"Nova versão (v{novo_v.versao}) criada. A versão anterior foi preservada como SUBSTITUÍDA e um novo procedimento no Gestoor Sign é obrigatório.",
+                "view_url": url_for("visualizar_contrato_documento", id=novo_v.id),
+            }
 
         contrato.contratado_nome = novo_nome
         contrato.contratado_cpf = novo_cpf
@@ -3343,10 +3793,35 @@ def visualizar_contrato_documento(id):
         return "Acesso negado", 403
 
     dt_ass = contrato.dt_assinatura or contrato.dt_inicio or (contrato.funcionario.dt_inicio if contrato.funcionario else None)
+    sec_obj = db.session.get(Secretaria, contrato.secretaria_id) if contrato.secretaria_id else None
+    mun_id = contrato.municipio_id or (sec_obj.municipio_id if sec_obj else None)
+    mun_obj = db.session.get(Municipio, mun_id) if mun_id else Municipio.query.order_by(Municipio.id.asc()).first()
+    assinatura_selada = (
+        AssinaturaContrato.query.filter_by(
+            contrato_id=contrato.id,
+            status=gestoor_sign_service.SESSAO_ASSINADA,
+        )
+        .order_by(AssinaturaContrato.id.desc())
+        .first()
+    )
 
     contrato_dict = {
         "id": contrato.id,
         "num_contrato": contrato.num_contrato,
+        "versao": int(getattr(contrato, "versao", 1) or 1),
+        "status_assinatura": contrato.status_assinatura or gestoor_sign_service.STATUS_AGUARDANDO,
+        "status_assinatura_label": gestoor_sign_service.STATUS_LABELS.get(
+            contrato.status_assinatura or gestoor_sign_service.STATUS_AGUARDANDO,
+            "Aguardando Assinatura",
+        ),
+        "codigo_validacao": contrato.codigo_validacao or (assinatura_selada.codigo_validacao if assinatura_selada else None),
+        "assinatura_selada_id": assinatura_selada.id if assinatura_selada else None,
+        "assinado_em_brt": gestoor_sign_service.format_brt(assinatura_selada.assinado_em) if assinatura_selada else None,
+        "municipio_nome": mun_obj.nome if mun_obj else "Município de Valença do Piauí",
+        "municipio_uf": mun_obj.uf if mun_obj and mun_obj.uf else "PI",
+        "secretaria_nome": sec_obj.nome if sec_obj else "SECRETARIA DE EDUCAÇÃO",
+        "secretaria_cnpj": (sec_obj.cnpj if sec_obj and sec_obj.cnpj else (mun_obj.cnpj if mun_obj and mun_obj.cnpj else "06.095.146/0001-44")),
+        "secretaria_endereco": (sec_obj.endereco if sec_obj and sec_obj.endereco else (mun_obj.endereco if mun_obj and mun_obj.endereco else "Rua Epaminondas Nogueira, nº 1425, Bairro São Francisco, Valença do Piauí-PI")),
         "ano_exercicio": contrato.ano_exercicio,
         "contratado_nome": contrato.contratado_nome,
         "contratado_cpf": contrato.contratado_cpf or "",
@@ -3412,6 +3887,15 @@ def excluir_contrato(id):
     contrato = db.session.get(ContratoGerado, id)
     if not contrato:
         flash("Contrato não encontrado.", "danger")
+        return redirect(url_for("pagina_contratos"))
+
+    # Proteção contra exclusão de contratos com assinatura ou histórico no Gestoor Sign
+    tem_assinatura = AssinaturaContrato.query.filter_by(contrato_id=contrato.id).first() is not None
+    if contrato.status_assinatura == gestoor_sign_service.STATUS_ASSINADO or tem_assinatura:
+        flash(
+            f"Contrato Nº {contrato.num_contrato} possui registro de assinatura/auditoria no Gestoor Sign e não pode ser excluído fisicamente. Utilize o cancelamento lógico ou geração de nova versão.",
+            "error",
+        )
         return redirect(url_for("pagina_contratos"))
 
     try:
@@ -7345,6 +7829,724 @@ def api_backup_restaurar():
                 os.remove(stg_path)
             except OSError:
                 pass
+
+
+# ==============================================================================
+# MÓDULO GESTOOR SIGN — ASSINATURA ELETRÔNICA PRESENCIAL DE CONTRATOS (OTP SMS)
+# ==============================================================================
+
+
+def _gestoor_sign_models_ctx():
+    return {
+        "Municipio": Municipio,
+        "Secretaria": Secretaria,
+        "User": User,
+        "Funcionario": Funcionario,
+        "ContratoGerado": ContratoGerado,
+        "DocumentoServidor": DocumentoServidor,
+        "ConfiguracaoGestoorSign": ConfiguracaoGestoorSign,
+        "AssinaturaContrato": AssinaturaContrato,
+        "AssinaturaSmsOtp": AssinaturaSmsOtp,
+        "AssinaturaEvento": AssinaturaEvento,
+        "AssinaturaDocumentoArquivo": AssinaturaDocumentoArquivo,
+    }
+
+
+def _get_req_info():
+    if not has_request_context():
+        return {"ip": "", "ua": ""}
+    forwarded = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    return {
+        "ip": forwarded or (request.remote_addr or ""),
+        "ua": str(request.user_agent or "")[:250],
+    }
+
+
+def _resolve_timbre_path(contrato):
+    cand = os.path.join(app.root_path, "static", "timbre.jpg")
+    if contrato and contrato.municipio_id:
+        mun = db.session.get(Municipio, contrato.municipio_id)
+        if mun and mun.timbre_path:
+            p = os.path.join(app.root_path, mun.timbre_path)
+            if os.path.isfile(p):
+                return p
+    return cand if os.path.isfile(cand) else None
+
+
+@app.route("/gestoor-sign", methods=["GET"])
+@login_required
+@security.require_permission("view_gestoor_sign")
+def gestoor_sign_painel():
+    status_filtro = (request.args.get("status") or "").strip().upper()
+    busca = (request.args.get("q") or "").strip().upper()
+
+    base_q = security.scope_query(ContratoGerado.query, ContratoGerado, current_user)
+    todos = base_q.order_by(ContratoGerado.data_geracao.desc()).all()
+
+    kpis = {
+        "aguardando": 0,
+        "assinados": 0,
+        "pendentes": 0,
+        "cancelados": 0,
+        "falha_auth": 0,
+        "substituidos": 0,
+        "total": len(todos),
+    }
+
+    assinaturas_por_contrato = {}
+    contrato_ids = [c.id for c in todos]
+    if contrato_ids:
+        sessoes = (
+            AssinaturaContrato.query.filter(AssinaturaContrato.contrato_id.in_(contrato_ids))
+            .order_by(AssinaturaContrato.id.desc())
+            .all()
+        )
+        for s in sessoes:
+            if s.contrato_id not in assinaturas_por_contrato:
+                assinaturas_por_contrato[s.contrato_id] = s
+
+    linhas = []
+    for c in todos:
+        st = c.status_assinatura or gestoor_sign_service.STATUS_AGUARDANDO
+        if st == gestoor_sign_service.STATUS_AGUARDANDO:
+            kpis["aguardando"] += 1
+        elif st == gestoor_sign_service.STATUS_ASSINADO:
+            kpis["assinados"] += 1
+        elif st == gestoor_sign_service.STATUS_PENDENTE:
+            kpis["pendentes"] += 1
+        elif st == gestoor_sign_service.STATUS_CANCELADO:
+            kpis["cancelados"] += 1
+        elif st == gestoor_sign_service.STATUS_FALHA_AUTH:
+            kpis["falha_auth"] += 1
+        elif st == gestoor_sign_service.STATUS_SUBSTITUIDO:
+            kpis["substituidos"] += 1
+
+        if status_filtro and st != status_filtro:
+            continue
+
+        sess = assinaturas_por_contrato.get(c.id)
+        if busca:
+            haystack = " ".join(
+                [
+                    str(c.num_contrato or ""),
+                    str(c.contratado_nome or ""),
+                    str(c.contratado_cpf or ""),
+                    str(c.codigo_validacao or ""),
+                    str(sess.tecnico_nome if sess else ""),
+                ]
+            ).upper()
+            if busca not in haystack:
+                continue
+
+        linhas.append(
+            {
+                "contrato": c,
+                "sessao": sess,
+                "status": st,
+                "status_label": gestoor_sign_service.STATUS_LABELS.get(st, st),
+                "modalidade_label": (
+                    gestoor_sign_service.MODALIDADE_SMS_LABEL
+                    if c.modalidade_assinatura == gestoor_sign_service.MODALIDADE_SMS_CODIGO
+                    else "Assinatura Eletrônica Simples (Presencial SMS)"
+                ),
+                "tecnico_nome": (
+                    sess.tecnico_nome
+                    if sess
+                    else (c.quem_gerou.nome_completo or c.quem_gerou.username if c.quem_gerou else "—")
+                ),
+            }
+        )
+
+    mun_id = security.get_user_municipio_id(current_user)
+    cfg = gestoor_sign_service.obter_ou_criar_config_municipio(db, _gestoor_sign_models_ctx(), mun_id)
+    sms_diag = sms_service.diagnostico_provedor_sms(cfg.sms_provider)
+
+    return render_template(
+        "gestoor_sign_painel.html",
+        kpis=kpis,
+        linhas=linhas,
+        status_filtro=status_filtro,
+        busca=busca,
+        config=cfg,
+        sms_diag=sms_diag,
+    )
+
+
+@app.route("/gestoor-sign/contrato/<int:contrato_id>", methods=["GET"])
+@login_required
+@security.require_permission("operate_gestoor_sign")
+def gestoor_sign_assinar(contrato_id):
+    contrato = db.session.get(ContratoGerado, contrato_id)
+    if not contrato:
+        flash("Contrato não encontrado.", "error")
+        return redirect(url_for("gestoor_sign_painel"))
+    if not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"Gestoor Sign acesso contrato_id={contrato_id}")
+        flash("Acesso negado: contrato pertence a outro município ou secretaria.", "error")
+        return redirect(url_for("gestoor_sign_painel"))
+
+    models = _gestoor_sign_models_ctx()
+    funcionario = gestoor_sign_service.localizar_servidor_do_contrato(db, models, contrato)
+    cfg = gestoor_sign_service.obter_ou_criar_config_municipio(db, models, contrato.municipio_id)
+    permitido_sms, mod_exigida, msg_mod = gestoor_sign_service.verificar_modalidade_minima(cfg, contrato.tipo_contrato)
+
+    sessao = None
+    erro_inicio = None
+    if contrato.status_assinatura not in (
+        gestoor_sign_service.STATUS_CANCELADO,
+        gestoor_sign_service.STATUS_SUBSTITUIDO,
+    ):
+        try:
+            sessao, _ = gestoor_sign_service.obter_ou_criar_sessao_assinatura(
+                db=db,
+                models=models,
+                contrato=contrato,
+                funcionario=funcionario,
+                user=current_user,
+                secret_key=app.config["SECRET_KEY"],
+                req_info=_get_req_info(),
+            )
+        except gestoor_sign_service.GestoorSignError as exc:
+            erro_inicio = exc.message
+    else:
+        sessao = (
+            AssinaturaContrato.query.filter_by(contrato_id=contrato.id)
+            .order_by(AssinaturaContrato.id.desc())
+            .first()
+        )
+
+    contrato_ctx = gestoor_sign_service.montar_contexto_contrato_pdf(
+        contrato, db, models, formatar_data_extenso, formatar_remuneracao_rs
+    )
+    etapa_atual = gestoor_sign_service.calcular_etapa_atual(sessao)
+    tel_servidor = (funcionario.telefone if funcionario else "") or ""
+    ok_tel, _, _, _ = sms_service.normalizar_celular_br(tel_servidor)
+    sms_diag = sms_service.diagnostico_provedor_sms(cfg.sms_provider)
+
+    qrcode_uri = None
+    validar_url = None
+    if sessao and sessao.codigo_validacao:
+        validar_url = url_for("validar_documento", codigo=sessao.codigo_validacao, _external=True)
+        qrcode_uri = gestoor_sign_pdf.gerar_qrcode_data_uri(validar_url)
+
+    return render_template(
+        "gestoor_sign_assinar.html",
+        contrato=contrato,
+        contrato_ctx=contrato_ctx,
+        funcionario=funcionario,
+        sessao=sessao,
+        etapa_atual=etapa_atual,
+        config=cfg,
+        permitido_sms=permitido_sms,
+        modalidade_exigida=mod_exigida,
+        msg_modalidade=msg_mod,
+        telefone_servidor=tel_servidor,
+        telefone_valido=ok_tel,
+        termo_manifestacao=gestoor_sign_service.TEXTO_MANIFESTACAO_VONTADE,
+        sms_diag=sms_diag,
+        erro_inicio=erro_inicio,
+        qrcode_uri=qrcode_uri,
+        validar_url=validar_url,
+    )
+
+
+@app.route("/api/gestoor-sign/contrato/<int:contrato_id>/confirmar-conferencia", methods=["POST"])
+@login_required
+@security.require_permission("operate_gestoor_sign", api=True)
+def api_gestoor_sign_confirmar_conferencia(contrato_id):
+    contrato = db.session.get(ContratoGerado, contrato_id)
+    if not contrato:
+        return jsonify({"success": False, "message": "Contrato não encontrado."}), 404
+    if not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"API Gestoor Sign conferencia contrato_id={contrato_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    data = request.get_json(silent=True) or request.form or {}
+    models = _gestoor_sign_models_ctx()
+    funcionario = gestoor_sign_service.localizar_servidor_do_contrato(db, models, contrato)
+    cfg = gestoor_sign_service.obter_ou_criar_config_municipio(db, models, contrato.municipio_id)
+
+    try:
+        sessao, _ = gestoor_sign_service.obter_ou_criar_sessao_assinatura(
+            db, models, contrato, funcionario, current_user, app.config["SECRET_KEY"], _get_req_info()
+        )
+        res = gestoor_sign_service.confirmar_conferencia_presencial(
+            db=db,
+            models=models,
+            assinatura=sessao,
+            contrato=contrato,
+            funcionario=funcionario,
+            config=cfg,
+            user=current_user,
+            telefone_confirmado=str(data.get("telefone") or ""),
+            presenca_confirmada=bool(data.get("presenca_confirmada")),
+            dados_conferidos=bool(data.get("dados_conferidos")),
+            secret_key=app.config["SECRET_KEY"],
+            timbre_path=_resolve_timbre_path(contrato),
+            req_info=_get_req_info(),
+            format_data_extenso=formatar_data_extenso,
+            format_rem_rs=formatar_remuneracao_rs,
+        )
+        registrar_log(
+            "GESTOOR_SIGN_CONFERENCIA",
+            f"Contrato Nº {contrato.num_contrato} (v{contrato.versao}) conferido presencialmente com {sessao.servidor_nome}",
+            secretaria_id=contrato.secretaria_id,
+        )
+        return jsonify({"success": True, **res})
+    except gestoor_sign_service.GestoorSignError as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "message": exc.message, **exc.extra}), exc.status_code
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Erro interno na conferência: {exc}"}), 500
+
+
+@app.route("/api/gestoor-sign/sessao/<int:assinatura_id>/enviar-sms", methods=["POST"])
+@login_required
+@security.require_permission("operate_gestoor_sign", api=True)
+def api_gestoor_sign_enviar_sms(assinatura_id):
+    sessao = db.session.get(AssinaturaContrato, assinatura_id)
+    if not sessao:
+        return jsonify({"success": False, "message": "Sessão de assinatura não encontrada."}), 404
+    contrato = db.session.get(ContratoGerado, sessao.contrato_id)
+    if not contrato or not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"API Gestoor Sign enviar SMS assinatura_id={assinatura_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    models = _gestoor_sign_models_ctx()
+    cfg = gestoor_sign_service.obter_ou_criar_config_municipio(db, models, contrato.municipio_id)
+
+    try:
+        res = gestoor_sign_service.enviar_codigo_sms_sessao(
+            db=db,
+            models=models,
+            assinatura=sessao,
+            contrato=contrato,
+            config=cfg,
+            user=current_user,
+            secret_key=app.config["SECRET_KEY"],
+            req_info=_get_req_info(),
+        )
+        registrar_log(
+            "GESTOOR_SIGN_SMS_ENVIADO",
+            f"OTP SMS enviado para {sessao.telefone_mascarado} — Contrato Nº {contrato.num_contrato} ({res['provider'].upper()})",
+            secretaria_id=contrato.secretaria_id,
+        )
+        return jsonify({"success": True, **res})
+    except gestoor_sign_service.GestoorSignError as exc:
+        return jsonify({"success": False, "message": exc.message, **exc.extra}), exc.status_code
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Erro ao enviar SMS: {exc}"}), 500
+
+
+@app.route("/api/gestoor-sign/sessao/<int:assinatura_id>/validar-otp", methods=["POST"])
+@login_required
+@security.require_permission("operate_gestoor_sign", api=True)
+def api_gestoor_sign_validar_otp(assinatura_id):
+    sessao = db.session.get(AssinaturaContrato, assinatura_id)
+    if not sessao:
+        return jsonify({"success": False, "message": "Sessão de assinatura não encontrada."}), 404
+    contrato = db.session.get(ContratoGerado, sessao.contrato_id)
+    if not contrato or not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"API Gestoor Sign validar OTP assinatura_id={assinatura_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    data = request.get_json(silent=True) or request.form or {}
+    models = _gestoor_sign_models_ctx()
+    cfg = gestoor_sign_service.obter_ou_criar_config_municipio(db, models, contrato.municipio_id)
+
+    try:
+        res = gestoor_sign_service.validar_codigo_otp_sessao(
+            db=db,
+            models=models,
+            assinatura=sessao,
+            contrato=contrato,
+            config=cfg,
+            codigo_digitado=str(data.get("codigo") or ""),
+            user=current_user,
+            secret_key=app.config["SECRET_KEY"],
+            req_info=_get_req_info(),
+        )
+        registrar_log(
+            "GESTOOR_SIGN_OTP_VALIDADO",
+            f"Código SMS validado para Contrato Nº {contrato.num_contrato} ({sessao.servidor_nome})",
+            secretaria_id=contrato.secretaria_id,
+        )
+        return jsonify({"success": True, **res})
+    except gestoor_sign_service.GestoorSignError as exc:
+        return jsonify({"success": False, "message": exc.message, **exc.extra}), exc.status_code
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Erro ao validar código: {exc}"}), 500
+
+
+@app.route("/api/gestoor-sign/sessao/<int:assinatura_id>/confirmar-vontade", methods=["POST"])
+@login_required
+@security.require_permission("operate_gestoor_sign", api=True)
+def api_gestoor_sign_confirmar_vontade(assinatura_id):
+    sessao = db.session.get(AssinaturaContrato, assinatura_id)
+    if not sessao:
+        return jsonify({"success": False, "message": "Sessão de assinatura não encontrada."}), 404
+    contrato = db.session.get(ContratoGerado, sessao.contrato_id)
+    if not contrato or not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"API Gestoor Sign finalizar assinatura_id={assinatura_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    data = request.get_json(silent=True) or request.form or {}
+    models = _gestoor_sign_models_ctx()
+    funcionario = gestoor_sign_service.localizar_servidor_do_contrato(db, models, contrato)
+    cfg = gestoor_sign_service.obter_ou_criar_config_municipio(db, models, contrato.municipio_id)
+    url_val_base = url_for("validar_documento", _external=True)
+
+    try:
+        res = gestoor_sign_service.confirmar_vontade_e_finalizar(
+            db=db,
+            models=models,
+            assinatura=sessao,
+            contrato=contrato,
+            funcionario=funcionario,
+            config=cfg,
+            user=current_user,
+            declaracao_aceita=bool(data.get("declaracao_aceita")),
+            cpf_ultimos4=str(data.get("cpf_ultimos4") or ""),
+            confirmacao_servidor_nome=str(data.get("confirmacao_servidor_nome") or ""),
+            url_validador_base=url_val_base,
+            timbre_path=_resolve_timbre_path(contrato),
+            req_info=_get_req_info(),
+            format_data_extenso=formatar_data_extenso,
+            format_rem_rs=formatar_remuneracao_rs,
+        )
+        registrar_log(
+            "GESTOOR_SIGN_ASSINADO",
+            f"Contrato Nº {contrato.num_contrato} (v{contrato.versao}) ASSINADO ELETRONICAMENTE por {sessao.servidor_nome} • Código {res['codigo_validacao']}",
+            secretaria_id=contrato.secretaria_id,
+        )
+        res["download_contrato_url"] = url_for("gestoor_sign_download_contrato", assinatura_id=sessao.id)
+        res["download_evidencias_url"] = url_for("gestoor_sign_download_evidencias", assinatura_id=sessao.id)
+        return jsonify({"success": True, **res})
+    except gestoor_sign_service.GestoorSignError as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "message": exc.message, **exc.extra}), exc.status_code
+    except Exception as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "message": f"Erro ao selar assinatura eletrônica: {exc}"}), 500
+
+
+@app.route("/api/gestoor-sign/contrato/<int:contrato_id>/cancelar", methods=["POST"])
+@login_required
+@security.require_permission("cancel_gestoor_sign", api=True)
+def api_gestoor_sign_cancelar(contrato_id):
+    contrato = db.session.get(ContratoGerado, contrato_id)
+    if not contrato:
+        return jsonify({"success": False, "message": "Contrato não encontrado."}), 404
+    if not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"API Gestoor Sign cancelar contrato_id={contrato_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    data = request.get_json(silent=True) or request.form or {}
+    sessao = (
+        AssinaturaContrato.query.filter_by(contrato_id=contrato.id)
+        .order_by(AssinaturaContrato.id.desc())
+        .first()
+    )
+    try:
+        res = gestoor_sign_service.cancelar_processo_assinatura(
+            db=db,
+            models=_gestoor_sign_models_ctx(),
+            contrato=contrato,
+            assinatura=sessao,
+            user=current_user,
+            motivo=str(data.get("motivo") or ""),
+            req_info=_get_req_info(),
+        )
+        registrar_log(
+            "GESTOOR_SIGN_CANCELADO",
+            f"Contrato Nº {contrato.num_contrato} cancelado logicamente. Motivo: {data.get('motivo')}",
+            nivel="WARN",
+            secretaria_id=contrato.secretaria_id,
+        )
+        return jsonify({"success": True, **res})
+    except gestoor_sign_service.GestoorSignError as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "message": exc.message}), exc.status_code
+
+
+@app.route("/api/gestoor-sign/contrato/<int:contrato_id>/nova-versao", methods=["POST"])
+@login_required
+@security.require_permission("manage_contratos", api=True)
+def api_gestoor_sign_nova_versao(contrato_id):
+    contrato = db.session.get(ContratoGerado, contrato_id)
+    if not contrato:
+        return jsonify({"success": False, "message": "Contrato não encontrado."}), 404
+    if not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"API Gestoor Sign nova versao contrato_id={contrato_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    data = request.get_json(silent=True) or request.form or {}
+    try:
+        novo = gestoor_sign_service.gerar_nova_versao_contrato(
+            db=db,
+            models=_gestoor_sign_models_ctx(),
+            contrato_anterior=contrato,
+            user=current_user,
+            motivo=str(data.get("motivo") or ""),
+            req_info=_get_req_info(),
+        )
+        registrar_log(
+            "GESTOOR_SIGN_NOVA_VERSAO",
+            f"Contrato Nº {novo.num_contrato} v{novo.versao} gerado a partir da v{contrato.versao}",
+            secretaria_id=novo.secretaria_id,
+        )
+        return jsonify(
+            {
+                "success": True,
+                "contrato_id": novo.id,
+                "versao": novo.versao,
+                "assinar_url": url_for("gestoor_sign_assinar", contrato_id=novo.id),
+            }
+        )
+    except gestoor_sign_service.GestoorSignError as exc:
+        db.session.rollback()
+        return jsonify({"success": False, "message": exc.message}), exc.status_code
+
+
+@app.route("/api/gestoor-sign/contrato/<int:contrato_id>/historico", methods=["GET"])
+@login_required
+@security.require_permission("view_gestoor_sign", api=True)
+def api_gestoor_sign_historico(contrato_id):
+    contrato = db.session.get(ContratoGerado, contrato_id)
+    if not contrato:
+        return jsonify({"success": False, "message": "Contrato não encontrado."}), 404
+    if not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"API Gestoor Sign historico contrato_id={contrato_id}")
+        return jsonify({"success": False, "message": "Acesso negado."}), 403
+
+    sessoes = (
+        AssinaturaContrato.query.filter_by(contrato_id=contrato.id)
+        .order_by(AssinaturaContrato.id.desc())
+        .all()
+    )
+    eventos = (
+        AssinaturaEvento.query.filter_by(contrato_id=contrato.id)
+        .order_by(AssinaturaEvento.id.asc())
+        .all()
+    )
+
+    return jsonify(
+        {
+            "success": True,
+            "contrato": {
+                "id": contrato.id,
+                "num_contrato": contrato.num_contrato,
+                "versao": int(getattr(contrato, "versao", 1) or 1),
+                "servidor_nome": contrato.contratado_nome,
+                "cpf_mascarado": sms_service.mascarar_cpf(contrato.contratado_cpf),
+                "status": contrato.status_assinatura,
+                "status_label": gestoor_sign_service.STATUS_LABELS.get(contrato.status_assinatura, contrato.status_assinatura),
+                "codigo_validacao": contrato.codigo_validacao,
+                "hash_sha256": contrato.hash_documento_sha256,
+                "data_geracao_brt": gestoor_sign_service.format_brt(contrato.data_geracao),
+                "data_assinatura_brt": gestoor_sign_service.format_brt(contrato.data_assinatura_eletronica),
+            },
+            "sessoes": [
+                {
+                    "id": s.id,
+                    "status": s.status,
+                    "modalidade": gestoor_sign_service.MODALIDADE_SMS_LABEL,
+                    "telefone_mascarado": s.telefone_mascarado,
+                    "tecnico_nome": s.tecnico_nome,
+                    "sms_provider": s.sms_provider_utilizado,
+                    "sms_message_id": s.sms_provider_message_id,
+                    "sms_enviado_brt": gestoor_sign_service.format_brt(s.sms_enviado_em),
+                    "sms_validado_brt": gestoor_sign_service.format_brt(s.sms_validado_em),
+                    "manifestacao_brt": gestoor_sign_service.format_brt(s.manifestacao_confirmada_em),
+                    "assinado_em_brt": gestoor_sign_service.format_brt(s.assinado_em),
+                    "codigo_validacao": s.codigo_validacao,
+                    "hash_base": s.hash_contrato_base_sha256,
+                    "hash_final": s.hash_documento_final_sha256,
+                    "download_contrato_url": (
+                        url_for("gestoor_sign_download_contrato", assinatura_id=s.id)
+                        if s.status == gestoor_sign_service.SESSAO_ASSINADA
+                        else None
+                    ),
+                    "download_evidencias_url": (
+                        url_for("gestoor_sign_download_evidencias", assinatura_id=s.id)
+                        if s.status == gestoor_sign_service.SESSAO_ASSINADA
+                        else None
+                    ),
+                }
+                for s in sessoes
+            ],
+            "eventos": [
+                {
+                    "id": e.id,
+                    "tipo_evento": e.tipo_evento,
+                    "descricao": e.descricao,
+                    "ator_tipo": e.ator_tipo,
+                    "ip_origem": e.ip_origem,
+                    "data_hora_brt": gestoor_sign_service.format_brt(e.data_hora),
+                    "hash_curto": (e.hash_evento_atual or "")[:16],
+                }
+                for e in eventos
+            ],
+        }
+    )
+
+
+def _servir_pdf_assinatura(assinatura_id: int, tipo_arquivo: str, evento_tipo: str):
+    sessao = db.session.get(AssinaturaContrato, assinatura_id)
+    if not sessao:
+        return "Assinatura não encontrada.", 404
+    contrato = db.session.get(ContratoGerado, sessao.contrato_id)
+    if not contrato or not security.can_access_record(current_user, contrato):
+        registrar_violacao_acesso(f"Download {tipo_arquivo} assinatura_id={assinatura_id}")
+        return "Acesso negado.", 403
+
+    arq = (
+        AssinaturaDocumentoArquivo.query.filter_by(
+            assinatura_id=sessao.id,
+            tipo_arquivo=tipo_arquivo,
+        )
+        .order_by(AssinaturaDocumentoArquivo.id.desc())
+        .first()
+    )
+    if not arq:
+        return "Documento PDF selado não encontrado.", 404
+
+    raw_bytes = base64.b64decode(arq.conteudo_b64)
+    # Verificação de integridade SHA-256 em tempo real antes de servir
+    sha_atual = gestoor_sign_pdf.sha256_bytes(raw_bytes)
+    if not hmac.compare_digest(sha_atual, arq.sha256):
+        registrar_log(
+            "ALERTA_INTEGRIDADE_PDF",
+            f"Falha de verificação SHA-256 no arquivo {arq.nome_arquivo} (assinatura_id={sessao.id})",
+            nivel="SECURITY",
+            secretaria_id=contrato.secretaria_id,
+        )
+        return "Falha de verificação de integridade criptográfica do documento.", 500
+
+    try:
+        gestoor_sign_service.registrar_evento_assinatura(
+            db=db,
+            models=_gestoor_sign_models_ctx(),
+            assinatura=sessao,
+            tipo_evento=evento_tipo,
+            descricao=f"Download do arquivo {arq.nome_arquivo} realizado por {current_user.username} (SHA-256 íntegro).",
+            ator_tipo="TECNICO_RH",
+            usuario_id=current_user.id,
+            req_info=_get_req_info(),
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    as_attach = request.args.get("download", "1") != "0"
+    return send_file(
+        io.BytesIO(raw_bytes),
+        mimetype="application/pdf",
+        as_attachment=as_attach,
+        download_name=arq.nome_arquivo,
+    )
+
+
+@app.route("/gestoor-sign/download/contrato/<int:assinatura_id>", methods=["GET"])
+@login_required
+@security.require_permission("view_gestoor_sign")
+def gestoor_sign_download_contrato(assinatura_id):
+    return _servir_pdf_assinatura(assinatura_id, "CONTRATO_ASSINADO_PDF", "DOWNLOAD_CONTRATO")
+
+
+@app.route("/gestoor-sign/download/evidencias/<int:assinatura_id>", methods=["GET"])
+@login_required
+@security.require_permission("view_gestoor_sign")
+def gestoor_sign_download_evidencias(assinatura_id):
+    return _servir_pdf_assinatura(assinatura_id, "RELATORIO_EVIDENCIAS_PDF", "DOWNLOAD_EVIDENCIAS")
+
+
+@app.route("/gestoor-sign/configuracoes", methods=["GET", "POST"])
+@login_required
+@security.require_permission("config_gestoor_sign")
+def gestoor_sign_configuracoes():
+    models = _gestoor_sign_models_ctx()
+    mun_id = request.args.get("municipio_id", type=int) or security.get_user_municipio_id(current_user)
+    if not mun_id:
+        mun_first = Municipio.query.order_by(Municipio.id.asc()).first()
+        mun_id = mun_first.id if mun_first else None
+
+    mun = db.session.get(Municipio, mun_id) if mun_id else None
+    cfg = gestoor_sign_service.obter_ou_criar_config_municipio(db, models, mun_id)
+
+    if request.method == "POST":
+        try:
+            # Dados do Município (Multi-Tenant)
+            if mun:
+                mun.nome = (request.form.get("municipio_nome") or mun.nome).strip()
+                mun.uf = (request.form.get("municipio_uf") or mun.uf or "PI").strip().upper()[:2]
+                mun.cnpj = (request.form.get("municipio_cnpj") or "").strip() or mun.cnpj
+                mun.endereco = (request.form.get("municipio_endereco") or "").strip() or mun.endereco
+
+            # Conformidade Jurídica & Modalidade Mínima
+            mod_padrao = (request.form.get("modalidade_minima_padrao") or "SIMPLES").strip().upper()
+            if mod_padrao not in ("SIMPLES", "AVANCADA", "QUALIFICADA"):
+                mod_padrao = "SIMPLES"
+            cfg.modalidade_minima_padrao = mod_padrao
+
+            regras = {}
+            for cod, _ in gestoor_sign_service.TIPOS_CONTRATO_PADRAO:
+                val = (request.form.get(f"regra_{cod}") or mod_padrao).strip().upper()
+                regras[cod] = val if val in ("SIMPLES", "AVANCADA", "QUALIFICADA") else mod_padrao
+            cfg.regras_modalidade_json = json.dumps(regras, ensure_ascii=False)
+
+            cfg.ato_normativo_referencia = (request.form.get("ato_normativo_referencia") or "").strip()[:250]
+            val_jur = (request.form.get("validacao_juridica_status") or "PENDENTE").strip().upper()
+            cfg.validacao_juridica_status = val_jur if val_jur in ("PENDENTE", "APROVADO_JURIDICO") else "PENDENTE"
+            cfg.validacao_juridica_obs = (request.form.get("validacao_juridica_obs") or "").strip()
+
+            # Parâmetros de Segurança OTP SMS
+            cfg.otp_tamanho = max(6, min(request.form.get("otp_tamanho", type=int) or 6, 8))
+            cfg.otp_expiracao_segundos = max(60, min(request.form.get("otp_expiracao_segundos", type=int) or 300, 1800))
+            cfg.otp_max_tentativas = max(1, min(request.form.get("otp_max_tentativas", type=int) or 3, 10))
+            cfg.otp_max_reenvios = max(0, min(request.form.get("otp_max_reenvios", type=int) or 3, 10))
+            cfg.otp_cooldown_reenvio_segundos = max(15, min(request.form.get("otp_cooldown_reenvio_segundos", type=int) or 60, 600))
+            cfg.bloqueio_minutos = max(5, min(request.form.get("bloqueio_minutos", type=int) or 30, 1440))
+
+            prov = (request.form.get("sms_provider") or "comtele").strip().lower()
+            if prov in ("comtele", "twilio", "zenvia", "homologacao_local"):
+                if prov == "homologacao_local" and sms_service.is_production_environment():
+                    flash("O modo 'homologacao_local' não é permitido em produção. Mantido provedor Comtele.", "error")
+                    cfg.sms_provider = "comtele"
+                else:
+                    cfg.sms_provider = prov
+            cfg.sms_remetente = (request.form.get("sms_remetente") or "GESTOOR360").strip()[:20]
+            cfg.arquivar_ged_automatico = request.form.get("arquivar_ged_automatico") == "1"
+            cfg.atualizado_por_id = current_user.id
+            cfg.atualizado_em = datetime.utcnow()
+
+            db.session.commit()
+            registrar_log(
+                "CONFIG_GESTOOR_SIGN",
+                f"Configurações do Gestoor Sign atualizadas para {mun.nome if mun else 'Município'} (Provedor: {cfg.sms_provider}, Modalidade padrão: {cfg.modalidade_minima_padrao})",
+            )
+            flash("Configurações do Gestoor Sign salvas com sucesso!", "success")
+            return redirect(url_for("gestoor_sign_configuracoes"))
+        except Exception as exc:
+            db.session.rollback()
+            flash(f"Erro ao salvar configurações: {exc}", "error")
+
+    try:
+        regras_atual = json.loads(cfg.regras_modalidade_json or "{}")
+    except Exception:
+        regras_atual = {}
+
+    return render_template(
+        "gestoor_sign_config.html",
+        municipio=mun,
+        config=cfg,
+        regras_atual=regras_atual,
+        tipos_contrato=gestoor_sign_service.TIPOS_CONTRATO_PADRAO,
+        sms_diag=sms_service.diagnostico_provedor_sms(cfg.sms_provider),
+    )
 
 
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===

@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações Municipais — GESTOOR SIGN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f4f7f5; color: #0f172a; }
+        .g360-bg-dark { background-color: #0B3D2E; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <header class="g360-bg-dark text-white border-b-4 border-[#FACC15] sticky top-0 z-40 shadow-lg">
+        <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-[#10B981]/20 border border-[#10B981]/40 flex items-center justify-center text-[#FACC15]">
+                    <i class="ph ph-gear-six text-2xl"></i>
+                </div>
+                <div>
+                    <span class="text-xs font-extrabold uppercase tracking-widest text-[#FACC15]">GESTOOR SIGN • Governança Municipal</span>
+                    <h1 class="text-lg font-extrabold">Configurações Jurídicas, Multi-Tenant e Provedor SMS</h1>
+                </div>
+            </div>
+            <a href="{{ url_for('gestoor_sign_painel') }}"
+               class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#10B981] hover:bg-emerald-500 text-white text-xs font-bold transition">
+                <i class="ph ph-arrow-left text-base"></i> Voltar ao Painel
+            </a>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="p-4 rounded-2xl text-xs font-bold flex items-center gap-2.5 {{ 'bg-emerald-50 text-emerald-900 border border-emerald-200' if category == 'success' else 'bg-rose-50 text-rose-800 border border-rose-200' }}">
+                    <i class="ph {{ 'ph-check-circle text-[#10B981]' if category == 'success' else 'ph-warning-circle text-rose-600' }} text-lg"></i>
+                    <span>{{ message }}</span>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- AVISO DE CONFORMIDADE JURÍDICA -->
+        <div class="p-4 rounded-2xl bg-amber-50 border-2 border-[#EAB308] text-amber-950 text-xs flex items-start gap-3">
+            <i class="ph ph-scales text-2xl text-amber-600 shrink-0 mt-0.5"></i>
+            <div class="space-y-1">
+                <p class="font-extrabold">Conformidade Legal — Lei nº 14.063/2020, MP nº 2.200-2/2001 e LGPD (Lei nº 13.709/2018)</p>
+                <p>A assinatura presencial com código OTP via SMS é classificada exclusivamente como <strong>Assinatura Eletrônica Simples</strong>. Não utilize SMS isolado para atos que a regulamentação municipal exija assinatura Avançada ou Qualificada. Esta configuração deve ser submetida à <strong>validação da Assessoria Jurídica do Município</strong>.</p>
+            </div>
+        </div>
+
+        <form method="POST" action="{{ url_for('gestoor_sign_configuracoes') }}" class="space-y-6">
+
+            <!-- 1. IDENTIFICAÇÃO DO MUNICÍPIO (TENANT) -->
+            {% if municipio %}
+            <section class="bg-white rounded-2xl shadow-sm border border-emerald-900/10 p-6 space-y-4">
+                <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2 uppercase tracking-wider">
+                    <i class="ph ph-buildings text-lg text-[#10B981]"></i> 1. Identificação do Município (Isolamento Multi-Tenant)
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+                    <div class="md:col-span-2">
+                        <label class="block font-bold text-slate-600 mb-1">Nome Oficial do Município</label>
+                        <input type="text" name="municipio_nome" value="{{ municipio.nome }}" required class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-semibold">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">UF</label>
+                        <input type="text" name="municipio_uf" value="{{ municipio.uf }}" maxlength="2" required class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-semibold uppercase">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">CNPJ</label>
+                        <input type="text" name="municipio_cnpj" value="{{ municipio.cnpj or '' }}" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-semibold">
+                    </div>
+                    <div class="md:col-span-4">
+                        <label class="block font-bold text-slate-600 mb-1">Endereço Institucional da Sede</label>
+                        <input type="text" name="municipio_endereco" value="{{ municipio.endereco or '' }}" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-semibold">
+                    </div>
+                </div>
+            </section>
+            {% endif %}
+
+            <!-- 2. REGULAMENTAÇÃO MUNICIPAL & MODALIDADE MÍNIMA -->
+            <section class="bg-white rounded-2xl shadow-sm border border-emerald-900/10 p-6 space-y-4">
+                <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2 uppercase tracking-wider">
+                    <i class="ph ph-gavel text-lg text-[#10B981]"></i> 2. Política Municipal de Modalidade Mínima (Lei nº 14.063/2020)
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Modalidade Mínima Padrão</label>
+                        <select name="modalidade_minima_padrao" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold text-[#0B3D2E]">
+                            <option value="SIMPLES" {% if config.modalidade_minima_padrao == 'SIMPLES' %}selected{% endif %}>SIMPLES (Permite SMS Presencial)</option>
+                            <option value="AVANCADA" {% if config.modalidade_minima_padrao == 'AVANCADA' %}selected{% endif %}>AVANÇADA (Bloqueia SMS isolado)</option>
+                            <option value="QUALIFICADA" {% if config.modalidade_minima_padrao == 'QUALIFICADA' %}selected{% endif %}>QUALIFICADA — ICP-Brasil (Bloqueia SMS isolado)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Status da Validação Jurídica</label>
+                        <select name="validacao_juridica_status" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold">
+                            <option value="PENDENTE" {% if config.validacao_juridica_status == 'PENDENTE' %}selected{% endif %}>Pendente de Parecer Jurídico</option>
+                            <option value="APROVADO_JURIDICO" {% if config.validacao_juridica_status == 'APROVADO_JURIDICO' %}selected{% endif %}>Aprovado pela Assessoria Jurídica</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Ato Normativo / Decreto Municipal</label>
+                        <input type="text" name="ato_normativo_referencia" value="{{ config.ato_normativo_referencia or '' }}"
+                               placeholder="Ex.: Decreto Municipal nº 12/2026"
+                               class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-semibold">
+                    </div>
+                </div>
+
+                <div class="pt-2">
+                    <p class="text-[11px] font-bold uppercase text-slate-500 mb-2">Modalidade mínima exigida por natureza do contrato:</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+                        {% for cod, lbl in tipos_contrato %}
+                        {% set val_atual = regras_atual.get(cod, config.modalidade_minima_padrao) %}
+                        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                            <label class="block font-bold text-slate-700 mb-1">{{ lbl }}</label>
+                            <select name="regra_{{ cod }}" class="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 bg-white font-bold text-[#0B3D2E]">
+                                <option value="SIMPLES" {% if val_atual == 'SIMPLES' %}selected{% endif %}>SIMPLES (SMS)</option>
+                                <option value="AVANCADA" {% if val_atual == 'AVANCADA' %}selected{% endif %}>AVANÇADA</option>
+                                <option value="QUALIFICADA" {% if val_atual == 'QUALIFICADA' %}selected{% endif %}>QUALIFICADA</option>
+                            </select>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="text-xs">
+                    <label class="block font-bold text-slate-600 mb-1">Observações / Parecer da Assessoria Jurídica</label>
+                    <textarea name="validacao_juridica_obs" rows="2" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50">{{ config.validacao_juridica_obs or '' }}</textarea>
+                </div>
+            </section>
+
+            <!-- 3. PROVEDOR SMS (COMTELE) E PARÂMETROS DE SEGURANÇA OTP -->
+            <section class="bg-white rounded-2xl shadow-sm border border-emerald-900/10 p-6 space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2 uppercase tracking-wider">
+                        <i class="ph ph-chat-circle-dots text-lg text-[#10B981]"></i> 3. Provedor SMS (Comtele) e Segurança OTP
+                    </h2>
+                    <span class="text-[11px] font-bold px-3 py-1 rounded-full {{ 'bg-emerald-100 text-emerald-800' if sms_diag.configurado else 'bg-amber-100 text-amber-900' }}">
+                        {{ sms_diag.detalhe }}
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Provedor SMS</label>
+                        <select name="sms_provider" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold text-[#0B3D2E]">
+                            <option value="comtele" {% if config.sms_provider == 'comtele' %}selected{% endif %}>Comtele API v2 (Produção — Padrão)</option>
+                            <option value="twilio" {% if config.sms_provider == 'twilio' %}selected{% endif %}>Twilio (Alternativo)</option>
+                            <option value="zenvia" {% if config.sms_provider == 'zenvia' %}selected{% endif %}>Zenvia (Alternativo)</option>
+                            {% if not sms_diag.ambiente_producao %}
+                            <option value="homologacao_local" {% if config.sms_provider == 'homologacao_local' %}selected{% endif %}>Homologação Local (Somente Dev/Testes)</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Remetente / Identificador (Sender)</label>
+                        <input type="text" name="sms_remetente" value="{{ config.sms_remetente or 'GESTOOR360' }}" maxlength="20" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-semibold">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Tamanho do Código OTP (dígitos)</label>
+                        <input type="number" name="otp_tamanho" value="{{ config.otp_tamanho or 6 }}" min="6" max="8" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Expiração do Código (segundos)</label>
+                        <input type="number" name="otp_expiracao_segundos" value="{{ config.otp_expiracao_segundos or 300 }}" min="60" max="1800" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Limite de Tentativas por Código</label>
+                        <input type="number" name="otp_max_tentativas" value="{{ config.otp_max_tentativas or 3 }}" min="1" max="10" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Máximo de Reenvios por Sessão</label>
+                        <input type="number" name="otp_max_reenvios" value="{{ config.otp_max_reenvios or 3 }}" min="0" max="10" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Cooldown entre Reenvios (segundos)</label>
+                        <input type="number" name="otp_cooldown_reenvio_segundos" value="{{ config.otp_cooldown_reenvio_segundos or 60 }}" min="15" max="600" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold">
+                    </div>
+                    <div>
+                        <label class="block font-bold text-slate-600 mb-1">Tempo de Bloqueio após Excesso (min)</label>
+                        <input type="number" name="bloqueio_minutos" value="{{ config.bloqueio_minutos or 30 }}" min="5" max="1440" class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-bold">
+                    </div>
+                    <div class="flex items-end pb-1">
+                        <label class="flex items-center gap-2 font-bold text-[#0B3D2E] cursor-pointer">
+                            <input type="checkbox" name="arquivar_ged_automatico" value="1" {% if config.arquivar_ged_automatico %}checked{% endif %} class="w-4 h-4 accent-[#0B3D2E]">
+                            Arquivar PDF assinado automaticamente no GED
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <div class="flex justify-end">
+                <button type="submit" class="px-6 py-3 rounded-xl g360-bg-dark hover:bg-[#14532D] text-white font-extrabold text-sm inline-flex items-center gap-2 shadow-md transition">
+                    <i class="ph ph-floppy-disk text-lg text-[#FACC15]"></i> Salvar Configurações do Gestoor Sign
+                </button>
+            </div>
+        </form>
+    </main>
+    <script src="{{ url_for('static', filename='js/inactivity.js') }}"></script>
+</body>
+</html>

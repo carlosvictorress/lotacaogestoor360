@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GESTOOR SIGN — Painel de Assinaturas Presenciais • Gestoor360</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f4f7f5; color: #0f172a; }
+        .g360-bg-dark { background-color: #0B3D2E; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- HEADER INSTITUCIONAL GESTOOR360 -->
+    <header class="g360-bg-dark text-white border-b-4 border-[#FACC15] sticky top-0 z-40 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3.5">
+                <div class="w-12 h-12 rounded-2xl bg-[#10B981]/20 border border-[#10B981]/40 flex items-center justify-center text-[#FACC15]">
+                    <i class="ph ph-signature text-3xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-xs font-extrabold uppercase tracking-widest text-[#FACC15]">GESTOOR SIGN</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-emerald-200">Módulo RH / Contratos</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full {{ 'bg-[#10B981]/20 text-emerald-200 border border-[#10B981]/40' if sms_diag.configurado else 'bg-amber-500/20 text-amber-200 border border-amber-400/40' }}">
+                            SMS: {{ sms_diag.provider|upper }} {{ '• OK' if sms_diag.configurado else '• Pendente' }}
+                        </span>
+                    </div>
+                    <h1 class="text-xl font-extrabold tracking-tight text-white mt-0.5">Painel de Assinaturas Eletrônicas Presenciais</h1>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                {% if has_perm('config_gestoor_sign') %}
+                <a href="{{ url_for('gestoor_sign_configuracoes') }}"
+                   class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition">
+                    <i class="ph ph-gear-six text-base text-[#FACC15]"></i> Configurações Municipais
+                </a>
+                {% endif %}
+                {% if has_perm('view_contratos') %}
+                <a href="{{ url_for('pagina_contratos') }}"
+                   class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition">
+                    <i class="ph ph-files text-base text-emerald-300"></i> Contratos Gerados
+                </a>
+                {% endif %}
+                <a href="{{ url_for('sistema') }}"
+                   class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#10B981] hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm">
+                    <i class="ph ph-arrow-left text-base"></i> Voltar ao RH
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="p-4 rounded-2xl text-xs font-bold flex items-center gap-2.5 shadow-sm {{ 'bg-emerald-50 text-emerald-900 border border-emerald-200' if category == 'success' else 'bg-rose-50 text-rose-800 border border-rose-200' }}">
+                    <i class="ph {{ 'ph-check-circle text-[#10B981]' if category == 'success' else 'ph-warning-circle text-rose-600' }} text-lg"></i>
+                    <span>{{ message }}</span>
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- INDICADORES DO PAINEL GESTOOR SIGN (5 KPIs OBRIGATÓRIOS) -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <a href="{{ url_for('gestoor_sign_painel', status='AGUARDANDO_ASSINATURA') }}"
+               class="bg-white rounded-2xl p-5 border-2 {{ 'border-[#0B3D2E] ring-2 ring-[#0B3D2E]/10' if status_filtro == 'AGUARDANDO_ASSINATURA' else 'border-emerald-900/10 hover:border-[#10B981]' }} shadow-sm transition">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold uppercase text-slate-500">Aguardando Assinatura</span>
+                    <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><i class="ph ph-hourglass text-xl"></i></span>
+                </div>
+                <p class="text-3xl font-extrabold text-[#0B3D2E] mt-2">{{ kpis.aguardando }}</p>
+                <span class="text-[11px] text-slate-400">Prontos para assinatura presencial</span>
+            </a>
+
+            <a href="{{ url_for('gestoor_sign_painel', status='ASSINADO_ELETRONICAMENTE') }}"
+               class="bg-white rounded-2xl p-5 border-2 {{ 'border-[#10B981] ring-2 ring-emerald-200' if status_filtro == 'ASSINADO_ELETRONICAMENTE' else 'border-emerald-900/10 hover:border-[#10B981]' }} shadow-sm transition">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold uppercase text-slate-500">Assinados Eletronicamente</span>
+                    <span class="w-9 h-9 rounded-xl bg-emerald-50 text-[#10B981] flex items-center justify-center"><i class="ph ph-seal-check text-xl"></i></span>
+                </div>
+                <p class="text-3xl font-extrabold text-[#10B981] mt-2">{{ kpis.assinados }}</p>
+                <span class="text-[11px] text-slate-400">Selados com SHA-256 + QR Code</span>
+            </a>
+
+            <a href="{{ url_for('gestoor_sign_painel', status='ASSINATURA_PENDENTE') }}"
+               class="bg-white rounded-2xl p-5 border-2 {{ 'border-[#EAB308] ring-2 ring-amber-200' if status_filtro == 'ASSINATURA_PENDENTE' else 'border-emerald-900/10 hover:border-[#EAB308]' }} shadow-sm transition">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold uppercase text-slate-500">Assinatura Pendente</span>
+                    <span class="w-9 h-9 rounded-xl bg-yellow-50 text-yellow-600 flex items-center justify-center"><i class="ph ph-clock-countdown text-xl"></i></span>
+                </div>
+                <p class="text-3xl font-extrabold text-amber-600 mt-2">{{ kpis.pendentes }}</p>
+                <span class="text-[11px] text-slate-400">Em conferência ou aguardando OTP</span>
+            </a>
+
+            <a href="{{ url_for('gestoor_sign_painel', status='CANCELADO') }}"
+               class="bg-white rounded-2xl p-5 border-2 {{ 'border-slate-500' if status_filtro == 'CANCELADO' else 'border-emerald-900/10 hover:border-slate-400' }} shadow-sm transition">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold uppercase text-slate-500">Cancelados</span>
+                    <span class="w-9 h-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center"><i class="ph ph-prohibit text-xl"></i></span>
+                </div>
+                <p class="text-3xl font-extrabold text-slate-700 mt-2">{{ kpis.cancelados }}</p>
+                <span class="text-[11px] text-slate-400">Cancelamento lógico auditado</span>
+            </a>
+
+            <a href="{{ url_for('gestoor_sign_painel', status='FALHA_AUTENTICACAO') }}"
+               class="bg-white rounded-2xl p-5 border-2 {{ 'border-rose-500 ring-2 ring-rose-200' if status_filtro == 'FALHA_AUTENTICACAO' else 'border-emerald-900/10 hover:border-rose-400' }} shadow-sm transition">
+                <div class="flex items-center justify-between">
+                    <span class="text-[11px] font-bold uppercase text-slate-500">Falha de Autenticação</span>
+                    <span class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center"><i class="ph ph-shield-warning text-xl"></i></span>
+                </div>
+                <p class="text-3xl font-extrabold text-rose-600 mt-2">{{ kpis.falha_auth }}</p>
+                <span class="text-[11px] text-slate-400">Bloqueio por excesso de tentativas</span>
+            </a>
+        </section>
+
+        <!-- BARRA DE FILTROS + TABELA DE ASSINATURAS -->
+        <section class="bg-white rounded-3xl shadow-sm border border-emerald-900/10 overflow-hidden">
+            <div class="p-5 sm:p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-base font-extrabold text-[#0B3D2E] flex items-center gap-2">
+                        <i class="ph ph-table text-xl text-[#10B981]"></i>
+                        Acompanhamento de Assinaturas ({{ linhas|length }} exibidos de {{ kpis.total }})
+                    </h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Exclusivo para contratos gerados no Gestoor360 • Classificação: <strong>Assinatura Eletrônica Simples (Lei nº 14.063/2020)</strong>
+                    </p>
+                </div>
+
+                <form method="GET" action="{{ url_for('gestoor_sign_painel') }}" class="flex flex-wrap items-center gap-2">
+                    <input type="text" name="q" value="{{ busca }}" placeholder="Nº contrato, servidor, CPF ou código..."
+                           class="px-3.5 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-semibold w-60 focus:outline-none focus:ring-2 focus:ring-[#10B981]">
+                    <select name="status" onchange="this.form.submit()" class="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700">
+                        <option value="">Todos os Status</option>
+                        <option value="AGUARDANDO_ASSINATURA" {% if status_filtro == 'AGUARDANDO_ASSINATURA' %}selected{% endif %}>Aguardando Assinatura</option>
+                        <option value="ASSINADO_ELETRONICAMENTE" {% if status_filtro == 'ASSINADO_ELETRONICAMENTE' %}selected{% endif %}>Assinado Eletronicamente</option>
+                        <option value="ASSINATURA_PENDENTE" {% if status_filtro == 'ASSINATURA_PENDENTE' %}selected{% endif %}>Assinatura Pendente</option>
+                        <option value="FALHA_AUTENTICACAO" {% if status_filtro == 'FALHA_AUTENTICACAO' %}selected{% endif %}>Falha de Autenticação</option>
+                        <option value="CANCELADO" {% if status_filtro == 'CANCELADO' %}selected{% endif %}>Cancelado</option>
+                        <option value="SUBSTITUIDO" {% if status_filtro == 'SUBSTITUIDO' %}selected{% endif %}>Substituído</option>
+                    </select>
+                    <button type="submit" class="px-4 py-2 rounded-xl g360-bg-dark text-white text-xs font-bold hover:bg-[#14532D] transition">
+                        <i class="ph ph-magnifying-glass"></i> Filtrar
+                    </button>
+                    {% if status_filtro or busca %}
+                    <a href="{{ url_for('gestoor_sign_painel') }}" class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold">Limpar</a>
+                    {% endif %}
+                </form>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left">
+                    <thead class="bg-[#0B3D2E]/5 text-[11px] uppercase font-extrabold text-[#0B3D2E] border-b border-emerald-900/10">
+                        <tr>
+                            <th class="px-5 py-3.5">Nº Contrato</th>
+                            <th class="px-5 py-3.5">Servidor / CPF</th>
+                            <th class="px-5 py-3.5">Data Geração</th>
+                            <th class="px-5 py-3.5">Data Assinatura</th>
+                            <th class="px-5 py-3.5">Técnico Responsável</th>
+                            <th class="px-5 py-3.5">Status</th>
+                            <th class="px-5 py-3.5">Modalidade</th>
+                            <th class="px-5 py-3.5 text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for item in linhas %}
+                        {% set c = item.contrato %}
+                        {% set s = item.sessao %}
+                        <tr class="hover:bg-emerald-50/30 transition-colors">
+                            <td class="px-5 py-3.5 font-extrabold text-[#0B3D2E] whitespace-nowrap">
+                                {{ c.num_contrato }}
+                                <span class="ml-1 px-1.5 py-0.5 rounded bg-emerald-100 text-[#0B3D2E] text-[10px]">v{{ c.versao or 1 }}</span>
+                            </td>
+                            <td class="px-5 py-3.5">
+                                <div class="font-bold text-slate-900">{{ c.contratado_nome }}</div>
+                                <div class="text-[11px] font-mono text-slate-500">{{ c.contratado_cpf | mask_cpf }}</div>
+                            </td>
+                            <td class="px-5 py-3.5 text-slate-600 whitespace-nowrap">{{ c.data_geracao | format_brt }}</td>
+                            <td class="px-5 py-3.5 text-slate-700 font-semibold whitespace-nowrap">
+                                {{ c.data_assinatura_eletronica | format_brt if c.data_assinatura_eletronica else '—' }}
+                            </td>
+                            <td class="px-5 py-3.5 text-slate-700 font-semibold">{{ item.tecnico_nome }}</td>
+                            <td class="px-5 py-3.5 whitespace-nowrap">
+                                {% if item.status == 'ASSINADO_ELETRONICAMENTE' %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 font-extrabold text-[10px]">
+                                    <i class="ph ph-seal-check text-sm text-[#10B981]"></i> ASSINADO ELETRONICAMENTE
+                                </span>
+                                {% elif item.status == 'AGUARDANDO_ASSINATURA' %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-extrabold text-[10px]">
+                                    <i class="ph ph-hourglass text-sm"></i> AGUARDANDO ASSINATURA
+                                </span>
+                                {% elif item.status == 'ASSINATURA_PENDENTE' %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-900 font-extrabold text-[10px]">
+                                    <i class="ph ph-clock-countdown text-sm"></i> ASSINATURA PENDENTE
+                                </span>
+                                {% elif item.status == 'FALHA_AUTENTICACAO' %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-extrabold text-[10px]">
+                                    <i class="ph ph-shield-warning text-sm"></i> FALHA AUTENTICAÇÃO
+                                </span>
+                                {% elif item.status == 'SUBSTITUIDO' %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 font-extrabold text-[10px]">
+                                    <i class="ph ph-git-branch text-sm"></i> SUBSTITUÍDO
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200 text-slate-700 font-extrabold text-[10px]">
+                                    <i class="ph ph-prohibit text-sm"></i> CANCELADO
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-5 py-3.5 text-[11px] text-slate-600 max-w-[180px]">
+                                <span class="font-semibold text-[#0B3D2E]">Simples</span> (OTP SMS)
+                            </td>
+                            <td class="px-5 py-3.5">
+                                <div class="flex items-center justify-center gap-1.5">
+                                    {% if has_perm('operate_gestoor_sign') and item.status in ('AGUARDANDO_ASSINATURA', 'ASSINATURA_PENDENTE', 'FALHA_AUTENTICACAO') %}
+                                    <a href="{{ url_for('gestoor_sign_assinar', contrato_id=c.id) }}"
+                                       class="px-3 py-1.5 rounded-lg g360-bg-dark hover:bg-[#14532D] text-white font-extrabold text-[11px] inline-flex items-center gap-1 shadow-sm transition">
+                                        <i class="ph ph-signature text-[#FACC15]"></i> Assinar
+                                    </a>
+                                    {% endif %}
+
+                                    {% if item.status == 'ASSINADO_ELETRONICAMENTE' and s %}
+                                    <a href="{{ url_for('gestoor_sign_download_contrato', assinatura_id=s.id) }}"
+                                       class="p-2 rounded-lg text-[#0B3D2E] hover:bg-emerald-100 transition" title="Baixar PDF Assinado">
+                                        <i class="ph ph-file-pdf text-lg"></i>
+                                    </a>
+                                    <a href="{{ url_for('gestoor_sign_download_evidencias', assinatura_id=s.id) }}"
+                                       class="p-2 rounded-lg text-[#10B981] hover:bg-emerald-50 transition" title="Baixar Relatório de Evidências">
+                                        <i class="ph ph-shield-check text-lg"></i>
+                                    </a>
+                                    {% endif %}
+
+                                    <button type="button" onclick="abrirHistorico({{ c.id }})"
+                                            class="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition" title="Consultar Histórico e Auditoria">
+                                        <i class="ph ph-clock-counter-clockwise text-lg"></i>
+                                    </button>
+
+                                    {% if has_perm('cancel_gestoor_sign') and item.status in ('AGUARDANDO_ASSINATURA', 'ASSINATURA_PENDENTE', 'FALHA_AUTENTICACAO') %}
+                                    <button type="button" onclick="cancelarContrato({{ c.id }}, '{{ c.num_contrato }}')"
+                                            class="p-2 rounded-lg text-rose-600 hover:bg-rose-50 transition" title="Cancelar Processo">
+                                        <i class="ph ph-prohibit text-lg"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" class="px-6 py-12 text-center text-slate-400 font-semibold">
+                                <i class="ph ph-signature text-4xl block mb-2 text-slate-300"></i>
+                                Nenhum contrato encontrado para os filtros selecionados.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- MODAL DE HISTÓRICO E AUDITORIA DA ASSINATURA -->
+    <div id="modalHistorico" class="fixed inset-0 bg-black/60 hidden z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl max-w-3xl w-full max-h-[88vh] flex flex-col shadow-2xl overflow-hidden border border-emerald-900/15">
+            <div class="g360-bg-dark text-white px-6 py-4 flex items-center justify-between border-b-4 border-[#FACC15]">
+                <div>
+                    <span class="text-[10px] font-extrabold uppercase tracking-widest text-[#FACC15]">Auditoria Gestoor Sign</span>
+                    <h3 id="histTitulo" class="text-base font-extrabold">Histórico da Assinatura</h3>
+                </div>
+                <button onclick="fecharHistorico()" class="text-white/70 hover:text-white p-1.5 rounded-lg hover:bg-white/10">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+            <div id="histCorpo" class="p-6 overflow-y-auto space-y-4 text-xs">
+                Carregando histórico...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function fecharHistorico() {
+            document.getElementById('modalHistorico').classList.add('hidden');
+        }
+
+        function abrirHistorico(contratoId) {
+            const modal = document.getElementById('modalHistorico');
+            const corpo = document.getElementById('histCorpo');
+            modal.classList.remove('hidden');
+            corpo.innerHTML = '<div class="py-8 text-center text-slate-400"><i class="ph ph-spinner animate-spin text-2xl"></i> Carregando...</div>';
+
+            fetch('/api/gestoor-sign/contrato/' + contratoId + '/historico')
+                .then(r => r.json())
+                .then(data => {
+                    if (!data.success) {
+                        corpo.innerHTML = '<div class="p-4 rounded-xl bg-rose-50 text-rose-700 font-bold">' + (data.message || 'Erro') + '</div>';
+                        return;
+                    }
+                    const c = data.contrato;
+                    document.getElementById('histTitulo').textContent = 'Contrato Nº ' + c.num_contrato + ' (v' + c.versao + ') — ' + c.servidor_nome;
+
+                    let html = `
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl p-4">
+                            <div><span class="text-[10px] font-bold uppercase text-slate-500 block">Status</span><strong class="text-[#0B3D2E]">${c.status_label}</strong></div>
+                            <div><span class="text-[10px] font-bold uppercase text-slate-500 block">CPF (LGPD)</span><strong class="font-mono">${c.cpf_mascarado}</strong></div>
+                            <div><span class="text-[10px] font-bold uppercase text-slate-500 block">Código Validação</span><strong class="font-mono text-[#0B3D2E]">${c.codigo_validacao || '—'}</strong></div>
+                        </div>`;
+
+                    if (c.hash_sha256) {
+                        html += `<div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><span class="text-[10px] font-bold uppercase text-slate-400 block">SHA-256 do Documento Assinado</span><span class="font-mono text-[11px] break-all text-[#0B3D2E]">${c.hash_sha256}</span></div>`;
+                    }
+
+                    html += '<h4 class="font-extrabold text-[#0B3D2E] uppercase tracking-wider text-[11px] pt-2">Linha do Tempo Cronológica (Hash Chain)</h4>';
+                    if (!data.eventos || data.eventos.length === 0) {
+                        html += '<p class="text-slate-400 italic">Nenhum evento do Gestoor Sign registrado para este contrato ainda.</p>';
+                    } else {
+                        html += '<div class="space-y-2.5">';
+                        data.eventos.forEach(ev => {
+                            html += `
+                                <div class="p-3 rounded-xl border border-slate-200 bg-white flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="px-2 py-0.5 rounded bg-[#0B3D2E] text-[#FACC15] text-[10px] font-extrabold">${ev.tipo_evento}</span>
+                                            <span class="text-[10px] font-bold text-slate-500">${ev.ator_tipo}</span>
+                                            <span class="text-[10px] text-slate-400">${ev.data_hora_brt}</span>
+                                        </div>
+                                        <p class="mt-1 text-slate-700 font-medium">${ev.descricao}</p>
+                                    </div>
+                                    <span class="font-mono text-[10px] text-slate-400 shrink-0">#${ev.hash_curto}</span>
+                                </div>`;
+                        });
+                        html += '</div>';
+                    }
+                    corpo.innerHTML = html;
+                })
+                .catch(err => {
+                    corpo.innerHTML = '<div class="p-4 rounded-xl bg-rose-50 text-rose-700 font-bold">Erro ao consultar histórico: ' + err + '</div>';
+                });
+        }
+
+        function cancelarContrato(contratoId, numContrato) {
+            const motivo = prompt('Informe o motivo obrigatório para cancelar o procedimento do Contrato Nº ' + numContrato + ':');
+            if (!motivo || motivo.trim().length < 5) {
+                if (motivo !== null) alert('Informe um motivo com pelo menos 5 caracteres.');
+                return;
+            }
+            fetch('/api/gestoor-sign/contrato/' + contratoId + '/cancelar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ motivo: motivo.trim() })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    window.location.reload();
+                } else {
+                    alert('Erro: ' + (res.message || 'Não foi possível cancelar.'));
+                }
+            });
+        }
+    </script>
+    <script src="{{ url_for('static', filename='js/inactivity.js') }}"></script>
+</body>
+</html>

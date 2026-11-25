@@ -268,6 +268,17 @@
                 </a>
                 {% endif %}
 
+                {% if has_perm('view_gestoor_sign') %}
+                <a href="{{ url_for('gestoor_sign_painel') }}"
+                    class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-emerald-50 hover:text-emerald-800 transition-colors dark:text-gray-200 dark:hover:bg-emerald-950/40">
+                    <div class="flex items-center gap-2.5">
+                        <i class="ph ph-signature text-base text-emerald-600"></i>
+                        <span>Gestoor Sign</span>
+                    </div>
+                    <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">SMS</span>
+                </a>
+                {% endif %}
+
                 <a href="{{ url_for('gerenciar_fotos') }}"
                     class="sidebar-nav-item w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 rounded-lg hover:bg-gray-100 transition-colors dark:text-gray-200 dark:hover:bg-gray-700">
                     <div class="flex items-center gap-2.5">

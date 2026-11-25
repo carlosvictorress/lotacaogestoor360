@@ -27,7 +27,12 @@
                 <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 mt-2">Contratos Gerados</h1>
                 <p class="text-slate-500 text-sm mt-0.5 font-medium">Histórico de contratos administrativos e extratos emitidos no sistema</p>
             </div>
-            <div class="flex gap-3">
+            <div class="flex flex-wrap gap-2.5">
+                {% if has_perm('view_gestoor_sign') %}
+                <a href="{{ url_for('gestoor_sign_painel') }}" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B3D2E] hover:bg-[#14532D] text-white shadow-sm border border-emerald-900 text-sm font-extrabold transition-all">
+                    <i class="ph ph-signature text-[#FACC15] text-lg"></i> Painel Gestoor Sign
+                </a>
+                {% endif %}
                 <a href="{{ url_for('sistema') }}" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white shadow-sm border border-slate-200 text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-all">
                     <i class="ph ph-arrow-left font-bold"></i> Voltar ao Sistema
                 </a>
@@ -73,7 +78,7 @@
                             <th class="px-6 py-4">Nº Contrato</th>
                             <th class="px-6 py-4">Servidor / CPF</th>
                             <th class="px-6 py-4">Função</th>
-                            <th class="px-6 py-4">Jornada</th>
+                            <th class="px-6 py-4">Status Assinatura</th>
                             <th class="px-6 py-4">Data da Assinatura</th>
                             <th class="px-6 py-4">Data da Geração</th>
                             <th class="px-6 py-4">Quem Gerou</th>
@@ -83,11 +88,13 @@
                     <tbody class="divide-y divide-slate-100">
                         {% for c in historico %}
                         {% set dt_ass_row = c.dt_assinatura or c.dt_inicio or (c.funcionario.dt_inicio if c.funcionario and c.funcionario.dt_inicio else None) %}
+                        {% set st_sign = c.status_assinatura or 'AGUARDANDO_ASSINATURA' %}
                         <tr class="hover:bg-slate-50/80 transition-colors">
-                            <td class="px-6 py-4 font-bold text-purple-700">
+                            <td class="px-6 py-4 font-bold text-[#0B3D2E]">
                                 {{ c.num_contrato }}
+                                <span class="ml-1 px-1.5 py-0.5 text-[10px] font-bold bg-emerald-100 text-[#0B3D2E] rounded">v{{ c.versao or 1 }}</span>
                                 {% if c.editado %}
-                                <span class="ml-2 px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full inline-flex items-center gap-1 cursor-help" 
+                                <span class="ml-1 px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full inline-flex items-center gap-1 cursor-help" 
                                       title="EDITADO POR: {{ c.quem_editou.username if c.quem_editou else 'Admin' }} em {{ c.data_edicao.strftime('%d/%m/%Y às %H:%M') if c.data_edicao else '' }}&#10;MOTIVO: {{ c.motivo_edicao }}">
                                     <i class="ph ph-pencil-simple-line"></i> Editado
                                 </span>
@@ -95,17 +102,43 @@
                             </td>
                             <td class="px-6 py-4">
                                 <div class="font-bold text-slate-900">{{ c.contratado_nome }}</div>
-                                <div class="text-xs text-slate-400">CPF: {{ c.contratado_cpf or 'N/A' }}</div>
+                                <div class="text-xs text-slate-400 font-mono">CPF: {{ c.contratado_cpf | mask_cpf if c.contratado_cpf else 'N/A' }}</div>
                             </td>
                             <td class="px-6 py-4 text-slate-600 font-medium">{{ c.funcao_nome or 'N/A' }}</td>
-                            <td class="px-6 py-4 text-slate-600">{{ c.jornada_trabalho or 'N/A' }}</td>
                             <td class="px-6 py-4">
-                                {% if current_user.is_admin %}
+                                {% if st_sign == 'ASSINADO_ELETRONICAMENTE' %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-900 font-extrabold text-[10px]">
+                                    <i class="ph ph-seal-check text-emerald-600"></i> ASSINADO ELETRONICAMENTE
+                                </span>
+                                {% elif st_sign == 'ASSINATURA_PENDENTE' %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-900 font-extrabold text-[10px]">
+                                    <i class="ph ph-clock-countdown"></i> PENDENTE
+                                </span>
+                                {% elif st_sign == 'FALHA_AUTENTICACAO' %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-extrabold text-[10px]">
+                                    <i class="ph ph-shield-warning"></i> FALHA AUTH
+                                </span>
+                                {% elif st_sign == 'SUBSTITUIDO' %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-800 font-extrabold text-[10px]">
+                                    <i class="ph ph-git-branch"></i> SUBSTITUÍDO
+                                </span>
+                                {% elif st_sign == 'CANCELADO' %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-slate-200 text-slate-700 font-extrabold text-[10px]">
+                                    <i class="ph ph-prohibit"></i> CANCELADO
+                                </span>
+                                {% else %}
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-900 font-extrabold text-[10px]">
+                                    <i class="ph ph-hourglass"></i> AGUARDANDO ASSINATURA
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4">
+                                {% if has_perm('manage_contratos') and st_sign not in ('ASSINADO_ELETRONICAMENTE', 'CANCELADO', 'SUBSTITUIDO') %}
                                 <div class="flex items-center gap-1.5">
                                     <input type="date" id="row_dt_ass_{{ c.id }}" value="{{ dt_ass_row.isoformat() if dt_ass_row else '' }}"
                                         onchange="alterarDataAssinaturaRapido({{ c.id }}, this.value, this)"
-                                        class="px-2.5 py-1.5 bg-purple-50/70 hover:bg-purple-100/70 border border-purple-200 rounded-lg text-xs font-bold text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-500 transition cursor-pointer"
-                                        title="Altere a data de assinatura diretamente aqui (salva automaticamente para o Contrato e Extrato sem exigir justificativa e sem marcar como Editado)">
+                                        class="px-2.5 py-1.5 bg-emerald-50/70 hover:bg-emerald-100/70 border border-emerald-200 rounded-lg text-xs font-bold text-[#0B3D2E] focus:outline-none focus:ring-2 focus:ring-emerald-500 transition cursor-pointer"
+                                        title="Altere a data de assinatura diretamente aqui (antes da assinatura eletrônica)">
                                     <span id="status_dt_ass_{{ c.id }}" class="text-[11px] font-bold text-emerald-600 hidden whitespace-nowrap">
                                         <i class="ph ph-check-circle"></i> Salvo
                                     </span>
@@ -121,9 +154,21 @@
                                 {{ c.quem_gerou.username if c.quem_gerou else 'Sistema' }}
                             </td>
                             <td class="px-6 py-4 text-center">
-                                <div class="flex items-center justify-center gap-2">
+                                <div class="flex items-center justify-center gap-1.5">
+                                    {% if has_perm('operate_gestoor_sign') and st_sign in ('AGUARDANDO_ASSINATURA', 'ASSINATURA_PENDENTE', 'FALHA_AUTENTICACAO') %}
+                                    <a href="{{ url_for('gestoor_sign_assinar', contrato_id=c.id) }}"
+                                        class="px-2.5 py-1.5 bg-[#0B3D2E] hover:bg-[#14532D] text-white rounded-lg text-[11px] font-extrabold inline-flex items-center gap-1 transition shadow-sm" title="Assinar Contrato Presencialmente — Gestoor Sign">
+                                        <i class="ph ph-signature text-[#FACC15]"></i> Assinar
+                                    </a>
+                                    {% elif st_sign == 'ASSINADO_ELETRONICAMENTE' %}
+                                    <a href="{{ url_for('gestoor_sign_assinar', contrato_id=c.id) }}"
+                                        class="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-[#0B3D2E] rounded-lg text-[11px] font-extrabold inline-flex items-center gap-1 transition" title="Ver Selo, QR Code e Downloads">
+                                        <i class="ph ph-seal-check text-emerald-700"></i> Selo
+                                    </a>
+                                    {% endif %}
+
                                     <a href="{{ url_for('visualizar_contrato_documento', id=c.id) }}" target="_blank" 
-                                        class="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition" title="Imprimir Contrato Completo (5 Págs)">
+                                        class="p-2 text-[#0B3D2E] hover:bg-emerald-50 rounded-lg transition" title="Visualizar / Imprimir Contrato Completo">
                                         <i class="ph ph-printer text-xl"></i>
                                     </a>
                                     <a href="{{ url_for('visualizar_contrato_extrato', id=c.id) }}" target="_blank" 
@@ -131,7 +176,7 @@
                                         <i class="ph ph-file-text text-xl"></i>
                                     </a>
                                     
-                                    {% if current_user.is_admin %}
+                                    {% if has_perm('manage_contratos') and st_sign not in ('CANCELADO', 'SUBSTITUIDO') %}
                                     <button type="button" onclick='abrirModalEditarContrato({
                                         id: {{ c.id }},
                                         num_contrato: {{ c.num_contrato|tojson }},
@@ -149,15 +194,17 @@
                                         dt_inicio: {{ (c.dt_inicio.isoformat() if c.dt_inicio else None)|tojson }},
                                         dt_termino: {{ (c.dt_termino.isoformat() if c.dt_termino else None)|tojson }},
                                         dt_assinatura: {{ (c.dt_assinatura.isoformat() if c.dt_assinatura else (c.dt_inicio.isoformat() if c.dt_inicio else (c.funcionario.dt_inicio.isoformat() if c.funcionario and c.funcionario.dt_inicio else None)))|tojson }},
-                                        representante_nome: {{ (c.representante_nome or "MARIA EDNA DE SOUSA QUARESMA")|tojson }},
-                                        representante_cargo: {{ (c.representante_cargo or "Secretária Municipal de Educação")|tojson }},
-                                        representante_rg_cpf: {{ (c.representante_rg_cpf or "676.079.263-72")|tojson }},
-                                        representante_endereco: {{ (c.representante_endereco or "Rua Coronel Anibal Martins, nº 455 - Novo Horizonte, Valença do Piauí - PI")|tojson }},
+                                        representante_nome: {{ (c.representante_nome or "")|tojson }},
+                                        representante_cargo: {{ (c.representante_cargo or "")|tojson }},
+                                        representante_rg_cpf: {{ (c.representante_rg_cpf or "")|tojson }},
+                                        representante_endereco: {{ (c.representante_endereco or "")|tojson }},
                                         motivo_edicao: {{ (c.motivo_edicao or "")|tojson }}
-                                    })' class="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition" title="Editar Contrato">
+                                    })' class="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition" title="{{ 'Retificar (Gerar Nova Versão)' if st_sign == 'ASSINADO_ELETRONICAMENTE' else 'Editar Contrato' }}">
                                         <i class="ph ph-pencil-simple text-xl"></i>
                                     </button>
+                                    {% endif %}
 
+                                    {% if has_perm('delete_permanently') and st_sign == 'AGUARDANDO_ASSINATURA' %}
                                     <form action="{{ url_for('excluir_contrato', id=c.id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja excluir o registro deste contrato?');" class="inline">
                                         <button type="submit" class="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition" title="Excluir Registro">
                                             <i class="ph ph-trash text-xl"></i>

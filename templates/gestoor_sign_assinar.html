@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GESTOOR SIGN — Assinatura Presencial • Contrato Nº {{ contrato.num_contrato }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: #f4f7f5; color: #0f172a; }
+        .g360-bg-dark { background-color: #0B3D2E; }
+        .g360-bg-dark-2 { background-color: #14532D; }
+        .g360-accent-green { color: #10B981; }
+        .g360-accent-yellow { color: #FACC15; }
+        .contract-doc { font-family: 'Times New Roman', Times, serif; color: #111827; line-height: 1.5; font-size: 10.5pt; }
+        .contract-doc p { text-align: justify; margin-bottom: 10px; }
+        .contract-doc h4 { font-weight: 700; margin-top: 12px; margin-bottom: 4px; font-size: 10.5pt; }
+        .step-connector { height: 3px; flex: 1; background: #d1d5db; transition: background 0.3s; }
+        .step-connector.done { background: #10B981; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- CABEÇALHO INSTITUCIONAL GESTOOR SIGN (VERDE-ESCURO + VERDE VIVO + AMARELO) -->
+    <header class="g360-bg-dark text-white border-b-4 border-[#FACC15] sticky top-0 z-40 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-[#10B981]/20 border border-[#10B981]/40 flex items-center justify-center text-[#FACC15]">
+                    <i class="ph ph-signature text-2xl"></i>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-xs font-extrabold uppercase tracking-widest text-[#FACC15]">GESTOOR SIGN</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#10B981]/20 text-emerald-200 border border-[#10B981]/40">Assinatura Presencial • RH</span>
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-white">Contrato Nº {{ contrato.num_contrato }} (v{{ contrato.versao or 1 }})</span>
+                    </div>
+                    <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-white mt-0.5">
+                        Assinatura Eletrônica de Contrato — {{ contrato.contratado_nome }}
+                    </h1>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <a href="{{ url_for('visualizar_contrato_documento', id=contrato.id) }}" target="_blank"
+                   class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition">
+                    <i class="ph ph-file-text text-base text-[#FACC15]"></i> Ver Documento
+                </a>
+                <a href="{{ url_for('gestoor_sign_painel') }}"
+                   class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#10B981] hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm">
+                    <i class="ph ph-arrow-left text-base"></i> Painel Gestoor Sign
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6 flex-1">
+
+        <!-- BARRA DE PROGRESSO VISUAL DAS 6 ETAPAS -->
+        <section class="bg-white rounded-2xl shadow-sm border border-emerald-900/10 p-5">
+            <div class="flex items-center justify-between mb-4">
+                <span class="text-xs font-extrabold uppercase tracking-wider text-[#0B3D2E] flex items-center gap-1.5">
+                    <i class="ph ph-list-checks text-base text-[#10B981]"></i> Progresso do Procedimento Presencial
+                </span>
+                <span id="badgeEtapaTexto" class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-50 text-[#0B3D2E] border border-emerald-200">
+                    Etapa {{ etapa_atual }} de 6
+                </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3" id="stepperGrid">
+                {% set etapas = [
+                    (1, 'Contrato gerado', 'ph-file-plus'),
+                    (2, 'Contrato conferido', 'ph-eyeglasses'),
+                    (3, 'Código enviado', 'ph-chat-text'),
+                    (4, 'Código validado', 'ph-shield-check'),
+                    (5, 'Concordância confirmada', 'ph-hand-pointing'),
+                    (6, 'Contrato assinado', 'ph-seal-check')
+                ] %}
+                {% for num, titulo, icone in etapas %}
+                <div data-step="{{ num }}" class="step-card rounded-xl p-3 border transition-all flex items-center gap-2.5
+                    {% if etapa_atual >= num %}bg-emerald-50/90 border-[#10B981] text-[#0B3D2E]{% else %}bg-slate-50 border-slate-200 text-slate-400{% endif %}">
+                    <div class="step-icon w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold
+                        {% if etapa_atual > num or (etapa_atual == 6 and num == 6) %}bg-[#10B981] text-white{% elif etapa_atual == num %}bg-[#0B3D2E] text-[#FACC15]{% else %}bg-slate-200 text-slate-500{% endif %}">
+                        <i class="ph {{ 'ph-check-bold' if (etapa_atual > num or (etapa_atual == 6 and num == 6)) else icone }} text-base"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="text-[10px] font-bold uppercase tracking-wider opacity-70">Etapa {{ num }}</div>
+                        <div class="text-xs font-extrabold leading-tight truncate">{{ titulo }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- ALERTAS DE BLOQUEIO / POLÍTICA MUNICIPAL / HOMOLOGAÇÃO -->
+        {% if erro_inicio %}
+        <div class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-sm font-semibold flex items-center gap-3">
+            <i class="ph ph-warning-octagon text-2xl text-rose-600 shrink-0"></i>
+            <div>{{ erro_inicio }}</div>
+        </div>
+        {% endif %}
+
+        {% if not permitido_sms %}
+        <div class="p-4 rounded-2xl bg-amber-50 border-2 border-[#EAB308] text-amber-950 text-sm flex items-start gap-3">
+            <i class="ph ph-scales text-2xl text-amber-600 shrink-0 mt-0.5"></i>
+            <div>
+                <p class="font-extrabold">Bloqueado pela Regulamentação Municipal (Modalidade Mínima: {{ modalidade_exigida }})</p>
+                <p class="text-xs mt-1 leading-relaxed">{{ msg_modalidade }}</p>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if sms_diag.provider == 'homologacao_local' and not sms_diag.ambiente_producao %}
+        <div class="p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                <i class="ph ph-flask text-lg text-amber-600"></i>
+                <span><strong>Ambiente de Homologação Local:</strong> o envio SMS está em modo simulado para testes. Em produção (Railway), apenas a API oficial <strong>Comtele</strong> é permitida.</span>
+            </div>
+        </div>
+        {% elif not sms_diag.configurado %}
+        <div class="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-900 text-xs font-semibold flex items-center gap-2">
+            <i class="ph ph-plugs text-lg text-rose-600"></i>
+            <span><strong>Provedor SMS ({{ sms_diag.provider|upper }}):</strong> {{ sms_diag.detalhe }}</span>
+        </div>
+        {% endif %}
+
+        <!-- RESUMO DO CONTRATO E IDENTIFICAÇÃO DO SERVIDOR (LGPD) -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            <div class="bg-white rounded-2xl p-4 border border-emerald-900/10 shadow-sm">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Nº do Contrato / Versão</span>
+                <p class="text-base font-extrabold text-[#0B3D2E] mt-0.5">{{ contrato.num_contrato }} <span class="text-xs font-bold text-[#10B981]">v{{ contrato.versao or 1 }}</span></p>
+                <span class="text-[11px] text-slate-500">Gerado em {{ contrato.data_geracao | format_brt }}</span>
+            </div>
+            <div class="bg-white rounded-2xl p-4 border border-emerald-900/10 shadow-sm lg:col-span-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Servidor Signatário</span>
+                <p class="text-sm font-extrabold text-slate-900 mt-0.5 truncate">{{ contrato.contratado_nome }}</p>
+                <div class="flex items-center gap-4 mt-1 text-xs text-slate-600 font-semibold">
+                    <span><i class="ph ph-identification-card text-[#10B981]"></i> CPF: <strong class="font-mono">{{ contrato.contratado_cpf | mask_cpf }}</strong></span>
+                    <span><i class="ph ph-device-mobile text-[#10B981]"></i> Celular: <strong id="hdrTelefoneMask" class="font-mono">{{ (sessao.telefone_mascarado if sessao else (telefone_servidor | mask_phone)) }}</strong></span>
+                </div>
+            </div>
+            <div class="bg-white rounded-2xl p-4 border border-emerald-900/10 shadow-sm">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Classificação Jurídica</span>
+                <p class="text-xs font-extrabold text-[#0B3D2E] mt-1">Assinatura Eletrônica Simples</p>
+                <span class="text-[10px] text-slate-500 leading-tight block mt-0.5">Lei nº 14.063/2020 (art. 4º, I) • Presencial OTP SMS</span>
+            </div>
+            <div class="bg-white rounded-2xl p-4 border border-emerald-900/10 shadow-sm">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Técnico do RH Condutor</span>
+                <p class="text-xs font-extrabold text-slate-900 mt-1 truncate">{{ current_user.nome_completo or current_user.username }}</p>
+                <span class="text-[10px] text-emerald-700 font-semibold block mt-0.5">{{ user_role_label }}</span>
+            </div>
+        </section>
+
+        <!-- LAYOUT PRINCIPAL: ESQUERDA (CONTRATO INTEGRAL) | DIREITA (ETAPAS INTERATIVAS) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+            <!-- COLUNA ESQUERDA (7 cols): VISUALIZAÇÃO INTEGRAL DO CONTRATO -->
+            <section class="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-emerald-900/10 overflow-hidden">
+                <div class="g360-bg-dark px-5 py-3.5 flex items-center justify-between text-white">
+                    <div class="flex items-center gap-2">
+                        <i class="ph ph-article text-lg text-[#FACC15]"></i>
+                        <h2 class="text-sm font-extrabold tracking-tight">Visualização Integral do Contrato para Conferência</h2>
+                    </div>
+                    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/10 text-emerald-200">
+                        Leia junto com o servidor
+                    </span>
+                </div>
+
+                <div class="p-6 sm:p-8 max-h-[680px] overflow-y-auto contract-doc bg-white">
+                    <div class="text-center mb-4">
+                        <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre Oficial" class="max-h-20 mx-auto object-contain mb-3">
+                        <div class="font-bold text-sm uppercase">CONTRATO ADMINISTRATIVO Nº {{ contrato_ctx.num_contrato }} {% if contrato_ctx.versao > 1 %}(VERSÃO {{ contrato_ctx.versao }}){% endif %}</div>
+                    </div>
+
+                    <div class="ml-auto w-full sm:w-2/3 text-xs font-bold text-justify mb-4 p-2.5 bg-slate-50 border-l-2 border-[#0B3D2E]">
+                        CONTRATO DE PRESTAÇÃO DE SERVIÇOS TEMPORÁRIO FIRMADO ENTRE O {{ contrato_ctx.municipio_nome|upper }} – {{ contrato_ctx.secretaria_nome|upper }} E {{ contrato_ctx.contratado_nome|upper }} PARA ATUAÇÃO COMO {{ contrato_ctx.funcao_nome|upper }}, NOS TERMOS DO ART. 37, INCISO IX DA CONSTITUIÇÃO FEDERAL.
+                    </div>
+
+                    <p style="text-indent: 2em;">
+                        Pelo presente instrumento particular, de um lado o <strong>{{ contrato_ctx.municipio_nome|upper }} – {{ contrato_ctx.secretaria_nome|upper }}</strong>, CNPJ nº {{ contrato_ctx.secretaria_cnpj }}, com sede na {{ contrato_ctx.secretaria_endereco }}, representada neste ato por {{ contrato_ctx.representante_cargo or 'Secretário(a) Municipal' }}, o(a) Sr.(a) {{ contrato_ctx.representante_nome }}, CPF/RG nº {{ contrato_ctx.representante_rg_cpf }}, residente e domiciliado(a) na {{ contrato_ctx.representante_endereco }}, doravante denominado <strong>CONTRATANTE</strong>, e de outro lado o(a) Sr.(a) <strong>{{ contrato_ctx.contratado_nome }}</strong>, {{ contrato_ctx.contratado_nacionalidade }}, {{ contrato_ctx.contratado_naturalidade }}, {{ contrato_ctx.contratado_estado_civil }}, RG nº {{ contrato_ctx.contratado_rg }} e CPF nº {{ contrato_ctx.contratado_cpf }}, residente e domiciliado(a) na {{ contrato_ctx.contratado_endereco }}, doravante denominado <strong>CONTRATADO</strong>, celebram o presente instrumento mediante as cláusulas e condições seguintes:
+                    </p>
+
+                    <h4>1 – DO OBJETO</h4>
+                    <p><strong>CLÁUSULA PRIMEIRA</strong> – O objeto do presente contrato é a contratação do Servidor Temporário para atender ao Excepcional Interesse Público, para a prestação de serviços na função de <strong>{{ contrato_ctx.funcao_nome }}</strong>, atendidas as determinações da {{ contrato_ctx.secretaria_nome }}, conforme Constituição Federal, artigo 37, inciso IX.</p>
+                    <p><strong>PARÁGRAFO ÚNICO</strong> – Os trabalhos serão desenvolvidos em estrita observância às cláusulas deste contrato, principalmente no tocante às obrigações do CONTRATADO.</p>
+
+                    <h4>2 – DO PREÇO</h4>
+                    <p><strong>CLÁUSULA SEGUNDA</strong> – A CONTRATANTE pagará ao CONTRATADO o valor mensal de <strong>{{ contrato_ctx.remuneracao_formatada }}</strong> ({{ contrato_ctx.remuneracao_extenso }}), estando incluídos todos os insumos, taxas, encargos e demais despesas.</p>
+
+                    <h4>3 – DA JORNADA DE TRABALHO</h4>
+                    <p><strong>CLÁUSULA TERCEIRA</strong> – A jornada de trabalho do CONTRATADO durante a vigência do presente contrato é de <strong>{{ contrato_ctx.jornada_trabalho }}</strong>.</p>
+
+                    <h4>4 – DO PRAZO</h4>
+                    <p><strong>CLÁUSULA QUARTA</strong> – O contratado trabalhará em caráter de excepcionalidade, contados a partir de <strong>{{ contrato_ctx.dt_inicio_extenso }}</strong> a <strong>{{ contrato_ctx.dt_termino_extenso }}</strong>.</p>
+                    <p><strong>PARÁGRAFO ÚNICO</strong> – O presente contrato poderá ser rescindido a qualquer tempo por acordo entre as partes, ou unilateralmente pela CONTRATANTE no caso de descumprimento contratual, prevalecendo sempre o interesse público.</p>
+
+                    <h4>5 – DA EXECUÇÃO DOS SERVIÇOS</h4>
+                    <p><strong>CLÁUSULA QUINTA</strong> – Na execução dos serviços o CONTRATADO se obriga a respeitar rigorosamente as normas de higiene, segurança e qualidade determinadas pelo CONTRATANTE, comunicando por escrito qualquer anormalidade verificada.</p>
+
+                    <h4>6 – DAS OBRIGAÇÕES DO CONTRATANTE</h4>
+                    <p><strong>CLÁUSULA SEXTA</strong> – Fornecer elementos necessários ao objeto, proceder à vistoria dos serviços e efetuar a retenção previdenciária obrigatória (Leis nº 8.212/91 e 8.213/91).</p>
+
+                    <h4>7 – DAS OBRIGAÇÕES DO CONTRATADO</h4>
+                    <p><strong>CLÁUSULA SÉTIMA</strong> – Arcar com despesas vinculadas à execução, atuar com esmero técnico, responsabilizar-se por danos causados à Administração ou a terceiros e sujeitar-se à fiscalização do CONTRATANTE.</p>
+
+                    <h4>8 – DA DOTAÇÃO ORÇAMENTÁRIA</h4>
+                    <p><strong>CLÁUSULA OITAVA</strong> – As despesas correrão por conta do Orçamento Anual do Município do exercício de {{ contrato_ctx.ano_exercicio }} (FUNDEB, FPM, IPVA, ICMS e Arrecadação Própria).</p>
+
+                    <h4>9 – DAS PENALIDADES</h4>
+                    <p><strong>CLÁUSULA NONA</strong> – Aplicam-se as penalidades previstas no Estatuto dos Servidores Públicos do {{ contrato_ctx.municipio_nome }}.</p>
+
+                    <h4>10 – DA RESCISÃO</h4>
+                    <p><strong>CLÁUSULA DÉCIMA</strong> – O contrato estará rescindido automaticamente ao término do prazo estipulado na Cláusula Quarta ou na hipótese de falta funcional prevista no Estatuto dos Servidores Públicos.</p>
+
+                    <h4>11 – DAS DISPOSIÇÕES GERAIS</h4>
+                    <p><strong>CLÁUSULA DÉCIMA PRIMEIRA</strong> – O CONTRATADO assume exclusiva responsabilidade pelas obrigações trabalhistas, previdenciárias, civis e fiscais decorrentes da execução deste contrato, sem solidariedade do CONTRATANTE.</p>
+
+                    <h4>12 – DO FORO</h4>
+                    <p><strong>CLÁUSULA DÉCIMA SEGUNDA</strong> – Fica eleito o Foro da Comarca de {{ contrato_ctx.municipio_cidade }} – {{ contrato_ctx.municipio_uf }} para dirimir quaisquer dúvidas pertinentes ao presente contrato.</p>
+
+                    <p class="text-center font-bold mt-5">{{ contrato_ctx.municipio_cidade }}/{{ contrato_ctx.municipio_uf }}, {{ contrato_ctx.dt_assinatura_extenso }}.</p>
+                </div>
+            </section>
+
+            <!-- COLUNA DIREITA (5 cols): CONDUÇÃO PRESENCIAL DAS ETAPAS 3, 4, 5 E 6 -->
+            <section class="lg:col-span-5 space-y-4">
+
+                <!-- MENSAGEM DE FEEDBACK DINÂMICO -->
+                <div id="signAlertBox" class="hidden p-4 rounded-2xl text-xs font-bold flex items-start gap-2.5 shadow-sm"></div>
+
+                {% if sessao and sessao.status == 'ASSINADO_ELETRONICAMENTE' %}
+                <!-- ETAPA 6: CONTRATO JÁ ASSINADO ELETRONICAMENTE -->
+                <div class="bg-white rounded-2xl shadow-md border-2 border-[#10B981] overflow-hidden">
+                    <div class="g360-bg-dark text-white p-5 border-b-4 border-[#FACC15]">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-2xl bg-[#10B981] text-white flex items-center justify-center shadow-lg">
+                                <i class="ph ph-seal-check text-3xl"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-[#FACC15]">Etapa 6 Concluída</span>
+                                <h3 class="text-lg font-extrabold">ASSINADO ELETRONICAMENTE</h3>
+                                <p class="text-xs text-emerald-200">{{ sessao.assinado_em | format_brt }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        <div class="flex items-center gap-4 bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
+                            {% if qrcode_uri %}
+                            <img src="{{ qrcode_uri }}" alt="QR Code Autenticidade" class="w-24 h-24 rounded-lg border border-emerald-300 bg-white p-1 shrink-0">
+                            {% endif %}
+                            <div class="min-w-0 space-y-1 text-xs">
+                                <div class="text-[10px] font-bold uppercase text-emerald-700">Código Único de Validação</div>
+                                <div class="font-mono font-extrabold text-sm text-[#0B3D2E] break-all">{{ sessao.codigo_validacao }}</div>
+                                <div class="text-[11px] text-slate-600">Modalidade: <strong>Assinatura Eletrônica Simples</strong></div>
+                                <a href="{{ validar_url }}" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-bold text-[#0B3D2E] underline hover:text-[#10B981]">
+                                    <i class="ph ph-qr-code"></i> Abrir Validador Público
+                                </a>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-50 rounded-xl p-3 border border-slate-200 text-[11px] space-y-1">
+                            <div class="font-bold text-slate-500 uppercase text-[10px]">Hash SHA-256 do Documento Assinado</div>
+                            <div class="font-mono text-[10px] text-[#0B3D2E] break-all">{{ sessao.hash_documento_final_sha256 }}</div>
+                        </div>
+
+                        <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-100 text-xs text-emerald-900 flex items-center gap-2">
+                            <i class="ph ph-folder-lock text-lg text-[#10B981]"></i>
+                            <span>Cópia selada arquivada automaticamente no <strong>Dossiê Digital (GED)</strong> do servidor.</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                            <a href="{{ url_for('gestoor_sign_download_contrato', assinatura_id=sessao.id) }}"
+                               class="w-full py-3 px-4 rounded-xl g360-bg-dark hover:bg-[#14532D] text-white font-extrabold text-xs text-center inline-flex items-center justify-center gap-2 shadow-sm transition">
+                                <i class="ph ph-file-pdf text-lg text-[#FACC15]"></i> Baixar Contrato Assinado
+                            </a>
+                            <a href="{{ url_for('gestoor_sign_download_evidencias', assinatura_id=sessao.id) }}"
+                               class="w-full py-3 px-4 rounded-xl bg-[#10B981] hover:bg-emerald-600 text-white font-extrabold text-xs text-center inline-flex items-center justify-center gap-2 shadow-sm transition">
+                                <i class="ph ph-shield-check text-lg"></i> Relatório de Evidências
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                {% elif sessao and permitido_sms and contrato.status_assinatura not in ('CANCELADO', 'SUBSTITUIDO') %}
+
+                <!-- CARD ETAPA 3: CONFIRMAÇÃO PRESENCIAL & CELULAR DO SERVIDOR -->
+                <div id="cardEtapa3" class="bg-white rounded-2xl shadow-sm border border-emerald-900/15 p-5 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-7 h-7 rounded-lg g360-bg-dark text-[#FACC15] text-xs font-extrabold flex items-center justify-center">3</span>
+                            <div>
+                                <h3 class="text-sm font-extrabold text-[#0B3D2E]">Conferência Presencial (Técnico RH)</h3>
+                                <p class="text-[11px] text-slate-500">Confirme presença, dados e celular do servidor antes do SMS</p>
+                            </div>
+                        </div>
+                        <span id="badgeEtapa3Done" class="{% if etapa_atual >= 2 %}{% else %}hidden{% endif %} text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Conferido</span>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+                            Telefone Celular Confirmado com o Servidor (DDD + 9 dígitos)*
+                        </label>
+                        <input type="text" id="inputTelefoneServidor" value="{{ telefone_servidor }}"
+                               placeholder="(89) 99999-1234"
+                               {% if etapa_atual >= 4 %}disabled{% endif %}
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-slate-50 text-sm font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#10B981]">
+                        <p class="text-[11px] text-slate-500 mt-1">O código de autenticação de uso único será enviado exclusivamente para o aparelho celular em posse do servidor.</p>
+                    </div>
+
+                    <div class="space-y-2.5 bg-emerald-50/60 border border-emerald-200/80 rounded-xl p-3.5 text-xs text-slate-800">
+                        <label class="flex items-start gap-2.5 cursor-pointer">
+                            <input type="checkbox" id="chkPresenca" {% if sessao.presenca_confirmada_em %}checked{% endif %} {% if etapa_atual >= 4 %}disabled{% endif %}
+                                   class="mt-0.5 w-4 h-4 accent-[#0B3D2E] rounded">
+                            <span>Confirmo que o servidor <strong>{{ contrato.contratado_nome }}</strong> encontra-se <strong>presencialmente no setor de RH</strong> e teve sua identidade conferida.</span>
+                        </label>
+                        <label class="flex items-start gap-2.5 cursor-pointer">
+                            <input type="checkbox" id="chkDadosConferidos" {% if sessao.contrato_conferido_em %}checked{% endif %} {% if etapa_atual >= 4 %}disabled{% endif %}
+                                   class="mt-0.5 w-4 h-4 accent-[#0B3D2E] rounded">
+                            <span>Confirmo que os dados cadastrais, o número de celular e o <strong>conteúdo integral do contrato</strong> foram apresentados ao servidor para leitura.</span>
+                        </label>
+                    </div>
+
+                    <button type="button" id="btnConfirmarConferencia" onclick="confirmarConferencia()"
+                            {% if etapa_atual >= 4 %}disabled{% endif %}
+                            class="w-full py-2.5 px-4 rounded-xl g360-bg-dark hover:bg-[#14532D] disabled:opacity-50 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition shadow-sm">
+                        <i class="ph ph-check-circle text-base text-[#FACC15]"></i>
+                        <span>{% if etapa_atual >= 2 %}Atualizar Conferência e Congelar Versão{% else %}Confirmar Presença e Liberar Envio de SMS{% endif %}</span>
+                    </button>
+                </div>
+
+                <!-- CARD ETAPA 4: AUTENTICAÇÃO POR SMS (OTP DE USO ÚNICO) -->
+                <div id="cardEtapa4" class="bg-white rounded-2xl shadow-sm border border-emerald-900/15 p-5 space-y-4 {% if etapa_atual < 2 %}opacity-60 pointer-events-none{% endif %}">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2.5">
+                            <span class="w-7 h-7 rounded-lg g360-bg-dark text-[#FACC15] text-xs font-extrabold flex items-center justify-center">4</span>
+                            <div>
+                                <h3 class="text-sm font-extrabold text-[#0B3D2E]">Autenticação por Código SMS</h3>
+                                <p class="text-[11px] text-slate-500">Código temporário de uso único • Destino: <strong id="lblTelSms">{{ sessao.telefone_mascarado }}</strong></p>
+                            </div>
+                        </div>
+                        <span id="badgeEtapa4Done" class="{% if etapa_atual >= 4 %}{% else %}hidden{% endif %} text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Validado</span>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row gap-2.5">
+                        <button type="button" id="btnEnviarSms" onclick="enviarCodigoSms()"
+                                {% if etapa_atual >= 4 %}disabled{% endif %}
+                                class="flex-1 py-2.5 px-4 rounded-xl bg-[#10B981] hover:bg-emerald-600 disabled:opacity-50 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition shadow-sm">
+                            <i class="ph ph-paper-plane-tilt text-base"></i>
+                            <span id="txtBtnSms">{% if etapa_atual >= 3 %}Reenviar código SMS{% else %}Enviar código SMS{% endif %}</span>
+                        </button>
+                        <div id="boxTimerSms" class="hidden px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold flex items-center justify-center gap-1.5">
+                            <i class="ph ph-timer text-base text-amber-600"></i>
+                            <span id="txtTimerSms">--:--</span>
+                        </div>
+                    </div>
+
+                    <!-- Aviso exclusivo de ambiente homologacao_local (nunca renderizado em produção) -->
+                    <div id="boxHomologOtp" class="hidden p-3 rounded-xl bg-amber-100 border border-amber-400 text-amber-950 text-xs font-bold"></div>
+
+                    <div id="areaValidarOtp" class="space-y-2.5 pt-2 border-t border-slate-100 {% if etapa_atual < 3 %}hidden{% endif %}">
+                        <label class="block text-[11px] font-bold uppercase text-slate-600">
+                            Informe o código recebido no celular do servidor:
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="text" id="inputCodigoOtp" maxlength="8" inputmode="numeric" autocomplete="one-time-code"
+                                   placeholder="000000"
+                                   {% if etapa_atual >= 4 %}disabled{% endif %}
+                                   class="flex-1 px-4 py-2.5 rounded-xl border-2 border-emerald-900/20 bg-white text-center text-lg font-mono font-extrabold tracking-[0.35em] text-[#0B3D2E] focus:outline-none focus:border-[#10B981]">
+                            <button type="button" id="btnValidarOtp" onclick="validarCodigoOtp()"
+                                    {% if etapa_atual >= 4 %}disabled{% endif %}
+                                    class="px-5 py-2.5 rounded-xl g360-bg-dark hover:bg-[#14532D] disabled:opacity-50 text-white font-extrabold text-xs transition flex items-center gap-1.5">
+                                <i class="ph ph-shield-check text-base text-[#FACC15]"></i> Validar
+                            </button>
+                        </div>
+                        <p class="text-[11px] text-slate-500">
+                            <i class="ph ph-info text-[#10B981]"></i> Antes de confirmar a assinatura, garanta que o servidor teve acesso integral ao contrato e manifesta livre concordância.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- CARD ETAPA 5: MANIFESTAÇÃO DE VONTADE (TELA EXCLUSIVA DO SERVIDOR) -->
+                <div id="cardEtapa5" class="bg-white rounded-2xl shadow-sm border-2 border-[#FACC15] p-5 space-y-4 {% if etapa_atual < 4 %}opacity-50 pointer-events-none{% endif %}">
+                    <div class="flex items-center gap-2.5">
+                        <span class="w-7 h-7 rounded-lg bg-[#FACC15] text-[#0B3D2E] text-xs font-extrabold flex items-center justify-center">5</span>
+                        <div>
+                            <h3 class="text-sm font-extrabold text-[#0B3D2E]">Manifestação de Vontade do Servidor</h3>
+                            <p class="text-[11px] text-slate-600">A confirmação final deve ser realizada diretamente pelo servidor</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-xs text-amber-950 leading-relaxed">
+                        <strong><i class="ph ph-warning-circle text-amber-600"></i> Regra Obrigatória de Segurança:</strong>
+                        O técnico do RH <strong>não pode</strong> marcar a concordância em nome do servidor. Clique abaixo e posicione a tela para o próprio servidor ler a declaração e confirmar sua assinatura.
+                    </div>
+
+                    <button type="button" id="btnAbrirTelaServidor" onclick="abrirModalServidor()"
+                            class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#0B3D2E] to-[#14532D] hover:brightness-110 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md transition">
+                        <i class="ph ph-hand-pointing text-xl text-[#FACC15]"></i>
+                        <span>Abrir Tela de Confirmação do Servidor</span>
+                    </button>
+                </div>
+
+                <!-- CARD DE RESULTADO FINAL DINÂMICO (PREENCHIDO VIA JS APÓS ETAPA 6) -->
+                <div id="cardEtapa6Dinamico" class="hidden bg-white rounded-2xl shadow-md border-2 border-[#10B981] overflow-hidden"></div>
+
+                {% endif %}
+            </section>
+        </div>
+    </main>
+
+    <!-- MODAL TELA CHEIA: ETAPA 5 — MANIFESTAÇÃO EXPRESSA DE VONTADE (EXCLUSIVA DO SERVIDOR) -->
+    <div id="modalTelaServidor" class="fixed inset-0 bg-[#0B3D2E]/95 hidden z-[999] flex items-center justify-center p-4 overflow-y-auto backdrop-blur-sm">
+        <div class="bg-white rounded-3xl max-w-2xl w-full shadow-2xl border-4 border-[#FACC15] overflow-hidden my-auto">
+            <div class="g360-bg-dark text-white px-6 py-5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-11 h-11 rounded-2xl bg-[#FACC15] text-[#0B3D2E] flex items-center justify-center font-extrabold">
+                        <i class="ph ph-user-check text-2xl"></i>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-extrabold uppercase tracking-widest text-[#FACC15]">Etapa Exclusiva do Servidor</span>
+                        <h2 class="text-lg font-extrabold">Manifestação Expressa de Vontade</h2>
+                    </div>
+                </div>
+                <button type="button" onclick="fecharModalServidor()" class="text-white/70 hover:text-white p-1.5 rounded-lg hover:bg-white/10 transition" title="Voltar">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+
+            <div class="p-6 sm:p-8 space-y-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 rounded-2xl p-4 border border-slate-200 text-xs">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Servidor Signatário</span>
+                        <strong class="text-sm text-[#0B3D2E]">{{ contrato.contratado_nome }}</strong>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Documento</span>
+                        <strong class="text-sm text-[#0B3D2E]">Contrato Nº {{ contrato.num_contrato }} (v{{ contrato.versao or 1 }})</strong>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">CPF (Parcialmente Oculto)</span>
+                        <strong class="font-mono text-slate-800">{{ contrato.contratado_cpf | mask_cpf }}</strong>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Função / Remuneração</span>
+                        <strong class="text-slate-800">{{ contrato.funcao_nome }} • {{ contrato_ctx.remuneracao_formatada }}</strong>
+                    </div>
+                </div>
+
+                <!-- DECLARAÇÃO LEGAL OBRIGATÓRIA (TEXTO EXATO DA ESPECIFICAÇÃO) -->
+                <div class="bg-emerald-50 border-2 border-[#10B981] rounded-2xl p-5">
+                    <p class="text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-2 flex items-center gap-1.5">
+                        <i class="ph ph-quotes text-base text-[#10B981]"></i> Declaração de Concordância
+                    </p>
+                    <p class="text-base font-bold text-[#0B3D2E] leading-relaxed">
+                        “{{ termo_manifestacao }}”
+                    </p>
+                </div>
+
+                <label class="flex items-start gap-3 p-4 rounded-2xl border-2 border-slate-200 hover:border-[#10B981] cursor-pointer transition bg-white">
+                    <input type="checkbox" id="chkServidorConcorda" onchange="atualizarEstadoBtnFinalizar()"
+                           class="mt-1 w-5 h-5 accent-[#0B3D2E] rounded cursor-pointer shrink-0">
+                    <span class="text-sm font-bold text-slate-900 leading-snug">
+                        Li e concordo integralmente com a declaração acima e confirmo minha assinatura eletrônica neste contrato.
+                    </span>
+                </label>
+
+                <!-- DUPLA BARREIRA DE AUTENTICIDADE PRESENCIAL DO SERVIDOR -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 rounded-2xl p-4 border border-slate-200">
+                    <div>
+                        <label class="block text-[11px] font-extrabold uppercase text-[#0B3D2E] mb-1">
+                            Confirmação do Servidor: 4 últimos dígitos do CPF*
+                        </label>
+                        <input type="password" id="inputCpfUltimos4" maxlength="4" inputmode="numeric"
+                               oninput="atualizarEstadoBtnFinalizar()"
+                               placeholder="••••"
+                               class="w-full px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-center text-lg font-mono font-extrabold tracking-[0.4em] focus:outline-none focus:ring-2 focus:ring-[#10B981]">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-extrabold uppercase text-[#0B3D2E] mb-1">
+                            Nome do Servidor (Ciência)
+                        </label>
+                        <input type="text" id="inputNomeCiencia"
+                               placeholder="Digite seu primeiro nome"
+                               class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 bg-white text-sm font-bold uppercase focus:outline-none focus:ring-2 focus:ring-[#10B981]">
+                    </div>
+                </div>
+
+                <div id="modalServidorErro" class="hidden p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold"></div>
+
+                <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button type="button" onclick="fecharModalServidor()"
+                            class="sm:w-1/3 py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition">
+                        Voltar para Releitura
+                    </button>
+                    <button type="button" id="btnFinalizarAssinatura" onclick="finalizarAssinatura()" disabled
+                            class="sm:w-2/3 py-3.5 px-5 rounded-xl bg-[#10B981] hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg transition">
+                        <i class="ph ph-seal-check text-xl"></i>
+                        <span>Finalizar Assinatura Eletrônica</span>
+                    </button>
+                </div>
+
+                <p class="text-[10px] text-center text-slate-500">
+                    Classificação legal: <strong>Assinatura Eletrônica Simples</strong> (Lei nº 14.063/2020, art. 4º, I • MP nº 2.200-2/2001 • LGPD).
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CONTRATO_ID = {{ contrato.id }};
+        let ASSINATURA_ID = {{ sessao.id if sessao else 'null' }};
+        let cooldownInterval = null;
+        let expiracaoInterval = null;
+
+        function mostrarAlerta(tipo, msg) {
+            const box = document.getElementById('signAlertBox');
+            if (!box) return;
+            box.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-900', 'border', 'border-emerald-200', 'bg-rose-50', 'text-rose-800', 'border-rose-200', 'bg-amber-50', 'text-amber-900', 'border-amber-200');
+            if (tipo === 'success') {
+                box.classList.add('bg-emerald-50', 'text-emerald-900', 'border', 'border-emerald-200');
+                box.innerHTML = '<i class="ph ph-check-circle text-lg text-[#10B981] shrink-0"></i><span>' + msg + '</span>';
+            } else if (tipo === 'warning') {
+                box.classList.add('bg-amber-50', 'text-amber-900', 'border', 'border-amber-200');
+                box.innerHTML = '<i class="ph ph-warning-circle text-lg text-amber-600 shrink-0"></i><span>' + msg + '</span>';
+            } else {
+                box.classList.add('bg-rose-50', 'text-rose-800', 'border', 'border-rose-200');
+                box.innerHTML = '<i class="ph ph-x-circle text-lg text-rose-600 shrink-0"></i><span>' + msg + '</span>';
+            }
+        }
+
+        function atualizarStepper(etapa) {
+            const badge = document.getElementById('badgeEtapaTexto');
+            if (badge) badge.textContent = 'Etapa ' + etapa + ' de 6';
+            document.querySelectorAll('.step-card').forEach(el => {
+                const n = parseInt(el.getAttribute('data-step'), 10);
+                const ico = el.querySelector('.step-icon');
+                if (etapa >= n) {
+                    el.className = 'step-card rounded-xl p-3 border transition-all flex items-center gap-2.5 bg-emerald-50/90 border-[#10B981] text-[#0B3D2E]';
+                    if (etapa > n || (etapa === 6 && n === 6)) {
+                        ico.className = 'step-icon w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold bg-[#10B981] text-white';
+                        ico.innerHTML = '<i class="ph ph-check-bold text-base"></i>';
+                    } else {
+                        ico.className = 'step-icon w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold bg-[#0B3D2E] text-[#FACC15]';
+                    }
+                }
+            });
+        }
+
+        function confirmarConferencia() {
+            const telefone = document.getElementById('inputTelefoneServidor').value.trim();
+            const presenca = document.getElementById('chkPresenca').checked;
+            const dados = document.getElementById('chkDadosConferidos').checked;
+
+            const btn = document.getElementById('btnConfirmarConferencia');
+            btn.disabled = true;
+
+            fetch('/api/gestoor-sign/contrato/' + CONTRATO_ID + '/confirmar-conferencia', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    telefone: telefone,
+                    presenca_confirmada: presenca,
+                    dados_conferidos: dados
+                })
+            })
+            .then(r => r.json())
+            .then(res => {
+                btn.disabled = false;
+                if (!res.success) {
+                    mostrarAlerta('error', res.message || 'Não foi possível confirmar a conferência.');
+                    return;
+                }
+                ASSINATURA_ID = res.assinatura_id;
+                document.getElementById('hdrTelefoneMask').textContent = res.telefone_mascarado;
+                document.getElementById('lblTelSms').textContent = res.telefone_mascarado;
+                document.getElementById('badgeEtapa3Done').classList.remove('hidden');
+                const c4 = document.getElementById('cardEtapa4');
+                c4.classList.remove('opacity-60', 'pointer-events-none');
+                atualizarStepper(res.etapa || 2);
+                mostrarAlerta('success', 'Conferência presencial registrada e versão do contrato congelada (SHA-256). Agora envie o código SMS ao servidor.');
+            })
+            .catch(err => {
+                btn.disabled = false;
+                mostrarAlerta('error', 'Erro de comunicação: ' + err);
+            });
+        }
+
+        function iniciarTimersSms(expSegundos, cooldownSegundos) {
+            if (cooldownInterval) clearInterval(cooldownInterval);
+            if (expiracaoInterval) clearInterval(expiracaoInterval);
+
+            const btn = document.getElementById('btnEnviarSms');
+            const txtBtn = document.getElementById('txtBtnSms');
+            let cd = cooldownSegundos || 60;
+            btn.disabled = true;
+            txtBtn.textContent = 'Reenviar em ' + cd + 's';
+            cooldownInterval = setInterval(() => {
+                cd--;
+                if (cd <= 0) {
+                    clearInterval(cooldownInterval);
+                    btn.disabled = false;
+                    txtBtn.textContent = 'Reenviar código SMS';
+                } else {
+                    txtBtn.textContent = 'Reenviar em ' + cd + 's';
+                }
+            }, 1000);
+
+            const boxTimer = document.getElementById('boxTimerSms');
+            const txtTimer = document.getElementById('txtTimerSms');
+            boxTimer.classList.remove('hidden');
+            let exp = expSegundos || 300;
+            const renderExp = () => {
+                const m = String(Math.floor(exp / 60)).padStart(2, '0');
+                const s = String(exp % 60).padStart(2, '0');
+                txtTimer.textContent = 'Expira em ' + m + ':' + s;
+            };
+            renderExp();
+            expiracaoInterval = setInterval(() => {
+                exp--;
+                if (exp <= 0) {
+                    clearInterval(expiracaoInterval);
+                    txtTimer.textContent = 'Código expirado';
+                } else {
+                    renderExp();
+                }
+            }, 1000);
+        }
+
+        function enviarCodigoSms() {
+            if (!ASSINATURA_ID) return;
+            const btn = document.getElementById('btnEnviarSms');
+            btn.disabled = true;
+
+            fetch('/api/gestoor-sign/sessao/' + ASSINATURA_ID + '/enviar-sms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) {
+                    btn.disabled = false;
+                    mostrarAlerta('error', res.message || 'Falha ao enviar SMS.');
+                    return;
+                }
+                document.getElementById('areaValidarOtp').classList.remove('hidden');
+                atualizarStepper(res.etapa || 3);
+                iniciarTimersSms(res.expira_em_segundos, res.cooldown_segundos);
+                mostrarAlerta('success', 'Código SMS enviado para ' + res.telefone_mascarado + ' via ' + (res.provider || '').toUpperCase() + ' (Protocolo: ' + res.message_id + ').');
+
+                const boxHom = document.getElementById('boxHomologOtp');
+                if (res.homologacao_codigo) {
+                    boxHom.classList.remove('hidden');
+                    boxHom.innerHTML = '<i class="ph ph-flask"></i> MODO HOMOLOGAÇÃO LOCAL — Código OTP simulado: <span class="font-mono text-base ml-1 tracking-widest">' + res.homologacao_codigo + '</span>';
+                } else {
+                    boxHom.classList.add('hidden');
+                }
+                document.getElementById('inputCodigoOtp').focus();
+            })
+            .catch(err => {
+                btn.disabled = false;
+                mostrarAlerta('error', 'Erro ao enviar SMS: ' + err);
+            });
+        }
+
+        function validarCodigoOtp() {
+            const codigo = document.getElementById('inputCodigoOtp').value.trim();
+            if (!codigo) {
+                mostrarAlerta('warning', 'Digite o código numérico recebido no celular do servidor.');
+                return;
+            }
+            const btn = document.getElementById('btnValidarOtp');
+            btn.disabled = true;
+
+            fetch('/api/gestoor-sign/sessao/' + ASSINATURA_ID + '/validar-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ codigo: codigo })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) {
+                    btn.disabled = false;
+                    mostrarAlerta('error', res.message || 'Código inválido.');
+                    return;
+                }
+                if (cooldownInterval) clearInterval(cooldownInterval);
+                if (expiracaoInterval) clearInterval(expiracaoInterval);
+
+                document.getElementById('badgeEtapa4Done').classList.remove('hidden');
+                document.getElementById('inputCodigoOtp').disabled = true;
+                document.getElementById('btnEnviarSms').disabled = true;
+                document.getElementById('inputTelefoneServidor').disabled = true;
+                document.getElementById('chkPresenca').disabled = true;
+                document.getElementById('chkDadosConferidos').disabled = true;
+                document.getElementById('btnConfirmarConferencia').disabled = true;
+
+                const c5 = document.getElementById('cardEtapa5');
+                c5.classList.remove('opacity-50', 'pointer-events-none');
+                atualizarStepper(res.etapa || 4);
+                mostrarAlerta('success', 'Código SMS validado com sucesso! Agora abra a Tela de Confirmação para o próprio servidor manifestar sua concordância.');
+            })
+            .catch(err => {
+                btn.disabled = false;
+                mostrarAlerta('error', 'Erro ao validar código: ' + err);
+            });
+        }
+
+        function abrirModalServidor() {
+            document.getElementById('modalTelaServidor').classList.remove('hidden');
+            document.getElementById('modalServidorErro').classList.add('hidden');
+        }
+
+        function fecharModalServidor() {
+            document.getElementById('modalTelaServidor').classList.add('hidden');
+        }
+
+        function atualizarEstadoBtnFinalizar() {
+            const aceito = document.getElementById('chkServidorConcorda').checked;
+            const cpf4 = document.getElementById('inputCpfUltimos4').value.replace(/\D/g, '');
+            document.getElementById('btnFinalizarAssinatura').disabled = !(aceito && cpf4.length === 4);
+        }
+
+        function finalizarAssinatura() {
+            const aceito = document.getElementById('chkServidorConcorda').checked;
+            const cpf4 = document.getElementById('inputCpfUltimos4').value.replace(/\D/g, '');
+            const nomeCiencia = document.getElementById('inputNomeCiencia').value.trim();
+            const errBox = document.getElementById('modalServidorErro');
+            errBox.classList.add('hidden');
+
+            const btn = document.getElementById('btnFinalizarAssinatura');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="ph ph-spinner animate-spin text-lg"></i> Selando PDF e Evidências...';
+
+            fetch('/api/gestoor-sign/sessao/' + ASSINATURA_ID + '/confirmar-vontade', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    declaracao_aceita: aceito,
+                    cpf_ultimos4: cpf4,
+                    confirmacao_servidor_nome: nomeCiencia
+                })
+            })
+            .then(r => r.json())
+            .then(res => {
+                if (!res.success) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="ph ph-seal-check text-xl"></i> <span>Finalizar Assinatura Eletrônica</span>';
+                    errBox.textContent = res.message || 'Erro ao finalizar assinatura.';
+                    errBox.classList.remove('hidden');
+                    return;
+                }
+                fecharModalServidor();
+                atualizarStepper(6);
+                ['cardEtapa3', 'cardEtapa4', 'cardEtapa5'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.add('hidden');
+                });
+                const card6 = document.getElementById('cardEtapa6Dinamico');
+                card6.classList.remove('hidden');
+                card6.innerHTML = `
+                    <div class="g360-bg-dark text-white p-5 border-b-4 border-[#FACC15]">
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-2xl bg-[#10B981] text-white flex items-center justify-center shadow-lg">
+                                <i class="ph ph-seal-check text-3xl"></i>
+                            </div>
+                            <div>
+                                <span class="text-[10px] font-extrabold uppercase tracking-widest text-[#FACC15]">Etapa 6 Concluída</span>
+                                <h3 class="text-lg font-extrabold">ASSINADO ELETRONICAMENTE</h3>
+                                <p class="text-xs text-emerald-200">${res.assinado_em_brt}</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-5 space-y-4">
+                        <div class="flex items-center gap-4 bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
+                            <img src="${res.qrcode_data_uri}" alt="QR Code" class="w-24 h-24 rounded-lg border border-emerald-300 bg-white p-1 shrink-0">
+                            <div class="min-w-0 space-y-1 text-xs">
+                                <div class="text-[10px] font-bold uppercase text-emerald-700">Código Único de Validação</div>
+                                <div class="font-mono font-extrabold text-sm text-[#0B3D2E] break-all">${res.codigo_validacao}</div>
+                                <div class="text-[11px] text-slate-600">Modalidade: <strong>Assinatura Eletrônica Simples</strong></div>
+                                <a href="${res.validar_url}" target="_blank" class="inline-flex items-center gap-1 text-[11px] font-bold text-[#0B3D2E] underline">
+                                    <i class="ph ph-qr-code"></i> Abrir Validador Público
+                                </a>
+                            </div>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-3 border border-slate-200 text-[11px] space-y-1">
+                            <div class="font-bold text-slate-500 uppercase text-[10px]">Hash SHA-256 do Documento Assinado</div>
+                            <div class="font-mono text-[10px] text-[#0B3D2E] break-all">${res.hash_documento_final_sha256}</div>
+                        </div>
+                        ${res.ged_arquivado ? '<div class="p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-xs text-emerald-900 flex items-center gap-2"><i class="ph ph-folder-lock text-lg text-[#10B981]"></i><span>Contrato assinado arquivado automaticamente no <strong>GED do Servidor</strong>.</span></div>' : ''}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                            <a href="${res.download_contrato_url}" class="w-full py-3 px-4 rounded-xl g360-bg-dark hover:bg-[#14532D] text-white font-extrabold text-xs text-center inline-flex items-center justify-center gap-2 shadow-sm">
+                                <i class="ph ph-file-pdf text-lg text-[#FACC15]"></i> Baixar Contrato Assinado
+                            </a>
+                            <a href="${res.download_evidencias_url}" class="w-full py-3 px-4 rounded-xl bg-[#10B981] hover:bg-emerald-600 text-white font-extrabold text-xs text-center inline-flex items-center justify-center gap-2 shadow-sm">
+                                <i class="ph ph-shield-check text-lg"></i> Relatório de Evidências
+                            </a>
+                        </div>
+                    </div>`;
+                mostrarAlerta('success', 'Contrato assinado eletronicamente com sucesso! O documento selado e o relatório de evidências estão prontos para download.');
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="ph ph-seal-check text-xl"></i> <span>Finalizar Assinatura Eletrônica</span>';
+                errBox.textContent = 'Erro de conexão: ' + err;
+                errBox.classList.remove('hidden');
+            });
+        }
+    </script>
+    <script src="{{ url_for('static', filename='js/inactivity.js') }}"></script>
+</body>
+</html>
