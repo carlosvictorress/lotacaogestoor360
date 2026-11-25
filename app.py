@@ -765,6 +765,7 @@ class AssinaturaContrato(db.Model):
 
     # Selo Criptográfico & Integridade
     codigo_validacao = db.Column(db.String(40), unique=True, nullable=True, index=True)
+    local_assinatura_json = db.Column(db.Text, nullable=True)
     hash_contrato_base_sha256 = db.Column(db.String(64), nullable=True)
     hash_documento_final_sha256 = db.Column(db.String(64), nullable=True)
     hash_evidencias_sha256 = db.Column(db.String(64), nullable=True)
@@ -3099,6 +3100,9 @@ def atualizar_schema():
                 "local_votacao": [
                     ("tipo_zona", "VARCHAR(20) DEFAULT 'URBANA'"),
                     ("meta_cobertura", "INTEGER DEFAULT 0"),
+                ],
+                "assinatura_contrato": [
+                    ("local_assinatura_json", "TEXT"),
                 ],
                 '"user"': [
                     ("municipio_id", "INTEGER"),
@@ -8029,6 +8033,10 @@ def gestoor_sign_assinar(contrato_id):
         validar_url = url_for("validar_documento", codigo=sessao.codigo_validacao, _external=True)
         qrcode_uri = gestoor_sign_pdf.gerar_qrcode_data_uri(validar_url)
 
+    local_assinatura_atual = gestoor_sign_service.normalizar_local_assinatura(
+        getattr(sessao, "local_assinatura_json", None) if sessao else None
+    )
+
     return render_template(
         "gestoor_sign_assinar.html",
         contrato=contrato,
@@ -8047,6 +8055,7 @@ def gestoor_sign_assinar(contrato_id):
         erro_inicio=erro_inicio,
         qrcode_uri=qrcode_uri,
         validar_url=validar_url,
+        local_assinatura_atual=local_assinatura_atual,
     )
 
 
@@ -8081,6 +8090,7 @@ def api_gestoor_sign_confirmar_conferencia(contrato_id):
             telefone_confirmado=str(data.get("telefone") or ""),
             presenca_confirmada=bool(data.get("presenca_confirmada")),
             dados_conferidos=bool(data.get("dados_conferidos")),
+            local_assinatura=data.get("local_assinatura"),
             secret_key=app.config["SECRET_KEY"],
             timbre_path=_resolve_timbre_path(contrato),
             req_info=_get_req_info(),

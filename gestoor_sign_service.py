@@ -82,6 +82,68 @@ TIPOS_CONTRATO_PADRAO = [
     ("OUTRO", "Outro Contrato Administrativo de RH"),
 ]
 
+LOCAL_MODOS_VALIDOS = {
+    "BLOCO_CONTRATADO": "Folha de Assinaturas — Campo do Contratado (Pág. 4)",
+    "BLOCO_CONTRATADO_E_EXTRATO": "Folha de Assinaturas (Pág. 4) + Extrato (Pág. 5)",
+    "RODAPE_TODAS_PAGINAS": "Folha de Assinaturas (Pág. 4) + Rubrica no Rodapé de Todas as Páginas",
+    "POSICAO_PERSONALIZADA": "Posição Personalizada Selecionada no Contrato",
+}
+
+
+def normalizar_local_assinatura(raw: Any) -> Dict[str, Any]:
+    """Valida e normaliza a configuração de posicionamento visual da assinatura eletrônica no contrato."""
+    default = {
+        "modo": "BLOCO_CONTRATADO",
+        "pagina": 4,
+        "x_pct": 50.0,
+        "y_pct": 66.0,
+        "descricao": LOCAL_MODOS_VALIDOS["BLOCO_CONTRATADO"],
+    }
+    if not raw:
+        return default
+    data = raw
+    if isinstance(raw, str):
+        try:
+            data = json.loads(raw)
+        except Exception:
+            return default
+    if not isinstance(data, dict):
+        return default
+
+    modo = str(data.get("modo") or "BLOCO_CONTRATADO").strip().upper()
+    if modo not in LOCAL_MODOS_VALIDOS:
+        modo = "BLOCO_CONTRATADO"
+
+    try:
+        pagina = int(data.get("pagina") or 4)
+    except Exception:
+        pagina = 4
+    pagina = max(1, min(pagina, 5))
+
+    try:
+        x_pct = float(data.get("x_pct") if data.get("x_pct") is not None else 50.0)
+    except Exception:
+        x_pct = 50.0
+    x_pct = round(max(10.0, min(x_pct, 90.0)), 2)
+
+    try:
+        y_pct = float(data.get("y_pct") if data.get("y_pct") is not None else 66.0)
+    except Exception:
+        y_pct = 66.0
+    y_pct = round(max(10.0, min(y_pct, 90.0)), 2)
+
+    desc = LOCAL_MODOS_VALIDOS[modo]
+    if modo == "POSICAO_PERSONALIZADA":
+        desc = f"Posição Personalizada — Página {pagina} (X: {x_pct:.0f}%, Y: {y_pct:.0f}%)"
+
+    return {
+        "modo": modo,
+        "pagina": pagina,
+        "x_pct": x_pct,
+        "y_pct": y_pct,
+        "descricao": desc,
+    }
+
 
 class GestoorSignError(Exception):
     """Erro de regra de negócio do Gestoor Sign."""
@@ -488,6 +550,7 @@ def confirmar_conferencia_presencial(
     req_info: Dict[str, str],
     format_data_extenso,
     format_rem_rs,
+    local_assinatura: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Etapa 3: Confirma presença do servidor, celular válido, conferência do contrato integral,
@@ -525,6 +588,9 @@ def confirmar_conferencia_presencial(
             funcionario.telefone = tel_formatado
         funcionario.telefone_confirmado_em = agora
         funcionario.telefone_confirmado_por_id = user.id
+
+    local_norm = normalizar_local_assinatura(local_assinatura or getattr(assinatura, "local_assinatura_json", None))
+    assinatura.local_assinatura_json = json.dumps(local_norm, ensure_ascii=False)
 
     assinatura.telefone_mascarado = sms_service.mascarar_telefone(digits_11)
     assinatura.telefone_e164_hash = sha256_texto(tel_e164, secret_key)
@@ -579,6 +645,7 @@ def confirmar_conferencia_presencial(
         detalhes={
             "telefone_mascarado": assinatura.telefone_mascarado,
             "hash_contrato_base_sha256": pdf_base_sha256,
+            "local_assinatura": local_norm,
         },
     )
     db.session.commit()
@@ -589,6 +656,7 @@ def confirmar_conferencia_presencial(
         "etapa": calcular_etapa_atual(assinatura),
         "telefone_mascarado": assinatura.telefone_mascarado,
         "hash_contrato_base_sha256": pdf_base_sha256,
+        "local_assinatura": local_norm,
     }
 
 
@@ -1098,10 +1166,13 @@ def confirmar_vontade_e_finalizar(
     ).hexdigest()
     assinatura.hash_evidencias_sha256 = hash_evidencias
 
+    local_norm = normalizar_local_assinatura(getattr(assinatura, "local_assinatura_json", None))
+
     evidencia_ctx = {
         "codigo_validacao": codigo_val,
         "validar_url": validar_url,
         "status_label": "ASSINADO ELETRONICAMENTE",
+        "local_assinatura": local_norm,
         "servidor_nome": assinatura.servidor_nome,
         "servidor_cpf_mascarado": assinatura.servidor_cpf_mascarado,
         "telefone_mascarado": assinatura.telefone_mascarado,

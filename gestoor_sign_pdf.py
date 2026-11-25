@@ -24,6 +24,7 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
     HRFlowable,
     Image,
@@ -249,8 +250,93 @@ def _timbre_flowable(timbre_path: Optional[str]) -> Optional[Image]:
         return None
 
 
-def _draw_page_footer(canvas, doc, rodape_texto: str):
+def _draw_custom_seal_on_canvas(canvas, selo: Dict[str, Any], x_pct: float, y_pct: float):
+    """Desenha o selo eletrônico oficial com QR Code diretamente no ponto (x_pct, y_pct) da página A4."""
+    page_w, page_h = A4
+    box_w = 96 * mm
+    box_h = 26 * mm
+
+    # Converte porcentagem (origem no topo esquerdo, igual ao navegador) para coordenadas PDF (origem inferior esquerda)
+    cx = (float(x_pct) / 100.0) * page_w
+    cy = page_h - ((float(y_pct) / 100.0) * page_h)
+
+    x0 = max(12 * mm, min(cx - (box_w / 2.0), page_w - box_w - 12 * mm))
+    y0 = max(16 * mm, min(cy - (box_h / 2.0), page_h - box_h - 14 * mm))
+
     canvas.saveState()
+    # Fundo verde claro + borda verde vivo + faixa esquerda verde escuro
+    canvas.setFillColor(COR_VERDE_CLARO_BG)
+    canvas.setStrokeColor(COR_VERDE_VIVO)
+    canvas.setLineWidth(1.1)
+    canvas.roundRect(x0, y0, box_w, box_h, 3, stroke=1, fill=1)
+
+    canvas.setFillColor(COR_VERDE_ESCURO)
+    canvas.rect(x0, y0, 3 * mm, box_h, stroke=0, fill=1)
+
+    # QR Code à direita
+    qr_size = 21 * mm
+    qr_x = x0 + box_w - qr_size - 2.5 * mm
+    qr_y = y0 + (box_h - qr_size) / 2.0
+    try:
+        qr_bytes = gerar_qrcode_png_bytes(selo.get("validar_url", ""), box_size=4, border=1)
+        canvas.drawImage(ImageReader(io.BytesIO(qr_bytes)), qr_x, qr_y, width=qr_size, height=qr_size)
+    except Exception:
+        pass
+
+    # Textos do selo
+    tx = x0 + 5 * mm
+    canvas.setFillColor(COR_VERDE_ESCURO)
+    canvas.setFont("Helvetica-Bold", 7.2)
+    canvas.drawString(tx, y0 + box_h - 5.2 * mm, "ASSINADO ELETRONICAMENTE — GESTOOR SIGN")
+
+    canvas.setFillColor(COR_TEXTO)
+    canvas.setFont("Helvetica-Bold", 6.8)
+    canvas.drawString(tx, y0 + box_h - 9.4 * mm, str(selo.get("servidor_nome") or "")[:36])
+
+    canvas.setFont("Helvetica", 6.4)
+    canvas.setFillColor(COR_MUTED)
+    canvas.drawString(tx, y0 + box_h - 13.0 * mm, f"CPF: {selo.get('servidor_cpf_mascarado') or ''}  |  Simples (Lei 14.063/2020)")
+    canvas.drawString(tx, y0 + box_h - 16.6 * mm, f"Data/Hora: {selo.get('assinado_em_brt') or ''}")
+    canvas.setFont("Courier-Bold", 6.5)
+    canvas.setFillColor(COR_VERDE_ESCURO)
+    canvas.drawString(tx, y0 + box_h - 20.4 * mm, f"Cód: {selo.get('codigo_validacao') or ''}")
+    canvas.setFont("Helvetica", 5.8)
+    canvas.setFillColor(COR_MUTED)
+    canvas.drawString(tx, y0 + 2.2 * mm, f"RH: {str(selo.get('tecnico_nome') or '')[:34]}")
+    canvas.restoreState()
+
+
+def _draw_page_footer(canvas, doc, rodape_texto: str, selo_eletronico: Optional[Dict[str, Any]] = None, total_paginas_contrato: int = 5):
+    canvas.saveState()
+    local_cfg = (selo_eletronico or {}).get("local_assinatura") or {}
+    modo = str(local_cfg.get("modo") or "BLOCO_CONTRATADO").upper()
+
+    # Rubrica eletrônica no rodapé de todas as páginas do contrato quando escolhido
+    if selo_eletronico and modo == "RODAPE_TODAS_PAGINAS" and doc.page <= total_paginas_contrato:
+        canvas.setFillColor(COR_VERDE_CLARO_BG)
+        canvas.setStrokeColor(COR_VERDE_VIVO)
+        canvas.setLineWidth(0.7)
+        canvas.roundRect(18 * mm, 14.2 * mm, A4[0] - 36 * mm, 6.2 * mm, 2, stroke=1, fill=1)
+        canvas.setFont("Helvetica-Bold", 6.6)
+        canvas.setFillColor(COR_VERDE_ESCURO)
+        rubrica = (
+            f"GESTOOR SIGN (Assinatura Eletrônica Simples) • {selo_eletronico.get('servidor_nome')} "
+            f"({selo_eletronico.get('servidor_cpf_mascarado')}) • {selo_eletronico.get('assinado_em_brt')} "
+            f"• Cód: {selo_eletronico.get('codigo_validacao')}"
+        )
+        canvas.drawString(20 * mm, 16.2 * mm, rubrica[:120])
+
+    # Posição personalizada desenhada diretamente na página e coordenadas escolhidas
+    if selo_eletronico and modo == "POSICAO_PERSONALIZADA":
+        alvo_pag = int(local_cfg.get("pagina") or 4)
+        if doc.page == alvo_pag:
+            _draw_custom_seal_on_canvas(
+                canvas,
+                selo_eletronico,
+                float(local_cfg.get("x_pct") or 50.0),
+                float(local_cfg.get("y_pct") or 66.0),
+            )
+
     canvas.setStrokeColor(COR_BORDA)
     canvas.setLineWidth(0.5)
     canvas.line(18 * mm, 13 * mm, A4[0] - 18 * mm, 13 * mm)
@@ -382,6 +468,14 @@ def _montar_corpo_contrato_story(
             styles["clause"],
         )
     )
+
+    # PÁGINA 2 (espelha exatamente a paginação oficial do contrato_documento.html)
+    story.append(PageBreak())
+    t2 = _timbre_flowable(timbre_path)
+    if t2:
+        story.append(t2)
+        story.append(Spacer(1, 3 * mm))
+
     story.append(
         Paragraph(
             "<b>PARÁGRAFO ÚNICO</b> – O presente contrato poderá ser rescindido a qualquer tempo por acordo entre as partes, "
@@ -422,6 +516,13 @@ def _montar_corpo_contrato_story(
     story.append(Paragraph("II - Executar serviços ora contratados com esmero e dentro da melhor técnica, responsabilizando-se por quaisquer erros, falhas ou imperfeições que porventura ocorram;", styles["item"]))
     story.append(Paragraph("III - Responsabilizar-se pelos danos causados diretamente à Administração ou a terceiros, decorrentes de seus serviços;", styles["item"]))
     story.append(Paragraph("IV - Sujeitar-se à mais ampla e irrestrita fiscalização por parte do CONTRATANTE, prestando todos os esclarecimentos solicitados e atendendo às reclamações solicitadas;", styles["item"]))
+
+    # PÁGINA 3
+    story.append(PageBreak())
+    t3 = _timbre_flowable(timbre_path)
+    if t3:
+        story.append(t3)
+        story.append(Spacer(1, 3 * mm))
 
     story.append(Paragraph("8 – DA DOTAÇÃO ORÇAMENTÁRIA", styles["heading"]))
     story.append(
@@ -484,10 +585,18 @@ def _montar_corpo_contrato_story(
         Paragraph(
             "<b>PARÁGRAFO QUARTO</b> – No caso de recusa no atendimento de qualquer reclamação, independentemente das sanções "
             "cabíveis, o Município poderá confiar a outrem a prestação dos serviços não executados, notificando brevemente ao "
-            "CONTRATADO, descontando o seu custo de uma só vez, no primeiro pagamento subsequente.",
+            "CONTRATADO, descontando o seu custo de uma só vez, no primeiro pagamento subsequente ou no valor da garantia, "
+            "sem que a mesma possa impugnar seu valor.",
             styles["clause"],
         )
     )
+
+    # PÁGINA 4 (Foro, Data, Assinaturas e Testemunhas)
+    story.append(PageBreak())
+    t4 = _timbre_flowable(timbre_path)
+    if t4:
+        story.append(t4)
+        story.append(Spacer(1, 3 * mm))
 
     story.append(Paragraph("12 – DO FORO", styles["heading"]))
     story.append(
@@ -522,22 +631,25 @@ def _montar_corpo_contrato_story(
         Spacer(1, 8 * mm),
     ]
 
-    if selo_eletronico:
-        qr_img = Image(io.BytesIO(gerar_qrcode_png_bytes(selo_eletronico.get("validar_url", ""))), width=23 * mm, height=23 * mm)
+    local_cfg = (selo_eletronico or {}).get("local_assinatura") or {}
+    modo_local = str(local_cfg.get("modo") or "BLOCO_CONTRATADO").upper()
+
+    def _criar_tabela_selo(selo_dict):
+        qr_img = Image(io.BytesIO(gerar_qrcode_png_bytes(selo_dict.get("validar_url", ""))), width=23 * mm, height=23 * mm)
         selo_texto = (
             f"<b><font color='#0B3D2E'>ASSINADO ELETRONICAMENTE — GESTOOR SIGN</font></b><br/>"
-            f"<b>Contratado(a):</b> {_esc(selo_eletronico.get('servidor_nome'))} • "
-            f"<b>CPF:</b> {_esc(selo_eletronico.get('servidor_cpf_mascarado'))}<br/>"
+            f"<b>Contratado(a):</b> {_esc(selo_dict.get('servidor_nome'))} • "
+            f"<b>CPF:</b> {_esc(selo_dict.get('servidor_cpf_mascarado'))}<br/>"
             f"<b>Modalidade:</b> Assinatura Eletrônica Simples (OTP SMS Presencial — Lei nº 14.063/2020)<br/>"
-            f"<b>Data/Hora:</b> {_esc(selo_eletronico.get('assinado_em_brt'))} (Horário de Brasília)<br/>"
-            f"<b>Código de Validação:</b> <font name='Courier'>{_esc(selo_eletronico.get('codigo_validacao'))}</font><br/>"
-            f"<b>Conduzido presencialmente por:</b> {_esc(selo_eletronico.get('tecnico_nome'))}"
+            f"<b>Data/Hora:</b> {_esc(selo_dict.get('assinado_em_brt'))} (Horário de Brasília)<br/>"
+            f"<b>Código de Validação:</b> <font name='Courier'>{_esc(selo_dict.get('codigo_validacao'))}</font><br/>"
+            f"<b>Conduzido presencialmente por:</b> {_esc(selo_dict.get('tecnico_nome'))}"
         )
-        tbl_selo = Table(
+        tbl = Table(
             [[Paragraph(selo_texto, styles["ev_val"]), qr_img]],
             colWidths=[145 * mm, 29 * mm],
         )
-        tbl_selo.setStyle(
+        tbl.setStyle(
             TableStyle(
                 [
                     ("BACKGROUND", (0, 0), (-1, -1), COR_VERDE_CLARO_BG),
@@ -552,7 +664,10 @@ def _montar_corpo_contrato_story(
                 ]
             )
         )
-        sig_blocks.append(tbl_selo)
+        return tbl
+
+    if selo_eletronico and modo_local != "POSICAO_PERSONALIZADA":
+        sig_blocks.append(_criar_tabela_selo(selo_eletronico))
     else:
         sig_blocks.extend(
             [
@@ -564,7 +679,13 @@ def _montar_corpo_contrato_story(
 
     story.append(KeepTogether(sig_blocks))
 
-    # Página do Extrato do Contrato
+    # Testemunhas (mesma estrutura oficial da página 4)
+    story.append(Spacer(1, 6 * mm))
+    story.append(Paragraph("<b>Testemunhas:</b>", styles["clause"]))
+    story.append(Paragraph("Nome: ________________________________________.  CPF: _________________________.", styles["clause"]))
+    story.append(Paragraph("Nome: ________________________________________.  CPF: _________________________.", styles["clause"]))
+
+    # PÁGINA 5: EXTRATO DO CONTRATO
     story.append(PageBreak())
     if timbre:
         timbre2 = _timbre_flowable(timbre_path)
@@ -591,6 +712,10 @@ def _montar_corpo_contrato_story(
             styles["clause"],
         )
     )
+
+    if selo_eletronico and modo_local == "BLOCO_CONTRATADO_E_EXTRATO":
+        story.append(Spacer(1, 10 * mm))
+        story.append(_criar_tabela_selo(selo_eletronico))
 
     return story
 
@@ -672,6 +797,12 @@ def _montar_relatorio_evidencias_story(
             Paragraph(_esc(evidencia.get("modalidade_label") or "Assinatura Eletrônica Simples (Lei nº 14.063/2020, art. 4º, I)"), styles["ev_val"]),
             Paragraph("<b>Referência Normativa</b>", styles["ev_label"]),
             Paragraph(_esc(evidencia.get("ato_normativo") or "Lei nº 14.063/2020 • MP nº 2.200-2/2001 • LGPD (Lei nº 13.709/2018)"), styles["ev_val"]),
+        ],
+        [
+            Paragraph("<b>Local da Assinatura</b>", styles["ev_label"]),
+            Paragraph(_esc(((evidencia.get("local_assinatura") or {}).get("descricao")) or "Folha de Assinaturas — Campo do Contratado (Pág. 4)"), styles["ev_val"]),
+            Paragraph("<b>Ambiente / Modalidade</b>", styles["ev_label"]),
+            Paragraph("Presencial no Setor de RH (Gestoor360)", styles["ev_val"]),
         ],
     ]
     tbl_gerais = Table(dados_gerais, colWidths=[34 * mm, 56 * mm, 34 * mm, 50 * mm])
@@ -919,8 +1050,8 @@ def gerar_pdf_contrato_base(contrato: Dict[str, Any], timbre_path: Optional[str]
     rodape = f"Gestoor360 • Contrato Nº {contrato.get('num_contrato')} (Versão {contrato.get('versao', 1)}) • Documento Base para Assinatura Presencial"
     doc.build(
         story,
-        onFirstPage=lambda c, d: _draw_page_footer(c, d, rodape),
-        onLaterPages=lambda c, d: _draw_page_footer(c, d, rodape),
+        onFirstPage=lambda c, d: _draw_page_footer(c, d, rodape, selo_eletronico=None),
+        onLaterPages=lambda c, d: _draw_page_footer(c, d, rodape, selo_eletronico=None),
     )
     raw = buf.getvalue()
     return raw, sha256_bytes(raw)
@@ -954,8 +1085,8 @@ def gerar_pdf_contrato_assinado(
     )
     doc.build(
         story,
-        onFirstPage=lambda c, d: _draw_page_footer(c, d, rodape),
-        onLaterPages=lambda c, d: _draw_page_footer(c, d, rodape),
+        onFirstPage=lambda c, d: _draw_page_footer(c, d, rodape, selo_eletronico=evidencia, total_paginas_contrato=5),
+        onLaterPages=lambda c, d: _draw_page_footer(c, d, rodape, selo_eletronico=evidencia, total_paginas_contrato=5),
     )
     raw = buf.getvalue()
     return raw, sha256_bytes(raw)
@@ -982,8 +1113,8 @@ def gerar_pdf_relatorio_evidencias(
     rodape = f"GESTOOR SIGN • Relatório de Evidências • Código: {evidencia.get('codigo_validacao')}"
     doc.build(
         story,
-        onFirstPage=lambda c, d: _draw_page_footer(c, d, rodape),
-        onLaterPages=lambda c, d: _draw_page_footer(c, d, rodape),
+        onFirstPage=lambda c, d: _draw_page_footer(c, d, rodape, selo_eletronico=None),
+        onLaterPages=lambda c, d: _draw_page_footer(c, d, rodape, selo_eletronico=None),
     )
     raw = buf.getvalue()
     return raw, sha256_bytes(raw)

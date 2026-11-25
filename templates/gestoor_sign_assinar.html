@@ -13,11 +13,57 @@
         .g360-bg-dark-2 { background-color: #14532D; }
         .g360-accent-green { color: #10B981; }
         .g360-accent-yellow { color: #FACC15; }
-        .contract-doc { font-family: 'Times New Roman', Times, serif; color: #111827; line-height: 1.5; font-size: 10.5pt; }
-        .contract-doc p { text-align: justify; margin-bottom: 10px; }
-        .contract-doc h4 { font-weight: 700; margin-top: 12px; margin-bottom: 4px; font-size: 10.5pt; }
+        .contract-doc { font-family: 'Times New Roman', Times, serif; color: #111827; line-height: 1.42; font-size: 10.5pt; }
+        .contract-doc p { text-align: justify; margin-bottom: 9px; }
+        .contract-doc h4 { font-weight: 700; margin-top: 10px; margin-bottom: 4px; font-size: 10.5pt; }
+        .contract-doc .item-list { margin-left: 20px; text-align: justify; margin-bottom: 5px; }
+        .contract-sheet {
+            position: relative;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            box-shadow: 0 4px 14px rgba(11, 61, 46, 0.08);
+            padding: 28px 34px 36px 34px;
+            margin-bottom: 20px;
+            min-height: 760px;
+            user-select: none;
+        }
+        .contract-sheet.custom-pick-mode {
+            cursor: crosshair;
+            border-color: #10B981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
+        }
+        .seal-preview-box {
+            background: #ECFDF5;
+            border: 2px dashed #10B981;
+            border-left: 5px solid #0B3D2E;
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: #0B3D2E;
+            box-shadow: 0 4px 12px rgba(11, 61, 46, 0.14);
+        }
+        .seal-draggable {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            width: 270px;
+            z-index: 30;
+            cursor: grab;
+        }
+        .seal-draggable:active { cursor: grabbing; }
         .step-connector { height: 3px; flex: 1; background: #d1d5db; transition: background 0.3s; }
         .step-connector.done { background: #10B981; }
+        .viewer-expanded {
+            position: fixed !important;
+            inset: 16px !important;
+            z-index: 950 !important;
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        .viewer-expanded #contractPagesScroll {
+            max-height: none !important;
+            flex: 1 1 auto !important;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -152,71 +198,283 @@
         <!-- LAYOUT PRINCIPAL: ESQUERDA (CONTRATO INTEGRAL) | DIREITA (ETAPAS INTERATIVAS) -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
-            <!-- COLUNA ESQUERDA (7 cols): VISUALIZAÇÃO INTEGRAL DO CONTRATO -->
-            <section class="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-emerald-900/10 overflow-hidden">
-                <div class="g360-bg-dark px-5 py-3.5 flex items-center justify-between text-white">
+            <!-- COLUNA ESQUERDA (7 cols): VISUALIZAÇÃO INTEGRAL COMPLETA (5 PÁGINAS) + SELETOR DE LOCAL DA ASSINATURA -->
+            <section id="viewerSection" class="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-emerald-900/10 overflow-hidden">
+                <div class="g360-bg-dark px-5 py-3.5 flex flex-wrap items-center justify-between gap-2 text-white">
                     <div class="flex items-center gap-2">
                         <i class="ph ph-article text-lg text-[#FACC15]"></i>
-                        <h2 class="text-sm font-extrabold tracking-tight">Visualização Integral do Contrato para Conferência</h2>
+                        <div>
+                            <h2 class="text-sm font-extrabold tracking-tight leading-tight">Visualização Integral do Contrato para Conferência</h2>
+                            <p class="text-[10px] text-emerald-200">Documento completo (5 páginas: Cláusulas 1ª a 12ª + Assinaturas + Testemunhas + Extrato)</p>
+                        </div>
                     </div>
-                    <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/10 text-emerald-200">
-                        Leia junto com o servidor
-                    </span>
+                    <div class="flex items-center gap-1.5">
+                        <button type="button" onclick="alternarExpandirContrato()" id="btnExpandirContrato"
+                                class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white inline-flex items-center gap-1 transition">
+                            <i class="ph ph-arrows-out text-sm text-[#FACC15]"></i> <span id="txtBtnExpandir">Expandir</span>
+                        </button>
+                    </div>
                 </div>
 
-                <div class="p-6 sm:p-8 max-h-[680px] overflow-y-auto contract-doc bg-white">
-                    <div class="text-center mb-4">
-                        <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre Oficial" class="max-h-20 mx-auto object-contain mb-3">
-                        <div class="font-bold text-sm uppercase">CONTRATO ADMINISTRATIVO Nº {{ contrato_ctx.num_contrato }} {% if contrato_ctx.versao > 1 %}(VERSÃO {{ contrato_ctx.versao }}){% endif %}</div>
+                <!-- BARRA DE ESCOLHA DO LOCAL DA ASSINATURA + NAVEGAÇÃO DAS 5 PÁGINAS -->
+                <div class="bg-emerald-50/90 border-b border-emerald-200 px-4 py-3 space-y-2.5">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <label for="selectLocalAssinatura" class="text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] flex items-center gap-1.5 shrink-0">
+                            <i class="ph ph-map-pin-line text-base text-[#10B981]"></i> Local da Assinatura no Contrato:
+                        </label>
+                        <select id="selectLocalAssinatura" onchange="alterarModoLocalAssinatura(this.value)"
+                                {% if etapa_atual >= 4 or (sessao and sessao.status == 'ASSINADO_ELETRONICAMENTE') %}disabled{% endif %}
+                                class="flex-1 px-3 py-1.5 rounded-xl border border-emerald-300 bg-white text-xs font-bold text-[#0B3D2E] focus:outline-none focus:ring-2 focus:ring-[#10B981] disabled:opacity-60">
+                            <option value="BLOCO_CONTRATADO" {% if local_assinatura_atual.modo == 'BLOCO_CONTRATADO' %}selected{% endif %}>Folha de Assinaturas — Campo do Contratado (Pág. 4 — Padrão)</option>
+                            <option value="BLOCO_CONTRATADO_E_EXTRATO" {% if local_assinatura_atual.modo == 'BLOCO_CONTRATADO_E_EXTRATO' %}selected{% endif %}>Folha de Assinaturas (Pág. 4) + Extrato (Pág. 5)</option>
+                            <option value="RODAPE_TODAS_PAGINAS" {% if local_assinatura_atual.modo == 'RODAPE_TODAS_PAGINAS' %}selected{% endif %}>Folha de Assinaturas (Pág. 4) + Rubrica no Rodapé de Todas as Páginas</option>
+                            <option value="POSICAO_PERSONALIZADA" {% if local_assinatura_atual.modo == 'POSICAO_PERSONALIZADA' %}selected{% endif %}>Posição Personalizada (Clicar / Arrastar diretamente na folha)</option>
+                        </select>
                     </div>
 
-                    <div class="ml-auto w-full sm:w-2/3 text-xs font-bold text-justify mb-4 p-2.5 bg-slate-50 border-l-2 border-[#0B3D2E]">
-                        CONTRATO DE PRESTAÇÃO DE SERVIÇOS TEMPORÁRIO FIRMADO ENTRE O {{ contrato_ctx.municipio_nome|upper }} – {{ contrato_ctx.secretaria_nome|upper }} E {{ contrato_ctx.contratado_nome|upper }} PARA ATUAÇÃO COMO {{ contrato_ctx.funcao_nome|upper }}, NOS TERMOS DO ART. 37, INCISO IX DA CONSTITUIÇÃO FEDERAL.
+                    <div id="bannerPosicaoCustom" class="{% if local_assinatura_atual.modo != 'POSICAO_PERSONALIZADA' %}hidden{% endif %} p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-[11px] text-amber-950 font-semibold flex flex-wrap items-center justify-between gap-2">
+                        <span class="flex items-center gap-1.5">
+                            <i class="ph ph-cursor-click text-base text-amber-600"></i>
+                            <strong>Modo Posição Livre:</strong> clique em qualquer ponto de qualquer página abaixo (ou arraste o selo verde) para escolher o local exato da assinatura.
+                        </span>
+                        <span id="badgeCoordAtual" class="font-mono text-[10px] font-extrabold px-2 py-0.5 rounded bg-[#0B3D2E] text-[#FACC15]">
+                            Pág. {{ local_assinatura_atual.pagina }} • X: {{ local_assinatura_atual.x_pct|round|int }}% • Y: {{ local_assinatura_atual.y_pct|round|int }}%
+                        </span>
                     </div>
 
-                    <p style="text-indent: 2em;">
-                        Pelo presente instrumento particular, de um lado o <strong>{{ contrato_ctx.municipio_nome|upper }} – {{ contrato_ctx.secretaria_nome|upper }}</strong>, CNPJ nº {{ contrato_ctx.secretaria_cnpj }}, com sede na {{ contrato_ctx.secretaria_endereco }}, representada neste ato por {{ contrato_ctx.representante_cargo or 'Secretário(a) Municipal' }}, o(a) Sr.(a) {{ contrato_ctx.representante_nome }}, CPF/RG nº {{ contrato_ctx.representante_rg_cpf }}, residente e domiciliado(a) na {{ contrato_ctx.representante_endereco }}, doravante denominado <strong>CONTRATANTE</strong>, e de outro lado o(a) Sr.(a) <strong>{{ contrato_ctx.contratado_nome }}</strong>, {{ contrato_ctx.contratado_nacionalidade }}, {{ contrato_ctx.contratado_naturalidade }}, {{ contrato_ctx.contratado_estado_civil }}, RG nº {{ contrato_ctx.contratado_rg }} e CPF nº {{ contrato_ctx.contratado_cpf }}, residente e domiciliado(a) na {{ contrato_ctx.contratado_endereco }}, doravante denominado <strong>CONTRATADO</strong>, celebram o presente instrumento mediante as cláusulas e condições seguintes:
-                    </p>
+                    <div class="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                        <div class="flex flex-wrap items-center gap-1">
+                            <span class="text-[10px] font-bold uppercase text-slate-500 mr-1">Ir para:</span>
+                            <button type="button" onclick="irParaPagina(1)" class="px-2 py-1 rounded-lg bg-white hover:bg-[#0B3D2E] hover:text-white border border-emerald-200 text-[11px] font-bold text-[#0B3D2E] transition">Pág. 1</button>
+                            <button type="button" onclick="irParaPagina(2)" class="px-2 py-1 rounded-lg bg-white hover:bg-[#0B3D2E] hover:text-white border border-emerald-200 text-[11px] font-bold text-[#0B3D2E] transition">Pág. 2</button>
+                            <button type="button" onclick="irParaPagina(3)" class="px-2 py-1 rounded-lg bg-white hover:bg-[#0B3D2E] hover:text-white border border-emerald-200 text-[11px] font-bold text-[#0B3D2E] transition">Pág. 3</button>
+                            <button type="button" onclick="irParaPagina(4)" class="px-2 py-1 rounded-lg bg-white hover:bg-[#0B3D2E] hover:text-white border border-emerald-200 text-[11px] font-bold text-[#0B3D2E] transition">Pág. 4 (Assinaturas)</button>
+                            <button type="button" onclick="irParaPagina(5)" class="px-2 py-1 rounded-lg bg-white hover:bg-[#0B3D2E] hover:text-white border border-emerald-200 text-[11px] font-bold text-[#0B3D2E] transition">Pág. 5 (Extrato)</button>
+                        </div>
+                        <span id="resumoLocalTopo" class="text-[10px] font-bold text-emerald-800">{{ local_assinatura_atual.descricao }}</span>
+                    </div>
+                </div>
 
-                    <h4>1 – DO OBJETO</h4>
-                    <p><strong>CLÁUSULA PRIMEIRA</strong> – O objeto do presente contrato é a contratação do Servidor Temporário para atender ao Excepcional Interesse Público, para a prestação de serviços na função de <strong>{{ contrato_ctx.funcao_nome }}</strong>, atendidas as determinações da {{ contrato_ctx.secretaria_nome }}, conforme Constituição Federal, artigo 37, inciso IX.</p>
-                    <p><strong>PARÁGRAFO ÚNICO</strong> – Os trabalhos serão desenvolvidos em estrita observância às cláusulas deste contrato, principalmente no tocante às obrigações do CONTRATADO.</p>
+                <!-- CORPO INTEGRAL COMPLETO DAS 5 PÁGINAS DO CONTRATO -->
+                <div id="contractPagesScroll" class="p-4 sm:p-6 max-h-[760px] overflow-y-auto bg-slate-200/70 contract-doc">
 
-                    <h4>2 – DO PREÇO</h4>
-                    <p><strong>CLÁUSULA SEGUNDA</strong> – A CONTRATANTE pagará ao CONTRATADO o valor mensal de <strong>{{ contrato_ctx.remuneracao_formatada }}</strong> ({{ contrato_ctx.remuneracao_extenso }}), estando incluídos todos os insumos, taxas, encargos e demais despesas.</p>
+                    <!-- PÁGINA 1: PREÂMBULO E CLÁUSULAS 1 A 4 -->
+                    <div id="folhaContrato1" data-page="1" class="contract-sheet" onclick="cliqueNaFolha(event, 1)">
+                        <div class="flex items-center justify-between text-[10px] font-sans font-bold text-slate-400 uppercase mb-3 border-b border-slate-100 pb-1.5">
+                            <span>Folha 1 de 5 — Contrato Administrativo</span>
+                            <span>Nº {{ contrato_ctx.num_contrato }}{% if contrato_ctx.versao > 1 %} (v{{ contrato_ctx.versao }}){% endif %}</span>
+                        </div>
 
-                    <h4>3 – DA JORNADA DE TRABALHO</h4>
-                    <p><strong>CLÁUSULA TERCEIRA</strong> – A jornada de trabalho do CONTRATADO durante a vigência do presente contrato é de <strong>{{ contrato_ctx.jornada_trabalho }}</strong>.</p>
+                        <div class="text-center mb-3">
+                            <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre Oficial" class="max-h-20 mx-auto object-contain mb-2">
+                            <div class="font-bold text-sm uppercase">CONTRATO ADMINISTRATIVO Nº {{ contrato_ctx.num_contrato }}{% if contrato_ctx.versao > 1 %} (VERSÃO {{ contrato_ctx.versao }}){% endif %}</div>
+                        </div>
 
-                    <h4>4 – DO PRAZO</h4>
-                    <p><strong>CLÁUSULA QUARTA</strong> – O contratado trabalhará em caráter de excepcionalidade, contados a partir de <strong>{{ contrato_ctx.dt_inicio_extenso }}</strong> a <strong>{{ contrato_ctx.dt_termino_extenso }}</strong>.</p>
-                    <p><strong>PARÁGRAFO ÚNICO</strong> – O presente contrato poderá ser rescindido a qualquer tempo por acordo entre as partes, ou unilateralmente pela CONTRATANTE no caso de descumprimento contratual, prevalecendo sempre o interesse público.</p>
+                        <div class="ml-auto w-full sm:w-3/5 text-[9.5pt] font-bold text-justify mb-4 leading-snug">
+                            CONTRATO DE PRESTAÇÃO DE SERVIÇOS TEMPORÁRIO FIRMADO ENTRE O {{ contrato_ctx.municipio_nome|upper }} – {{ contrato_ctx.secretaria_nome|upper }} E {{ contrato_ctx.contratado_nome|upper }} PARA ATUAÇÃO COMO {{ contrato_ctx.funcao_nome|upper }}, NOS TERMOS DO ART. 37, INCISO IX DA CONSTITUIÇÃO FEDERAL.
+                        </div>
 
-                    <h4>5 – DA EXECUÇÃO DOS SERVIÇOS</h4>
-                    <p><strong>CLÁUSULA QUINTA</strong> – Na execução dos serviços o CONTRATADO se obriga a respeitar rigorosamente as normas de higiene, segurança e qualidade determinadas pelo CONTRATANTE, comunicando por escrito qualquer anormalidade verificada.</p>
+                        <p style="text-indent: 2em;">
+                            Pelo presente instrumento particular, de um lado o <strong>{{ contrato_ctx.municipio_nome|upper }} – {{ contrato_ctx.secretaria_nome|upper }}</strong>, CNPJ de Nº {{ contrato_ctx.secretaria_cnpj }}, com sede na {{ contrato_ctx.secretaria_endereco }}, representada neste ato por {{ contrato_ctx.representante_cargo or 'Secretário(a) Municipal' }}, o(a) Sr.(a) {{ contrato_ctx.representante_nome }}, CPF/RG de nº {{ contrato_ctx.representante_rg_cpf }}, residente e domiciliado(a) na {{ contrato_ctx.representante_endereco }}, doravante denominado <strong>CONTRATANTE</strong>, e de outro lado o(a) Sr.(a) <strong>{{ contrato_ctx.contratado_nome }}</strong>, {{ contrato_ctx.contratado_nacionalidade }}, {{ contrato_ctx.contratado_naturalidade }}, {{ contrato_ctx.contratado_estado_civil }}, inscrito(a) com RG nº {{ contrato_ctx.contratado_rg }} e CPF nº {{ contrato_ctx.contratado_cpf }}, residente e domiciliado(a) na {{ contrato_ctx.contratado_endereco }}, doravante denominado <strong>CONTRATADO</strong>, têm, entre si, justo e contratado, com base no que dispõe o Art. 37, inciso IX da Constituição Federal, mediante as cláusulas e condições que seguem:
+                        </p>
 
-                    <h4>6 – DAS OBRIGAÇÕES DO CONTRATANTE</h4>
-                    <p><strong>CLÁUSULA SEXTA</strong> – Fornecer elementos necessários ao objeto, proceder à vistoria dos serviços e efetuar a retenção previdenciária obrigatória (Leis nº 8.212/91 e 8.213/91).</p>
+                        <h4>1 – DO OBJETO</h4>
+                        <p><strong>CLÁUSULA PRIMEIRA</strong> – O objeto do presente contrato é a contratação do Servidor Temporário para atender ao Excepcional Interesse Público, para a prestação de serviços na função de <strong>{{ contrato_ctx.funcao_nome }}</strong>, atendidas as determinações da {{ contrato_ctx.secretaria_nome }}, conforme Constituição Federal, artigo 37, inciso IX.</p>
+                        <p><strong>PARÁGRAFO ÚNICO</strong> – Os trabalhos serão desenvolvidos em estrita observância às cláusulas deste contrato, principalmente no tocante às obrigações do CONTRATADO.</p>
 
-                    <h4>7 – DAS OBRIGAÇÕES DO CONTRATADO</h4>
-                    <p><strong>CLÁUSULA SÉTIMA</strong> – Arcar com despesas vinculadas à execução, atuar com esmero técnico, responsabilizar-se por danos causados à Administração ou a terceiros e sujeitar-se à fiscalização do CONTRATANTE.</p>
+                        <h4>2 – DO PREÇO</h4>
+                        <p><strong>CLÁUSULA SEGUNDA</strong> – A CONTRATANTE pagará ao CONTRATADO o valor mensal de <strong>{{ contrato_ctx.remuneracao_formatada }}</strong> ({{ contrato_ctx.remuneracao_extenso }}).</p>
+                        <p>Pelos serviços contratados, estando incluídos nos mesmos todos os insumos, taxas, encargos e demais despesas;</p>
 
-                    <h4>8 – DA DOTAÇÃO ORÇAMENTÁRIA</h4>
-                    <p><strong>CLÁUSULA OITAVA</strong> – As despesas correrão por conta do Orçamento Anual do Município do exercício de {{ contrato_ctx.ano_exercicio }} (FUNDEB, FPM, IPVA, ICMS e Arrecadação Própria).</p>
+                        <h4>3 – DA JORNADA DE TRABALHO</h4>
+                        <p><strong>CLÁUSULA TERCEIRA</strong> – A jornada de trabalho do CONTRATADO durante a vigência do presente contrato é de <strong>{{ contrato_ctx.jornada_trabalho }}</strong>;</p>
 
-                    <h4>9 – DAS PENALIDADES</h4>
-                    <p><strong>CLÁUSULA NONA</strong> – Aplicam-se as penalidades previstas no Estatuto dos Servidores Públicos do {{ contrato_ctx.municipio_nome }}.</p>
+                        <h4>4 – DO PRAZO</h4>
+                        <p><strong>CLÁUSULA QUARTA</strong> – O contratado trabalhará em caráter de excepcionalidade, contados a partir de <strong>{{ contrato_ctx.dt_inicio_extenso }}</strong> a <strong>{{ contrato_ctx.dt_termino_extenso }}</strong>.</p>
 
-                    <h4>10 – DA RESCISÃO</h4>
-                    <p><strong>CLÁUSULA DÉCIMA</strong> – O contrato estará rescindido automaticamente ao término do prazo estipulado na Cláusula Quarta ou na hipótese de falta funcional prevista no Estatuto dos Servidores Públicos.</p>
+                        <div class="rodape-rubrica-preview hidden mt-6 px-3 py-1.5 rounded bg-emerald-50 border border-[#10B981] font-sans text-[10px] font-bold text-[#0B3D2E]">
+                            ✍ Rubrica Eletrônica Gestoor Sign será estampada no rodapé desta página
+                        </div>
+                    </div>
 
-                    <h4>11 – DAS DISPOSIÇÕES GERAIS</h4>
-                    <p><strong>CLÁUSULA DÉCIMA PRIMEIRA</strong> – O CONTRATADO assume exclusiva responsabilidade pelas obrigações trabalhistas, previdenciárias, civis e fiscais decorrentes da execução deste contrato, sem solidariedade do CONTRATANTE.</p>
+                    <!-- PÁGINA 2: PARÁGRAFO ÚNICO E CLÁUSULAS 5, 6 E 7 COMPLETAS -->
+                    <div id="folhaContrato2" data-page="2" class="contract-sheet" onclick="cliqueNaFolha(event, 2)">
+                        <div class="flex items-center justify-between text-[10px] font-sans font-bold text-slate-400 uppercase mb-3 border-b border-slate-100 pb-1.5">
+                            <span>Folha 2 de 5 — Execução e Obrigações</span>
+                            <span>Nº {{ contrato_ctx.num_contrato }}</span>
+                        </div>
 
-                    <h4>12 – DO FORO</h4>
-                    <p><strong>CLÁUSULA DÉCIMA SEGUNDA</strong> – Fica eleito o Foro da Comarca de {{ contrato_ctx.municipio_cidade }} – {{ contrato_ctx.municipio_uf }} para dirimir quaisquer dúvidas pertinentes ao presente contrato.</p>
+                        <div class="text-center mb-3">
+                            <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre Oficial" class="max-h-16 mx-auto object-contain">
+                        </div>
 
-                    <p class="text-center font-bold mt-5">{{ contrato_ctx.municipio_cidade }}/{{ contrato_ctx.municipio_uf }}, {{ contrato_ctx.dt_assinatura_extenso }}.</p>
+                        <p><strong>PARÁGRAFO ÚNICO</strong> – O presente contrato poderá ser rescindido a qualquer tempo por acordo entre as partes, ou unilateralmente pela CONTRATANTE no caso de o CONTRATADO deixar de cumprir qualquer uma das suas cláusulas, devendo prevalecer em todos os casos o interesse público.</p>
+
+                        <h4>5 – DA EXECUÇÃO DOS SERVIÇOS</h4>
+                        <p><strong>CLÁUSULA QUINTA</strong> – Na execução dos serviços o CONTRATADO se obriga a respeitar, rigorosamente, durante o período de vigência deste contrato as normas de higiene e segurança, por cujos encargos responderá unilateralmente, devendo observar também os requisitos de qualidade, determinados pelo CONTRATANTE, através do setor responsável pela fiscalização, aprovação e liberação do serviço.</p>
+                        <p><strong>PARÁGRAFO ÚNICO</strong>: O CONTRATADO, sem prejuízo de sua responsabilidade, deverá comunicar à fiscalização do CONTRATANTE, por escrito, qualquer anormalidade verificada na execução ou no controle dos serviços, bem como qualquer fato que possa colocar em risco a segurança e a qualidade dos mesmos e sua execução dentro do prazo pactuado.</p>
+
+                        <h4>6 – DAS OBRIGAÇÕES DO CONTRATANTE</h4>
+                        <p><strong>CLÁUSULA SEXTA</strong> – São obrigações da CONTRATANTE:</p>
+                        <p class="item-list">I - Fornecer elementos necessários à realização do objeto deste contrato;</p>
+                        <p class="item-list">II - Receber os serviços, procedendo-lhe a vistoria necessária e compatível com o objeto deste;</p>
+                        <p class="item-list">III - Efetuar a retenção da contribuição previdenciária obrigatória sobre sua remuneração, para os fins da Lei 8.212/91 e Lei 8.213/91.</p>
+
+                        <h4>7 – DAS OBRIGAÇÕES DO CONTRATADO</h4>
+                        <p><strong>CLÁUSULA SÉTIMA</strong> – São obrigações do CONTRATADO:</p>
+                        <p class="item-list">I - Todas as despesas referentes ao objeto deste contrato, mão de obra, locomoção, seguro de acidente, impostos federais, estaduais e municipais, contribuições previdenciárias, encargos trabalhistas e quaisquer outras que forem devidas, relativamente à execução dos serviços ora contratados;</p>
+                        <p class="item-list">II - Executar serviços ora contratados com esmero e dentro da melhor técnica, responsabilizando-se por quaisquer erros, falhas ou imperfeições que porventura ocorram;</p>
+                        <p class="item-list">III - Responsabilizar-se pelos danos causados diretamente à Administração ou a terceiros, decorrentes de seus serviços;</p>
+                        <p class="item-list">IV - Sujeitar-se à mais ampla e irrestrita fiscalização por parte do CONTRATANTE, prestando todos os esclarecimentos solicitados e atendendo às reclamações solicitadas;</p>
+
+                        <div class="rodape-rubrica-preview hidden mt-6 px-3 py-1.5 rounded bg-emerald-50 border border-[#10B981] font-sans text-[10px] font-bold text-[#0B3D2E]">
+                            ✍ Rubrica Eletrônica Gestoor Sign será estampada no rodapé desta página
+                        </div>
+                    </div>
+
+                    <!-- PÁGINA 3: CLÁUSULAS 8, 9, 10 E 11 COMPLETAS -->
+                    <div id="folhaContrato3" data-page="3" class="contract-sheet" onclick="cliqueNaFolha(event, 3)">
+                        <div class="flex items-center justify-between text-[10px] font-sans font-bold text-slate-400 uppercase mb-3 border-b border-slate-100 pb-1.5">
+                            <span>Folha 3 de 5 — Dotação, Penalidades, Rescisão e Disposições Gerais</span>
+                            <span>Nº {{ contrato_ctx.num_contrato }}</span>
+                        </div>
+
+                        <div class="text-center mb-3">
+                            <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre Oficial" class="max-h-16 mx-auto object-contain">
+                        </div>
+
+                        <h4>8 – DA DOTAÇÃO ORÇAMENTÁRIA</h4>
+                        <p><strong>CLÁUSULA OITAVA</strong> – As despesas decorrentes do presente contrato correrão por conta de recursos orçamentários consignados no Orçamento Anual do Município do exercício de {{ contrato_ctx.ano_exercicio }}, mais especificamente dos recursos do Fundo Nacional de Desenvolvimento da Educação (FUNDEB); Fundo de Participação dos Municípios (FPM); do Imposto sobre a Propriedade de Veículos Automotores (IPVA); do Imposto sobre a Circulação de Mercadorias e Serviços (ICMS) e da Arrecadação Própria do Município.</p>
+
+                        <h4>9 – DAS PENALIDADES</h4>
+                        <p><strong>CLÁUSULA NONA</strong> – Se o CONTRATADO não satisfazer os compromissos assumidos serão aplicadas as penalidades previstas no Estatuto dos Servidores Públicos do {{ contrato_ctx.municipio_nome }} e demais normas administrativas aplicáveis.</p>
+
+                        <h4>10 – DA RESCISÃO</h4>
+                        <p><strong>CLÁUSULA DÉCIMA</strong> – Este contrato estará rescindido, automaticamente:</p>
+                        <p class="item-list">a) No final do prazo estipulado na Cláusula Quarta, desde que não tenha ocorrido prorrogação;</p>
+                        <p class="item-list">b) Se a parte CONTRATADA incidir em qualquer das faltas arroladas no Estatuto dos Servidores Públicos do {{ contrato_ctx.municipio_nome }}.</p>
+
+                        <h4>11 – DAS DISPOSIÇÕES GERAIS</h4>
+                        <p><strong>CLÁUSULA DÉCIMA PRIMEIRA</strong> – Além das cláusulas que compõem o presente contrato, ficam sujeitas as partes às normas previstas no Estatuto dos Servidores Públicos do {{ contrato_ctx.municipio_nome }}.</p>
+                        <p><strong>PARÁGRAFO PRIMEIRO</strong> – O CONTRATADO assume exclusiva responsabilidade pelo cumprimento de todas as obrigações decorrentes da execução deste contrato, sejam estas de natureza trabalhistas, previdenciária, civil ou fiscal, inexistindo solidariedade do CONTRATANTE relativamente a esses encargos, inclusive os que eventualmente advirem de prejuízos causados a terceiros.</p>
+                        <p><strong>PARÁGRAFO SEGUNDO</strong> – O CONTRATADO assumirá inteira responsabilidade por todos os prejuízos que venha, dolosa ou culposamente, causar ao Município quando da prestação dos serviços.</p>
+                        <p><strong>PARÁGRAFO TERCEIRO</strong> – O CONTRATADO prestará todos os esclarecimentos que forem solicitados pelo Município, cujas reclamações se obrigam a atender, prontamente, mantendo um representante ou preposto com poderes para com o Município.</p>
+                        <p><strong>PARÁGRAFO QUARTO</strong> – No caso de recusa no atendimento de qualquer reclamação, independentemente das sanções cabíveis, o Município poderá confiar a outrem a prestação dos serviços não executados, notificando brevemente ao CONTRATADO, descontando o seu custo de uma só vez, no primeiro pagamento subsequente ou no valor da garantia, sem que a mesma possa impugnar seu valor.</p>
+
+                        <div class="rodape-rubrica-preview hidden mt-6 px-3 py-1.5 rounded bg-emerald-50 border border-[#10B981] font-sans text-[10px] font-bold text-[#0B3D2E]">
+                            ✍ Rubrica Eletrônica Gestoor Sign será estampada no rodapé desta página
+                        </div>
+                    </div>
+
+                    <!-- PÁGINA 4: FORO, LOCAL/DATA, ASSINATURAS E TESTEMUNHAS -->
+                    <div id="folhaContrato4" data-page="4" class="contract-sheet" onclick="cliqueNaFolha(event, 4)">
+                        <div class="flex items-center justify-between text-[10px] font-sans font-bold text-slate-400 uppercase mb-3 border-b border-slate-100 pb-1.5">
+                            <span>Folha 4 de 5 — Foro, Assinaturas e Testemunhas</span>
+                            <span>Nº {{ contrato_ctx.num_contrato }}</span>
+                        </div>
+
+                        <div class="text-center mb-3">
+                            <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre Oficial" class="max-h-16 mx-auto object-contain">
+                        </div>
+
+                        <h4>12 – DO FORO</h4>
+                        <p><strong>CLÁUSULA DÉCIMA SEGUNDA</strong> – Fica eleito o FORO da Comarca de {{ contrato_ctx.municipio_cidade }} – {{ contrato_ctx.municipio_uf }}, com expressa renúncia de qualquer outro, para serem dirimidas quaisquer dúvidas pertinentes ao presente contrato.</p>
+                        <p>As partes firmam o presente instrumento em igual teor e forma, obrigando-se por si e seus sucessores ao fiel cumprimento do que ora ficou ajustado.</p>
+
+                        <p class="text-center font-bold mt-6 mb-8">{{ contrato_ctx.municipio_cidade }}/{{ contrato_ctx.municipio_uf }}, {{ contrato_ctx.dt_assinatura_extenso }}.</p>
+
+                        <div class="space-y-8 text-center my-6">
+                            <div class="max-w-sm mx-auto">
+                                <div class="border-t border-black pt-1.5">
+                                    <strong>{{ contrato_ctx.municipio_nome }} – {{ contrato_ctx.secretaria_nome }}</strong>
+                                    <div class="text-xs">{{ contrato_ctx.representante_nome }}</div>
+                                </div>
+                            </div>
+
+                            <!-- CAMPO DO CONTRATADO: EXIBE PREVIEW DO SELO ELETRÔNICO QUANDO MODO PADRÃO -->
+                            <div id="previewSeloBlocoContratado" class="max-w-md mx-auto">
+                                <div class="seal-preview-box text-left">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <div>
+                                            <div class="text-[10px] font-extrabold uppercase tracking-wider text-[#0B3D2E] flex items-center gap-1">
+                                                <i class="ph ph-signature text-sm text-[#10B981]"></i> Local da Assinatura Eletrônica (Gestoor Sign)
+                                            </div>
+                                            <div class="text-xs font-extrabold text-slate-900 mt-0.5">{{ contrato_ctx.contratado_nome }}</div>
+                                            <div class="text-[10px] text-slate-600">CPF: {{ contrato_ctx.contratado_cpf | mask_cpf }} • Assinatura Eletrônica Simples (OTP SMS)</div>
+                                        </div>
+                                        <div class="w-11 h-11 rounded-lg bg-white border border-emerald-300 flex items-center justify-center text-[#0B3D2E] shrink-0">
+                                            <i class="ph ph-qr-code text-2xl"></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div id="linhaManualContratado" class="hidden max-w-sm mx-auto">
+                                <div class="border-t border-black pt-1.5">
+                                    <strong>CONTRATADO(A): {{ contrato_ctx.contratado_nome }}</strong>
+                                    <div class="text-xs">CPF: {{ contrato_ctx.contratado_cpf }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-8 space-y-2 text-sm">
+                            <div class="font-bold">Testemunhas:</div>
+                            <div>Nome: ________________________________________. &nbsp; CPF: _________________________.</div>
+                            <div>Nome: ________________________________________. &nbsp; CPF: _________________________.</div>
+                        </div>
+
+                        <div class="rodape-rubrica-preview hidden mt-6 px-3 py-1.5 rounded bg-emerald-50 border border-[#10B981] font-sans text-[10px] font-bold text-[#0B3D2E]">
+                            ✍ Rubrica Eletrônica Gestoor Sign será estampada no rodapé desta página
+                        </div>
+                    </div>
+
+                    <!-- PÁGINA 5: EXTRATO DO CONTRATO -->
+                    <div id="folhaContrato5" data-page="5" class="contract-sheet" onclick="cliqueNaFolha(event, 5)">
+                        <div class="flex items-center justify-between text-[10px] font-sans font-bold text-slate-400 uppercase mb-3 border-b border-slate-100 pb-1.5">
+                            <span>Folha 5 de 5 — Extrato do Contrato</span>
+                            <span>Nº {{ contrato_ctx.num_contrato }}</span>
+                        </div>
+
+                        <div class="text-center mb-4">
+                            <img src="{{ url_for('static', filename='timbre.jpg') }}" alt="Timbre Oficial" class="max-h-20 mx-auto object-contain mb-3">
+                            <div class="font-bold text-sm uppercase">
+                                {{ contrato_ctx.municipio_nome|upper }} – {{ contrato_ctx.secretaria_nome|upper }}<br>
+                                EXTRATO DE CONTRATO Nº {{ contrato_ctx.num_contrato }}{% if contrato_ctx.versao > 1 %} (VERSÃO {{ contrato_ctx.versao }}){% endif %}
+                            </div>
+                        </div>
+
+                        <p style="line-height: 1.7;">
+                            <strong>CONTRATANTE:</strong> {{ contrato_ctx.municipio_nome }} – {{ contrato_ctx.secretaria_nome }}.
+                            <strong>CONTRATADO:</strong> {{ contrato_ctx.contratado_nome }}.
+                            <strong>OBJETO:</strong> Prestação de serviços na função de {{ contrato_ctx.funcao_nome }}, atendidas as determinações da {{ contrato_ctx.secretaria_nome }}.
+                            <strong>RECURSOS:</strong> Orçamento Anual do Município do exercício de {{ contrato_ctx.ano_exercicio }}, mais especificamente dos recursos do Fundo Nacional de Desenvolvimento da Educação (FUNDEB); Fundo de Participação dos Municípios (FPM); do Imposto sobre a Propriedade de Veículos Automotores (IPVA); do Imposto sobre a Circulação de Mercadorias e Serviços (ICMS) e da Arrecadação Própria do Município.
+                            <strong>VALOR:</strong> {{ contrato_ctx.remuneracao_formatada }} ({{ contrato_ctx.remuneracao_extenso }}) mensais.
+                            <strong>VIGÊNCIA:</strong> {{ contrato_ctx.dt_inicio_formatada }} a {{ contrato_ctx.dt_termino_formatada }}.
+                            <strong>DATA DA ASSINATURA:</strong> {{ contrato_ctx.dt_assinatura_formatada }}.
+                        </p>
+
+                        <div id="previewSeloExtrato" class="hidden max-w-md mx-auto mt-10">
+                            <div class="seal-preview-box text-left">
+                                <div class="flex items-center justify-between gap-2">
+                                    <div>
+                                        <div class="text-[10px] font-extrabold uppercase tracking-wider text-[#0B3D2E] flex items-center gap-1">
+                                            <i class="ph ph-signature text-sm text-[#10B981]"></i> Selo Eletrônico no Extrato (Gestoor Sign)
+                                        </div>
+                                        <div class="text-xs font-extrabold text-slate-900 mt-0.5">{{ contrato_ctx.contratado_nome }}</div>
+                                        <div class="text-[10px] text-slate-600">Assinatura Eletrônica Simples + QR Code de Validação</div>
+                                    </div>
+                                    <div class="w-10 h-10 rounded-lg bg-white border border-emerald-300 flex items-center justify-center text-[#0B3D2E] shrink-0">
+                                        <i class="ph ph-qr-code text-xl"></i>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="rodape-rubrica-preview hidden mt-6 px-3 py-1.5 rounded bg-emerald-50 border border-[#10B981] font-sans text-[10px] font-bold text-[#0B3D2E]">
+                            ✍ Rubrica Eletrônica Gestoor Sign será estampada no rodapé desta página
+                        </div>
+                    </div>
+
                 </div>
             </section>
 
@@ -509,6 +767,150 @@
         let ASSINATURA_ID = {{ sessao.id if sessao else 'null' }};
         let cooldownInterval = null;
         let expiracaoInterval = null;
+        let LOCAL_ASSINATURA = {{ local_assinatura_atual | tojson }};
+        let sealDragEl = null;
+        let arrastandoSelo = false;
+
+        function irParaPagina(numPag) {
+            const el = document.getElementById('folhaContrato' + numPag);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function alternarExpandirContrato() {
+            const sec = document.getElementById('viewerSection');
+            const txt = document.getElementById('txtBtnExpandir');
+            if (!sec) return;
+            const expanded = sec.classList.toggle('viewer-expanded');
+            txt.textContent = expanded ? 'Restaurar' : 'Expandir';
+        }
+
+        function renderizarLocalAssinatura() {
+            const modo = LOCAL_ASSINATURA.modo || 'BLOCO_CONTRATADO';
+            const seloBloco = document.getElementById('previewSeloBlocoContratado');
+            const linhaManual = document.getElementById('linhaManualContratado');
+            const seloExtrato = document.getElementById('previewSeloExtrato');
+            const bannerCustom = document.getElementById('bannerPosicaoCustom');
+            const badgeCoord = document.getElementById('badgeCoordAtual');
+            const resumoTopo = document.getElementById('resumoLocalTopo');
+
+            // Remove selo flutuante antigo se existir
+            if (sealDragEl && sealDragEl.parentNode) {
+                sealDragEl.parentNode.removeChild(sealDragEl);
+                sealDragEl = null;
+            }
+
+            // Reset classes das folhas
+            document.querySelectorAll('.contract-sheet').forEach(sh => {
+                sh.classList.toggle('custom-pick-mode', modo === 'POSICAO_PERSONALIZADA');
+            });
+            document.querySelectorAll('.rodape-rubrica-preview').forEach(r => {
+                r.classList.toggle('hidden', modo !== 'RODAPE_TODAS_PAGINAS');
+            });
+
+            if (seloBloco && linhaManual) {
+                const usarBloco = modo !== 'POSICAO_PERSONALIZADA';
+                seloBloco.classList.toggle('hidden', !usarBloco);
+                linhaManual.classList.toggle('hidden', usarBloco);
+            }
+            if (seloExtrato) {
+                seloExtrato.classList.toggle('hidden', modo !== 'BLOCO_CONTRATADO_E_EXTRATO');
+            }
+            if (bannerCustom) {
+                bannerCustom.classList.toggle('hidden', modo !== 'POSICAO_PERSONALIZADA');
+            }
+
+            const descricoes = {
+                'BLOCO_CONTRATADO': 'Folha de Assinaturas — Campo do Contratado (Pág. 4)',
+                'BLOCO_CONTRATADO_E_EXTRATO': 'Folha de Assinaturas (Pág. 4) + Extrato (Pág. 5)',
+                'RODAPE_TODAS_PAGINAS': 'Folha de Assinaturas (Pág. 4) + Rubrica no Rodapé de Todas as Páginas',
+                'POSICAO_PERSONALIZADA': 'Posição Personalizada — Pág. ' + LOCAL_ASSINATURA.pagina + ' (X: ' + Math.round(LOCAL_ASSINATURA.x_pct) + '%, Y: ' + Math.round(LOCAL_ASSINATURA.y_pct) + '%)'
+            };
+            LOCAL_ASSINATURA.descricao = descricoes[modo] || descricoes['BLOCO_CONTRATADO'];
+            if (resumoTopo) resumoTopo.textContent = LOCAL_ASSINATURA.descricao;
+            if (badgeCoord) {
+                badgeCoord.textContent = 'Pág. ' + LOCAL_ASSINATURA.pagina + ' • X: ' + Math.round(LOCAL_ASSINATURA.x_pct) + '% • Y: ' + Math.round(LOCAL_ASSINATURA.y_pct) + '%';
+            }
+
+            if (modo === 'POSICAO_PERSONALIZADA') {
+                const folhaAlvo = document.getElementById('folhaContrato' + (LOCAL_ASSINATURA.pagina || 4));
+                if (folhaAlvo) {
+                    const div = document.createElement('div');
+                    div.className = 'seal-preview-box seal-draggable';
+                    div.style.left = LOCAL_ASSINATURA.x_pct + '%';
+                    div.style.top = LOCAL_ASSINATURA.y_pct + '%';
+                    div.innerHTML = `
+                        <div class="flex items-center justify-between gap-2 pointer-events-none">
+                            <div>
+                                <div class="text-[9px] font-extrabold uppercase tracking-wider text-[#0B3D2E] flex items-center gap-1">
+                                    <i class="ph ph-arrows-out-cardinal text-xs text-[#10B981]"></i> ASSINATURA ELETRÔNICA AQUI
+                                </div>
+                                <div class="text-[11px] font-extrabold text-slate-900 truncate max-w-[185px]">{{ contrato_ctx.contratado_nome }}</div>
+                                <div class="text-[9px] text-slate-600">Arraste ou clique na página para reposicionar</div>
+                            </div>
+                            <div class="w-9 h-9 rounded bg-white border border-emerald-300 flex items-center justify-center text-[#0B3D2E] shrink-0">
+                                <i class="ph ph-qr-code text-lg"></i>
+                            </div>
+                        </div>`;
+
+                    div.addEventListener('mousedown', function(ev) {
+                        ev.stopPropagation();
+                        arrastandoSelo = true;
+                        const onMove = (mv) => {
+                            if (!arrastandoSelo) return;
+                            const rect = folhaAlvo.getBoundingClientRect();
+                            let xp = ((mv.clientX - rect.left) / rect.width) * 100;
+                            let yp = ((mv.clientY - rect.top) / rect.height) * 100;
+                            xp = Math.max(12, Math.min(88, xp));
+                            yp = Math.max(8, Math.min(92, yp));
+                            LOCAL_ASSINATURA.x_pct = Math.round(xp * 10) / 10;
+                            LOCAL_ASSINATURA.y_pct = Math.round(yp * 10) / 10;
+                            div.style.left = LOCAL_ASSINATURA.x_pct + '%';
+                            div.style.top = LOCAL_ASSINATURA.y_pct + '%';
+                            if (badgeCoord) badgeCoord.textContent = 'Pág. ' + LOCAL_ASSINATURA.pagina + ' • X: ' + Math.round(LOCAL_ASSINATURA.x_pct) + '% • Y: ' + Math.round(LOCAL_ASSINATURA.y_pct) + '%';
+                            if (resumoTopo) resumoTopo.textContent = 'Posição Personalizada — Pág. ' + LOCAL_ASSINATURA.pagina + ' (X: ' + Math.round(LOCAL_ASSINATURA.x_pct) + '%, Y: ' + Math.round(LOCAL_ASSINATURA.y_pct) + '%)';
+                        };
+                        const onUp = () => {
+                            arrastandoSelo = false;
+                            window.removeEventListener('mousemove', onMove);
+                            window.removeEventListener('mouseup', onUp);
+                        };
+                        window.addEventListener('mousemove', onMove);
+                        window.addEventListener('mouseup', onUp);
+                    });
+                    folhaAlvo.appendChild(div);
+                    sealDragEl = div;
+                }
+            }
+        }
+
+        function alterarModoLocalAssinatura(novoModo) {
+            LOCAL_ASSINATURA.modo = novoModo;
+            renderizarLocalAssinatura();
+            if (novoModo === 'BLOCO_CONTRATADO_E_EXTRATO') {
+                irParaPagina(5);
+            } else if (novoModo === 'BLOCO_CONTRATADO' || novoModo === 'POSICAO_PERSONALIZADA') {
+                irParaPagina(LOCAL_ASSINATURA.pagina || 4);
+            }
+        }
+
+        function cliqueNaFolha(event, numPag) {
+            if (LOCAL_ASSINATURA.modo !== 'POSICAO_PERSONALIZADA') return;
+            const selectEl = document.getElementById('selectLocalAssinatura');
+            if (selectEl && selectEl.disabled) return;
+            const folha = document.getElementById('folhaContrato' + numPag);
+            if (!folha) return;
+            const rect = folha.getBoundingClientRect();
+            let xp = ((event.clientX - rect.left) / rect.width) * 100;
+            let yp = ((event.clientY - rect.top) / rect.height) * 100;
+            xp = Math.max(12, Math.min(88, xp));
+            yp = Math.max(8, Math.min(92, yp));
+            LOCAL_ASSINATURA.pagina = numPag;
+            LOCAL_ASSINATURA.x_pct = Math.round(xp * 10) / 10;
+            LOCAL_ASSINATURA.y_pct = Math.round(yp * 10) / 10;
+            renderizarLocalAssinatura();
+        }
+
+        document.addEventListener('DOMContentLoaded', renderizarLocalAssinatura);
 
         function mostrarAlerta(tipo, msg) {
             const box = document.getElementById('signAlertBox');
@@ -558,7 +960,8 @@
                 body: JSON.stringify({
                     telefone: telefone,
                     presenca_confirmada: presenca,
-                    dados_conferidos: dados
+                    dados_conferidos: dados,
+                    local_assinatura: LOCAL_ASSINATURA
                 })
             })
             .then(r => r.json())
@@ -692,6 +1095,8 @@
                 document.getElementById('chkPresenca').disabled = true;
                 document.getElementById('chkDadosConferidos').disabled = true;
                 document.getElementById('btnConfirmarConferencia').disabled = true;
+                const selLoc = document.getElementById('selectLocalAssinatura');
+                if (selLoc) selLoc.disabled = true;
 
                 const c5 = document.getElementById('cardEtapa5');
                 c5.classList.remove('opacity-50', 'pointer-events-none');
