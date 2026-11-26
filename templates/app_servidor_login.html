@@ -62,6 +62,20 @@
 
             <!-- Atalhos de ajuda -->
             <div class="mt-5 space-y-3 anim-fade-up delay-2">
+                <a href="{{ url_for('app_servidor_recuperar_senha') }}"
+                   class="app-card app-card-interactive p-4 flex items-center justify-between border-emerald-200/80">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-[#0B3D2E]">
+                            <i class="ph-fill ph-scan text-lg"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-extrabold text-[#0B3D2E]">Esqueci minha senha</p>
+                            <p class="text-[11px] text-slate-500">Recuperar acesso com reconhecimento facial</p>
+                        </div>
+                    </div>
+                    <i class="ph ph-caret-right text-slate-400 card-arrow"></i>
+                </a>
+
                 <a href="{{ url_for('app_servidor_primeiro_acesso') }}"
                    class="app-card app-card-interactive p-4 flex items-center justify-between">
                     <div class="flex items-center gap-3">
@@ -75,10 +89,6 @@
                     </div>
                     <i class="ph ph-caret-right text-slate-400 card-arrow"></i>
                 </a>
-
-                <p class="text-[11px] text-center text-slate-500 px-3 leading-relaxed">
-                    Esqueceu sua senha? Solicite ao <strong>RH da sua secretaria</strong> o reinício do acesso ao SERVIDOR 360 para cadastrar uma nova senha com validação facial.
-                </p>
             </div>
         </main>
     </div>

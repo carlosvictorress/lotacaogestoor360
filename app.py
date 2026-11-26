@@ -9137,10 +9137,279 @@ def app_servidor_entrar():
 
 @app.route("/app-servidor/sair")
 def app_servidor_sair():
-    for key in ("app_servidor_id", "app_onboarding", "servidor_id", "servidor_nome", "servidor_cpf"):
+    for key in ("app_servidor_id", "app_onboarding", "app_recuperacao", "servidor_id", "servidor_nome", "servidor_cpf"):
         session.pop(key, None)
     flash("Você saiu do SERVIDOR 360 com segurança.", "success")
     return redirect(url_for("app_servidor_acesso"))
+
+
+@app.route("/app-servidor/recuperar-senha")
+def app_servidor_recuperar_senha():
+    func_obj, _ = _obter_servidor_app_autenticado()
+    if func_obj:
+        return redirect(url_for("app_servidor_inicio"))
+    mun = _obter_municipio_app()
+    return render_template(
+        "app_servidor_recuperar_senha.html",
+        municipio=mun,
+        facial_max_distance=app_servidor_service.FACIAL_MAX_DISTANCE,
+    )
+
+
+@app.route("/app-servidor/api/recuperar-senha/validar-dados", methods=["POST"])
+def app_servidor_api_rec_validar_dados():
+    client_ip = obter_ip_cliente()
+    rate_key = f"app_srv_rec:{client_ip}"
+    limited, retry_after = security.login_rate_limiter.is_limited(
+        rate_key, max_attempts=12, window_seconds=300
+    )
+    if limited:
+        return jsonify({
+            "success": False,
+            "code": "RATE_LIMIT",
+            "message": f"Muitas tentativas de recuperação. Aguarde {retry_after} segundos.",
+        }), 429
+
+    data = request.get_json(silent=True) or {}
+    cpf_raw = (data.get("cpf") or "").strip()
+    data_nasc = (data.get("data_nasc") or "").strip()
+    confirmacao_extra = (data.get("confirmacao_extra") or "").strip()
+
+    func_found = _buscar_funcionario_por_cpf(cpf_raw)
+    elegivel, codigo, msg = app_servidor_service.verificar_elegibilidade_servidor(func_found)
+    if not elegivel:
+        security.login_rate_limiter.register_failure(rate_key)
+        return jsonify({"success": False, "code": codigo, "message": msg}), 400
+
+    conta = ServidorContaApp.query.filter_by(funcionario_id=func_found.id).first()
+    if not conta or not conta.primeiro_acesso_concluido:
+        return jsonify({
+            "success": False,
+            "code": "NAO_ATIVADO",
+            "message": "Você ainda não concluiu seu Primeiro Acesso no SERVIDOR 360. Utilize a opção 'Primeiro Acesso' para criar sua senha inicial.",
+        }), 400
+
+    if not conta.ativo:
+        return jsonify({
+            "success": False,
+            "code": "CONTA_SUSPENSA",
+            "message": "Sua conta no aplicativo foi suspensa pelo RH. Procure sua secretaria.",
+        }), 403
+
+    ok_dados, msg_dados = app_servidor_service.conferir_dados_primeiro_acesso(
+        func_found, data_nasc, confirmacao_extra
+    )
+    if not ok_dados:
+        security.login_rate_limiter.register_failure(rate_key)
+        return jsonify({"success": False, "code": "DADOS_NAO_CONFEREM", "message": msg_dados}), 400
+
+    _, fonte_foto = app_servidor_service.extrair_foto_referencia(func_found)
+    if not fonte_foto:
+        return jsonify({
+            "success": False,
+            "code": "SEM_FOTO",
+            "message": "Seu cadastro não possui foto no RH para validação facial. Procure o RH da sua secretaria.",
+        }), 400
+
+    token = secrets.token_urlsafe(32)
+    session["app_recuperacao"] = {
+        "token": token,
+        "funcionario_id": func_found.id,
+        "fonte_foto": fonte_foto,
+        "facial_ok": False,
+        "exp": datetime.utcnow().timestamp() + app_servidor_service.ONBOARDING_TTL_SECONDS,
+    }
+    session.modified = True
+
+    return jsonify({
+        "success": True,
+        "recovery_token": token,
+        "nome_completo": func_found.nome,
+        "cpf_mascarado": app_servidor_service.mascarar_cpf(func_found.cpf),
+        "secretaria": func_found.secretaria.nome if func_found.secretaria else "Prefeitura Municipal",
+        "cargo": func_found.funcao.nome if func_found.funcao else (func_found.lotacao or "Servidor Municipal"),
+        "fonte_foto": "Foto 3x4 do RH" if fonte_foto == "foto_3x4" else "Biometria do RH",
+    })
+
+
+@app.route("/app-servidor/api/recuperar-senha/foto-referencia")
+def app_servidor_api_rec_foto_referencia():
+    rec = session.get("app_recuperacao") or {}
+    token_q = (request.args.get("token") or "").strip()
+    if (
+        not rec
+        or not token_q
+        or not hmac.compare_digest(str(rec.get("token", "")), token_q)
+        or datetime.utcnow().timestamp() > float(rec.get("exp") or 0)
+    ):
+        return jsonify({"success": False, "message": "Sessão de recuperação expirada. Recomece pela etapa 1."}), 401
+
+    func_obj = db.session.get(Funcionario, int(rec["funcionario_id"]))
+    elegivel, codigo, msg = app_servidor_service.verificar_elegibilidade_servidor(func_obj)
+    if not elegivel:
+        return jsonify({"success": False, "code": codigo, "message": msg}), 400
+
+    foto_uri, fonte = app_servidor_service.extrair_foto_referencia(func_obj)
+    if not foto_uri:
+        return jsonify({"success": False, "code": "SEM_FOTO", "message": "Foto de referência ausente no RH."}), 400
+
+    resp = jsonify({"success": True, "foto_data_uri": foto_uri, "fonte": fonte})
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
+@app.route("/app-servidor/api/recuperar-senha/confirmar-facial", methods=["POST"])
+def app_servidor_api_rec_confirmar_facial():
+    import hashlib
+
+    rec = session.get("app_recuperacao") or {}
+    data = request.get_json(silent=True) or {}
+    token_body = (data.get("recovery_token") or "").strip()
+
+    if (
+        not rec
+        or not token_body
+        or not hmac.compare_digest(str(rec.get("token", "")), token_body)
+        or datetime.utcnow().timestamp() > float(rec.get("exp") or 0)
+    ):
+        return jsonify({"success": False, "message": "Sessão de recuperação expirada. Inicie novamente."}), 401
+
+    try:
+        facial_distancia = float(data.get("facial_distancia"))
+    except (TypeError, ValueError):
+        facial_distancia = 9.9
+    try:
+        frames_validos = int(data.get("frames_validos") or 0)
+    except (TypeError, ValueError):
+        frames_validos = 0
+
+    if (
+        not bool(data.get("facial_confirmado"))
+        or frames_validos < 2
+        or facial_distancia < 0.0
+        or facial_distancia > app_servidor_service.FACIAL_MAX_DISTANCE
+    ):
+        return jsonify({
+            "success": False,
+            "message": "Reconhecimento facial insuficiente para liberar a troca de senha. Tente novamente em local iluminado.",
+        }), 400
+
+    selfie_b64 = app_servidor_service.validar_selfie_b64(data.get("selfie_b64"))
+    if not selfie_b64:
+        return jsonify({"success": False, "message": "Selfie de auditoria facial não recebida. Refaça a captura."}), 400
+
+    score = app_servidor_service.calcular_score_similaridade(facial_distancia)
+    rec["facial_ok"] = True
+    rec["facial_distancia"] = round(facial_distancia, 4)
+    rec["facial_score"] = score
+    rec["selfie_sha256"] = hashlib.sha256(selfie_b64.encode("utf-8")).hexdigest()
+    session["app_recuperacao"] = rec
+    session.modified = True
+
+    return jsonify({
+        "success": True,
+        "score": score,
+        "message": f"Identidade facial confirmada ({score}%)! Agora defina sua nova senha.",
+    })
+
+
+@app.route("/app-servidor/api/recuperar-senha/redefinir", methods=["POST"])
+def app_servidor_api_rec_redefinir():
+    import hashlib
+
+    rec = session.get("app_recuperacao") or {}
+    data = request.get_json(silent=True) or {}
+    token_body = (data.get("recovery_token") or "").strip()
+
+    if (
+        not rec
+        or not token_body
+        or not hmac.compare_digest(str(rec.get("token", "")), token_body)
+        or datetime.utcnow().timestamp() > float(rec.get("exp") or 0)
+    ):
+        return jsonify({"success": False, "message": "Sessão de recuperação expirada. Inicie novamente."}), 401
+
+    if not rec.get("facial_ok"):
+        return jsonify({
+            "success": False,
+            "message": "A confirmação por reconhecimento facial é obrigatória antes de redefinir a senha.",
+        }), 403
+
+    func_obj = db.session.get(Funcionario, int(rec["funcionario_id"]))
+    elegivel, codigo, msg = app_servidor_service.verificar_elegibilidade_servidor(func_obj)
+    if not elegivel:
+        return jsonify({"success": False, "code": codigo, "message": msg}), 400
+
+    conta = ServidorContaApp.query.filter_by(funcionario_id=func_obj.id).first()
+    if not conta or not conta.primeiro_acesso_concluido or not conta.ativo:
+        return jsonify({"success": False, "message": "Conta não habilitada para recuperação."}), 400
+
+    senha = str(data.get("senha") or "")
+    senha_conf = str(data.get("senha_confirmacao") or "")
+    if senha != senha_conf:
+        return jsonify({"success": False, "message": "As senhas digitadas não conferem."}), 400
+
+    ok_senha, msg_senha = security.validate_password_strength(senha)
+    if not ok_senha:
+        return jsonify({"success": False, "message": msg_senha}), 400
+
+    selfie_b64 = app_servidor_service.validar_selfie_b64(data.get("selfie_b64"))
+    expected_sha = rec.get("selfie_sha256") or ""
+    if not selfie_b64 or not hmac.compare_digest(
+        hashlib.sha256(selfie_b64.encode("utf-8")).hexdigest(), expected_sha
+    ):
+        return jsonify({"success": False, "message": "Integridade da prova facial inválida. Refaça a etapa facial."}), 400
+
+    agora = datetime.utcnow()
+    client_ip = obter_ip_cliente()
+    ua = (request.headers.get("User-Agent") or "")[:250]
+    score = float(rec.get("facial_score") or 0.0)
+    dist = float(rec.get("facial_distancia") or 0.0)
+
+    conta.set_password(senha)
+    conta.tentativas_falhas = 0
+    conta.bloqueado_ate = None
+    conta.facial_verificado = True
+    conta.facial_score = score
+    conta.facial_distancia = dist
+    conta.facial_selfie_b64 = selfie_b64
+    conta.ultimo_login_em = agora
+    conta.ultimo_login_ip = client_ip
+    conta.ultimo_user_agent = ua
+    db.session.commit()
+
+    try:
+        db.session.add(
+            LogAuditoria(
+                usuario_id=None,
+                secretaria_id=func_obj.secretaria_id,
+                nivel="WARNING",
+                acao="APP_SERVIDOR_SENHA_RECUPERADA_FACIAL",
+                alvo=f"Senha redefinida via biometria facial para {func_obj.nome} (CPF {app_servidor_service.mascarar_cpf(func_obj.cpf)}) — Similaridade {score}%",
+                tabela_afetada="servidor_conta_app",
+                registro_id=conta.id,
+                ip_origem=client_ip,
+                user_agent=ua,
+                rota_acessada=request.path,
+            )
+        )
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    session.pop("app_recuperacao", None)
+    session["app_servidor_id"] = func_obj.id
+    session["servidor_id"] = func_obj.id
+    session["servidor_nome"] = func_obj.nome
+    session["servidor_cpf"] = func_obj.cpf
+    session.permanent = True
+
+    return jsonify({
+        "success": True,
+        "message": "Senha redefinida com sucesso via reconhecimento facial!",
+        "redirect": url_for("app_servidor_inicio"),
+    })
 
 
 @app.route("/app-servidor/primeiro-acesso")
@@ -9186,7 +9455,7 @@ def app_servidor_api_validar_dados():
         return jsonify({
             "success": False,
             "code": "JA_ATIVADO",
-            "message": "Seu primeiro acesso já foi concluído anteriormente. Use 'Entrar no Aplicativo' com seu CPF e senha. Caso tenha esquecido a senha, solicite ao RH o reinício do acesso.",
+            "message": "Seu primeiro acesso já foi concluído anteriormente. Use 'Entrar no Aplicativo' ou 'Esqueci minha senha' para recuperar sua senha via reconhecimento facial.",
         }), 400
 
     ok_dados, msg_dados = app_servidor_service.conferir_dados_primeiro_acesso(

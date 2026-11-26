@@ -1,0 +1,620 @@
+{% extends "app_servidor_base.html" %}
+{% block title %}Recuperar Senha • SERVIDOR 360{% endblock %}
+
+{% block extra_head %}
+<script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+<style>
+    @keyframes scanSweep {
+        0% { top: 8%; opacity: 0.2; }
+        50% { top: 86%; opacity: 0.95; }
+        100% { top: 8%; opacity: 0.2; }
+    }
+    .scanner-beam {
+        position: absolute;
+        left: 8%;
+        right: 8%;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #FACC15, #10B981, #FACC15, transparent);
+        box-shadow: 0 0 14px rgba(250, 204, 21, 0.85);
+        border-radius: 999px;
+        animation: scanSweep 2.1s ease-in-out infinite;
+    }
+    .face-ring-idle { border-color: rgba(255, 255, 255, 0.35); }
+    .face-ring-searching { border-color: #FACC15; box-shadow: 0 0 0 6px rgba(250, 204, 21, 0.18); }
+    .face-ring-matched { border-color: #10B981; box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.28); }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="flex-1 flex flex-col justify-between min-h-[100dvh]">
+    <div>
+        <!-- Header Curvo -->
+        <header class="relative overflow-hidden bg-gradient-to-br from-[#0B3D2E] via-[#104936] to-[#14532D] pt-8 pb-16 px-6 safe-top">
+            <div class="relative z-10 flex items-center gap-3">
+                <a href="{{ url_for('app_servidor_entrar') }}" onclick="pararCameraRec()"
+                   class="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white active:scale-95 transition">
+                    <i class="ph-bold ph-arrow-left text-lg"></i>
+                </a>
+                <div class="flex-1">
+                    <h1 class="text-xl font-extrabold text-white leading-tight">Recuperar Senha</h1>
+                    <p class="text-[11px] text-emerald-200/90">Redefinição segura via reconhecimento facial</p>
+                </div>
+                <span class="px-2.5 py-1 rounded-full bg-white/10 text-[#FACC15] text-[10px] font-extrabold tracking-wider">
+                    SERVIDOR 360
+                </span>
+            </div>
+
+            <!-- Indicador de 3 Etapas -->
+            <div class="relative z-10 mt-5 grid grid-cols-3 gap-2">
+                <div id="recPill1" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/15 border border-[#FACC15]/70 text-white text-[10px] font-extrabold transition">
+                    <span class="w-4 h-4 rounded-full bg-[#FACC15] text-[#0B3D2E] flex items-center justify-center text-[10px]">1</span>
+                    <span>Dados</span>
+                </div>
+                <div id="recPill2" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-emerald-200/70 text-[10px] font-bold transition">
+                    <span class="w-4 h-4 rounded-full bg-white/15 text-white flex items-center justify-center text-[10px]">2</span>
+                    <span>Facial</span>
+                </div>
+                <div id="recPill3" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-emerald-200/70 text-[10px] font-bold transition">
+                    <span class="w-4 h-4 rounded-full bg-white/15 text-white flex items-center justify-center text-[10px]">3</span>
+                    <span>Nova Senha</span>
+                </div>
+            </div>
+
+            <svg class="absolute bottom-0 left-0 w-full h-10 text-[#F3F7F5]" viewBox="0 0 1440 120" preserveAspectRatio="none">
+                <path fill="currentColor" d="M0,115 C420,105 980,55 1440,0 L1440,120 L0,120 Z"></path>
+            </svg>
+        </header>
+
+        <main class="px-6 mt-1 pb-8">
+            <!-- Alerta Dinâmico -->
+            <div id="recAlert" class="hidden mb-4 rounded-2xl p-4 text-xs font-semibold border flex items-start gap-2.5 anim-scale-in">
+                <i id="recAlertIcon" class="ph-fill text-lg shrink-0 mt-0.5"></i>
+                <div class="flex-1">
+                    <p id="recAlertText" class="leading-relaxed"></p>
+                    <a id="recAlertLink" href="#" class="hidden mt-2 inline-flex items-center gap-1 font-extrabold underline"></a>
+                </div>
+            </div>
+
+            <!-- ==================== ETAPA 1: CONFERÊNCIA CADASTRAL ==================== -->
+            <section id="recStep1" class="app-card p-6 space-y-4 anim-fade-up">
+                <div>
+                    <h2 class="text-base font-extrabold text-[#0B3D2E]">Informe seus dados cadastrais</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Após confirmar seus dados, faremos a validação facial com sua foto do RH para liberar a criação de uma nova senha.
+                    </p>
+                </div>
+
+                <div>
+                    <label for="recCpf" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                        CPF *
+                    </label>
+                    <input type="text" id="recCpf" inputmode="numeric" placeholder="000.000.000-00"
+                           class="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                </div>
+
+                <div>
+                    <label for="recNasc" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                        Data de Nascimento *
+                    </label>
+                    <input type="date" id="recNasc"
+                           class="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                </div>
+
+                <div>
+                    <label for="recExtra" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                        Confirmação Adicional *
+                    </label>
+                    <input type="text" id="recExtra" placeholder="Primeiro nome da mãe OU 4 últimos dígitos do celular"
+                           class="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                </div>
+
+                <button type="button" id="btnRecStep1" onclick="validarDadosRecuperacao()"
+                        class="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#0B3D2E] to-[#14532D] text-white font-extrabold text-sm shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition">
+                    <span>Continuar para Biometria Facial</span>
+                    <i class="ph-bold ph-scan text-base text-[#FACC15]"></i>
+                </button>
+            </section>
+
+            <!-- ==================== ETAPA 2: RECONHECIMENTO FACIAL ==================== -->
+            <section id="recStep2" class="hidden app-card p-5 space-y-4 text-center anim-fade-up">
+                <div>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-extrabold uppercase tracking-wider text-[#0B3D2E]">
+                        <i class="ph-fill ph-scan text-emerald-600"></i>
+                        Confirmação Biométrica • <span id="recFonteFoto">Foto do RH</span>
+                    </span>
+                    <h2 class="text-base font-extrabold text-[#0B3D2E] mt-2">Olhe para a câmera frontal</h2>
+                    <p id="recResumoPessoa" class="text-[11px] font-semibold text-slate-500 mt-0.5"></p>
+                </div>
+
+                <div class="relative mx-auto w-60 h-60 rounded-full overflow-hidden border-[5px] face-ring-idle bg-slate-900 shadow-2xl transition-all duration-300" id="recRingWrap">
+                    <video id="videoRecFacial" autoplay muted playsinline class="w-full h-full object-cover scale-x-[-1]"></video>
+                    <div id="recScannerBeam" class="scanner-beam hidden"></div>
+
+                    <div id="recFacialOkOverlay" class="hidden absolute inset-0 bg-[#0B3D2E]/85 backdrop-blur-sm flex flex-col items-center justify-center text-white p-4">
+                        <div class="w-14 h-14 rounded-full bg-[#10B981] flex items-center justify-center shadow-lg mb-2">
+                            <i class="ph-bold ph-check text-3xl text-white"></i>
+                        </div>
+                        <p class="text-sm font-extrabold">Rosto Confirmado!</p>
+                        <p id="recScoreBadge" class="text-xs font-bold text-[#FACC15] mt-0.5"></p>
+                    </div>
+                </div>
+
+                <div class="max-w-[240px] mx-auto">
+                    <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
+                        <div id="recProgressBar" class="h-full w-0 bg-gradient-to-r from-[#FACC15] to-[#10B981] transition-all duration-300"></div>
+                    </div>
+                    <p id="recStatusText" class="text-xs font-bold text-[#0B3D2E] mt-2.5">
+                        Preparando motor de reconhecimento facial...
+                    </p>
+                </div>
+
+                <div class="pt-2 flex items-center justify-center gap-3">
+                    <button type="button" onclick="voltarRecEtapa1()"
+                            class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs active:scale-95 transition">
+                        Voltar
+                    </button>
+                    <button type="button" id="btnRecRetryCam" onclick="iniciarFacialRecuperacao()"
+                            class="hidden px-4 py-2.5 rounded-xl bg-[#0B3D2E] text-white font-extrabold text-xs shadow active:scale-95 transition">
+                        Tentar Novamente
+                    </button>
+                </div>
+            </section>
+
+            <!-- ==================== ETAPA 3: DEFINIR NOVA SENHA ==================== -->
+            <section id="recStep3" class="hidden space-y-4 anim-fade-up">
+                <div class="rounded-2xl p-4 bg-gradient-to-r from-[#0B3D2E] to-[#14532D] text-white shadow-lg flex items-center gap-3.5">
+                    <div class="w-11 h-11 rounded-2xl bg-[#10B981] text-white flex items-center justify-center shrink-0">
+                        <i class="ph-bold ph-shield-check text-2xl"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[10px] font-extrabold uppercase tracking-wider text-[#FACC15]">Biometria Aprovada</p>
+                        <p id="recNomeOk" class="text-sm font-extrabold truncate mt-0.5">—</p>
+                        <p id="recScoreResumo" class="text-[11px] text-emerald-200 truncate">—</p>
+                    </div>
+                </div>
+
+                <div class="app-card p-6 space-y-4">
+                    <div>
+                        <h2 class="text-base font-extrabold text-[#0B3D2E]">Defina sua nova senha</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Mínimo de 8 caracteres, contendo pelo menos uma letra e um número.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label for="recNovaSenha" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                            Nova Senha *
+                        </label>
+                        <input type="password" id="recNovaSenha" autocomplete="new-password" oninput="atualizarRegrasRecSenha()"
+                               placeholder="Crie uma nova senha forte"
+                               class="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                        <div class="flex items-center gap-2 mt-2 text-[10px] font-bold">
+                            <span id="recRuleLen" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">8+ caracteres</span>
+                            <span id="recRuleLetter" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">1+ letra</span>
+                            <span id="recRuleNum" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">1+ número</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="recNovaSenhaConf" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                            Confirmar Nova Senha *
+                        </label>
+                        <input type="password" id="recNovaSenhaConf" autocomplete="new-password"
+                               placeholder="Repita a nova senha"
+                               class="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                    </div>
+
+                    <button type="button" id="btnSalvarNovaSenha" onclick="salvarNovaSenhaRecuperada()"
+                            class="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#0B3D2E] to-[#14532D] text-white font-extrabold text-sm shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition">
+                        <i class="ph-bold ph-key text-base text-[#FACC15]"></i>
+                        <span>Salvar Nova Senha e Entrar</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="px-6 py-5 text-center safe-bottom">
+        <p class="text-[10px] font-bold text-[#0B3D2E]/55 uppercase tracking-wider">
+            {{ municipio.nome if municipio else 'Prefeitura Municipal' }} • SERVIDOR 360
+        </p>
+    </footer>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    aplicarMascaraCPF(document.getElementById('recCpf'));
+
+    const FACIAL_MAX_DISTANCE = {{ facial_max_distance }};
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+
+    let recoveryToken = null;
+    let capturedSelfieB64 = null;
+    let recModelsPromise = null;
+    let recFaceMatcher = null;
+    let recStream = null;
+    let recDetectTimer = null;
+    let recMatches = 0;
+    let recBestDist = 9.9;
+    let recSendingFace = false;
+
+    function getCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    }
+
+    function mostrarRecAlerta(msg, tipo = 'error', linkUrl = null, linkLabel = null) {
+        const box = document.getElementById('recAlert');
+        const txt = document.getElementById('recAlertText');
+        const ic = document.getElementById('recAlertIcon');
+        const lnk = document.getElementById('recAlertLink');
+
+        box.classList.remove('hidden', 'bg-rose-50', 'text-rose-900', 'border-rose-200', 'bg-amber-50', 'text-amber-950', 'border-amber-200', 'bg-emerald-50', 'text-emerald-950', 'border-emerald-200');
+        if (tipo === 'warning') {
+            box.classList.add('bg-amber-50', 'text-amber-950', 'border-amber-200');
+            ic.className = 'ph-fill ph-warning text-lg text-amber-600 shrink-0 mt-0.5';
+        } else if (tipo === 'success') {
+            box.classList.add('bg-emerald-50', 'text-emerald-950', 'border-emerald-200');
+            ic.className = 'ph-fill ph-check-circle text-lg text-emerald-600 shrink-0 mt-0.5';
+        } else {
+            box.classList.add('bg-rose-50', 'text-rose-900', 'border-rose-200');
+            ic.className = 'ph-fill ph-warning-circle text-lg text-rose-600 shrink-0 mt-0.5';
+        }
+        txt.textContent = msg;
+
+        if (linkUrl && linkLabel) {
+            lnk.href = linkUrl;
+            lnk.textContent = linkLabel;
+            lnk.classList.remove('hidden');
+        } else {
+            lnk.classList.add('hidden');
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function ocultarRecAlerta() {
+        document.getElementById('recAlert').classList.add('hidden');
+    }
+
+    function irParaRecEtapa(n) {
+        ocultarRecAlerta();
+        document.getElementById('recStep1').classList.toggle('hidden', n !== 1);
+        document.getElementById('recStep2').classList.toggle('hidden', n !== 2);
+        document.getElementById('recStep3').classList.toggle('hidden', n !== 3);
+
+        [1, 2, 3].forEach((i) => {
+            const p = document.getElementById('recPill' + i);
+            const badge = p.querySelector('span');
+            if (i === n) {
+                p.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/15 border border-[#FACC15]/70 text-white text-[10px] font-extrabold transition';
+                badge.className = 'w-4 h-4 rounded-full bg-[#FACC15] text-[#0B3D2E] flex items-center justify-center text-[10px]';
+            } else if (i < n) {
+                p.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/25 border border-emerald-400/50 text-white text-[10px] font-bold transition';
+                badge.className = 'w-4 h-4 rounded-full bg-[#10B981] text-white flex items-center justify-center text-[10px]';
+            } else {
+                p.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-emerald-200/70 text-[10px] font-bold transition';
+                badge.className = 'w-4 h-4 rounded-full bg-white/15 text-white flex items-center justify-center text-[10px]';
+            }
+        });
+    }
+
+    function carregarModelosRec() {
+        if (recModelsPromise) return recModelsPromise;
+        recModelsPromise = (async () => {
+            for (let i = 0; i < 40 && typeof faceapi === 'undefined'; i++) {
+                await new Promise(r => setTimeout(r, 150));
+            }
+            if (typeof faceapi === 'undefined') {
+                throw new Error('Não foi possível carregar o motor de reconhecimento facial.');
+            }
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+            ]);
+            return true;
+        })();
+        return recModelsPromise;
+    }
+
+    async function validarDadosRecuperacao() {
+        ocultarRecAlerta();
+        const cpf = document.getElementById('recCpf').value.trim();
+        const data_nasc = document.getElementById('recNasc').value.trim();
+        const confirmacao_extra = document.getElementById('recExtra').value.trim();
+
+        if (cpf.replace(/\D/g, '').length !== 11 || !data_nasc) {
+            mostrarRecAlerta('Preencha seu CPF completo e data de nascimento.', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('btnRecStep1');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ph ph-spinner-gap animate-spin text-lg"></i><span>Consultando cadastro...</span>';
+
+        try {
+            const resp = await fetch('/app-servidor/api/recuperar-senha/validar-dados', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken(),
+                },
+                body: JSON.stringify({ cpf, data_nasc, confirmacao_extra }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                if (data.code === 'NAO_ATIVADO') {
+                    mostrarRecAlerta(data.message, 'warning', '{{ url_for("app_servidor_primeiro_acesso") }}', 'Ir para Primeiro Acesso →');
+                } else {
+                    mostrarRecAlerta(data.message || 'Dados não conferem.', data.code === 'SEM_FOTO' ? 'warning' : 'error');
+                }
+                return;
+            }
+
+            recoveryToken = data.recovery_token;
+            document.getElementById('recResumoPessoa').textContent = `${data.nome_completo} • ${data.cargo}`;
+            document.getElementById('recNomeOk').textContent = data.nome_completo;
+            document.getElementById('recFonteFoto').textContent = data.fonte_foto || 'Foto do RH';
+
+            irParaRecEtapa(2);
+            iniciarFacialRecuperacao();
+        } catch (e) {
+            mostrarRecAlerta('Falha de conexão. Tente novamente.', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<span>Continuar para Biometria Facial</span><i class="ph-bold ph-scan text-base text-[#FACC15]"></i>';
+        }
+    }
+
+    function pararCameraRec() {
+        if (recDetectTimer) {
+            clearInterval(recDetectTimer);
+            recDetectTimer = null;
+        }
+        if (recStream) {
+            recStream.getTracks().forEach(t => t.stop());
+            recStream = null;
+        }
+        const beam = document.getElementById('recScannerBeam');
+        if (beam) beam.classList.add('hidden');
+    }
+
+    function voltarRecEtapa1() {
+        pararCameraRec();
+        irParaRecEtapa(1);
+    }
+
+    async function iniciarFacialRecuperacao() {
+        pararCameraRec();
+        ocultarRecAlerta();
+        recMatches = 0;
+        recBestDist = 9.9;
+        recSendingFace = false;
+
+        const statusEl = document.getElementById('recStatusText');
+        const progEl = document.getElementById('recProgressBar');
+        const ringEl = document.getElementById('recRingWrap');
+        const btnRetry = document.getElementById('btnRecRetryCam');
+        btnRetry.classList.add('hidden');
+        document.getElementById('recFacialOkOverlay').classList.add('hidden');
+        progEl.style.width = '12%';
+        ringEl.classList.remove('face-ring-matched');
+        ringEl.classList.add('face-ring-searching');
+
+        try {
+            statusEl.textContent = 'Carregando IA de reconhecimento facial...';
+            await carregarModelosRec();
+            progEl.style.width = '30%';
+
+            statusEl.textContent = 'Obtendo foto oficial do RH...';
+            const refResp = await fetch(`/app-servidor/api/recuperar-senha/foto-referencia?token=${encodeURIComponent(recoveryToken)}`, {
+                cache: 'no-store',
+            });
+            const refData = await refResp.json();
+            if (!refResp.ok || !refData.success || !refData.foto_data_uri) {
+                throw new Error(refData.message || 'Erro ao carregar foto de referência do RH.');
+            }
+
+            const refImg = new Image();
+            refImg.src = refData.foto_data_uri;
+            await new Promise((resolve, reject) => {
+                refImg.onload = resolve;
+                refImg.onerror = () => reject(new Error('Foto cadastrada no RH inválida. Procure o RH.'));
+            });
+
+            const refDet = await faceapi
+                .detectSingleFace(refImg, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.35 }))
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!refDet) {
+                throw new Error('Não foi possível detectar um rosto nítido na sua foto cadastrada no RH.');
+            }
+
+            recFaceMatcher = new faceapi.FaceMatcher(
+                [new faceapi.LabeledFaceDescriptors('SERVIDOR', [refDet.descriptor])],
+                FACIAL_MAX_DISTANCE
+            );
+            progEl.style.width = '45%';
+
+            statusEl.textContent = 'Abrindo câmera frontal...';
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Câmera indisponível. Abra o SERVIDOR 360 em HTTPS pelo Chrome ou Safari.');
+            }
+
+            recStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } },
+                audio: false,
+            });
+            const video = document.getElementById('videoRecFacial');
+            video.srcObject = recStream;
+            await video.play();
+
+            document.getElementById('recScannerBeam').classList.remove('hidden');
+            statusEl.textContent = 'Olhe diretamente para a câmera. Comparando com sua foto do RH...';
+
+            recDetectTimer = setInterval(async () => {
+                if (recSendingFace || !video || video.readyState < 2) return;
+                try {
+                    const liveDet = await faceapi
+                        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 256, scoreThreshold: 0.45 }))
+                        .withFaceLandmarks()
+                        .withFaceDescriptor();
+
+                    if (!liveDet) {
+                        recMatches = 0;
+                        progEl.style.width = '45%';
+                        statusEl.textContent = 'Centralize seu rosto no círculo com boa iluminação...';
+                        return;
+                    }
+
+                    const match = recFaceMatcher.findBestMatch(liveDet.descriptor);
+                    if (match.label === 'SERVIDOR' && match.distance <= FACIAL_MAX_DISTANCE) {
+                        recMatches += 1;
+                        if (match.distance < recBestDist) recBestDist = match.distance;
+                        progEl.style.width = Math.min(95, 50 + recMatches * 16) + '%';
+                        statusEl.textContent = `Rosto reconhecido! Confirmando (${recMatches}/3)...`;
+
+                        if (recMatches >= 3) {
+                            recSendingFace = true;
+                            await confirmarFacialRecuperacao(video, recBestDist, recMatches);
+                        }
+                    } else {
+                        recMatches = 0;
+                        progEl.style.width = '48%';
+                        statusEl.textContent = 'Rosto ainda não compatível com a foto do RH. Ajuste a iluminação...';
+                    }
+                } catch (errLoop) {}
+            }, 420);
+        } catch (err) {
+            pararCameraRec();
+            progEl.style.width = '0%';
+            statusEl.textContent = 'Validação facial interrompida.';
+            btnRetry.classList.remove('hidden');
+            mostrarRecAlerta(err.message || 'Erro ao iniciar câmera facial.', 'error');
+        }
+    }
+
+    function capturarSelfieRec(video) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 320;
+        const ctx = canvas.getContext('2d');
+        ctx.translate(320, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, 320, 320);
+        return canvas.toDataURL('image/jpeg', 0.72);
+    }
+
+    async function confirmarFacialRecuperacao(video, distancia, frames) {
+        capturedSelfieB64 = capturarSelfieRec(video);
+        pararCameraRec();
+
+        const ringEl = document.getElementById('recRingWrap');
+        ringEl.classList.remove('face-ring-searching');
+        ringEl.classList.add('face-ring-matched');
+        document.getElementById('recProgressBar').style.width = '100%';
+        document.getElementById('recStatusText').textContent = 'Validando confirmação biométrica...';
+
+        try {
+            const resp = await fetch('/app-servidor/api/recuperar-senha/confirmar-facial', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    recovery_token: recoveryToken,
+                    facial_confirmado: true,
+                    facial_distancia: distancia,
+                    frames_validos: frames,
+                    selfie_b64: capturedSelfieB64,
+                }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                recSendingFace = false;
+                document.getElementById('btnRecRetryCam').classList.remove('hidden');
+                mostrarRecAlerta(data.message || 'Erro na validação facial.', 'error');
+                return;
+            }
+
+            document.getElementById('recScoreBadge').textContent = `Similaridade: ${data.score}%`;
+            document.getElementById('recScoreResumo').textContent = `Identidade facial confirmada (${data.score}%)`;
+            document.getElementById('recFacialOkOverlay').classList.remove('hidden');
+
+            setTimeout(() => {
+                irParaRecEtapa(3);
+            }, 900);
+        } catch (e) {
+            recSendingFace = false;
+            document.getElementById('btnRecRetryCam').classList.remove('hidden');
+            mostrarRecAlerta('Erro de conexão ao confirmar biometria.', 'error');
+        }
+    }
+
+    function atualizarRegrasRecSenha() {
+        const s = document.getElementById('recNovaSenha').value || '';
+        const setR = (id, ok) => {
+            document.getElementById(id).className = ok
+                ? 'px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold'
+                : 'px-2 py-0.5 rounded-full bg-slate-100 text-slate-500';
+        };
+        setR('recRuleLen', s.length >= 8);
+        setR('recRuleLetter', /[A-Za-z]/.test(s));
+        setR('recRuleNum', /\d/.test(s));
+    }
+
+    async function salvarNovaSenhaRecuperada() {
+        ocultarRecAlerta();
+        const s1 = document.getElementById('recNovaSenha').value;
+        const s2 = document.getElementById('recNovaSenhaConf').value;
+
+        if (s1.length < 8 || !/[A-Za-z]/.test(s1) || !/\d/.test(s1)) {
+            mostrarRecAlerta('A nova senha precisa ter no mínimo 8 caracteres, com letras e números.', 'warning');
+            return;
+        }
+        if (s1 !== s2) {
+            mostrarRecAlerta('As senhas digitadas não conferem.', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('btnSalvarNovaSenha');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ph ph-spinner-gap animate-spin text-lg"></i><span>Salvando nova senha...</span>';
+
+        try {
+            const resp = await fetch('/app-servidor/api/recuperar-senha/redefinir', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    recovery_token: recoveryToken,
+                    senha: s1,
+                    senha_confirmacao: s2,
+                    selfie_b64: capturedSelfieB64,
+                }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                mostrarRecAlerta(data.message || 'Erro ao redefinir senha.', 'error');
+                return;
+            }
+            mostrarRecAlerta('Senha redefinida com sucesso! Entrando no SERVIDOR 360...', 'success');
+            setTimeout(() => {
+                window.location.href = data.redirect || '/app-servidor/inicio';
+            }, 900);
+        } catch (e) {
+            mostrarRecAlerta('Erro de conexão ao salvar nova senha.', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="ph-bold ph-key text-base text-[#FACC15]"></i><span>Salvar Nova Senha e Entrar</span>';
+        }
+    }
+
+    window.addEventListener('beforeunload', pararCameraRec);
+</script>
+{% endblock %}

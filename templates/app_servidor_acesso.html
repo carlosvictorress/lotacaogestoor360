@@ -79,6 +79,15 @@
                 <i class="ph ph-caret-right text-lg text-slate-400 card-arrow shrink-0"></i>
             </a>
 
+            <!-- Link discreto de recuperação facial -->
+            <div class="text-center pt-1 anim-fade-up delay-4">
+                <a href="{{ url_for('app_servidor_recuperar_senha') }}"
+                   class="inline-flex items-center gap-1.5 text-xs font-bold text-[#0B3D2E]/80 hover:text-[#0B3D2E] transition">
+                    <i class="ph-bold ph-scan text-emerald-600"></i>
+                    <span>Esqueceu sua senha? Recuperar com reconhecimento facial</span>
+                </a>
+            </div>
+
             <!-- Card Discreto de Instalação PWA (aparece se ainda não estiver instalado) -->
             <button type="button" id="pwaInstallCard" onclick="acionarInstalacaoPWA()"
                     class="hidden w-full text-left anim-fade-up delay-4 rounded-2xl p-3.5 bg-gradient-to-r from-[#0B3D2E] to-[#14532D] text-white shadow-lg flex items-center gap-3.5 active:scale-[0.98] transition">
