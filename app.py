@@ -721,6 +721,15 @@ class ConfiguracaoGestoorSign(db.Model):
     comtele_api_key_enc = db.Column(db.Text, nullable=True)  # Cifrada em AES-256-GCM
     arquivar_ged_automatico = db.Column(db.Boolean, default=True)
 
+    # Assinaturas Fixas do Contrato (Secretaria + 2 Testemunhas — persistidas em PNG Base64 no DB)
+    assinatura_secretaria_b64 = db.Column(db.Text, nullable=True)
+    testemunha1_nome = db.Column(db.String(150), nullable=True)
+    testemunha1_cpf = db.Column(db.String(20), nullable=True)
+    testemunha1_assinatura_b64 = db.Column(db.Text, nullable=True)
+    testemunha2_nome = db.Column(db.String(150), nullable=True)
+    testemunha2_cpf = db.Column(db.String(20), nullable=True)
+    testemunha2_assinatura_b64 = db.Column(db.Text, nullable=True)
+
     atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     atualizado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
@@ -3111,6 +3120,13 @@ def atualizar_schema():
                     ("comtele_panel_mode", "VARCHAR(20) DEFAULT 'novo'"),
                     ("comtele_route_id", "INTEGER DEFAULT 17"),
                     ("comtele_api_key_enc", "TEXT"),
+                    ("assinatura_secretaria_b64", "TEXT"),
+                    ("testemunha1_nome", "VARCHAR(150)"),
+                    ("testemunha1_cpf", "VARCHAR(20)"),
+                    ("testemunha1_assinatura_b64", "TEXT"),
+                    ("testemunha2_nome", "VARCHAR(150)"),
+                    ("testemunha2_cpf", "VARCHAR(20)"),
+                    ("testemunha2_assinatura_b64", "TEXT"),
                 ],
                 '"user"': [
                     ("municipio_id", "INTEGER"),
@@ -3808,6 +3824,11 @@ def visualizar_contrato_documento(id):
     sec_obj = db.session.get(Secretaria, contrato.secretaria_id) if contrato.secretaria_id else None
     mun_id = contrato.municipio_id or (sec_obj.municipio_id if sec_obj else None)
     mun_obj = db.session.get(Municipio, mun_id) if mun_id else Municipio.query.order_by(Municipio.id.asc()).first()
+    cfg_sign_doc = (
+        ConfiguracaoGestoorSign.query.filter_by(municipio_id=mun_obj.id).first()
+        if mun_obj
+        else None
+    )
     assinatura_selada = (
         AssinaturaContrato.query.filter_by(
             contrato_id=contrato.id,
@@ -3857,6 +3878,13 @@ def visualizar_contrato_documento(id):
         "representante_cargo": contrato.representante_cargo,
         "representante_rg_cpf": contrato.representante_rg_cpf,
         "representante_endereco": contrato.representante_endereco,
+        "assinatura_secretaria_b64": getattr(cfg_sign_doc, "assinatura_secretaria_b64", None) if cfg_sign_doc else None,
+        "testemunha1_nome": (getattr(cfg_sign_doc, "testemunha1_nome", None) or "").strip() if cfg_sign_doc else "",
+        "testemunha1_cpf": (getattr(cfg_sign_doc, "testemunha1_cpf", None) or "").strip() if cfg_sign_doc else "",
+        "testemunha1_assinatura_b64": getattr(cfg_sign_doc, "testemunha1_assinatura_b64", None) if cfg_sign_doc else None,
+        "testemunha2_nome": (getattr(cfg_sign_doc, "testemunha2_nome", None) or "").strip() if cfg_sign_doc else "",
+        "testemunha2_cpf": (getattr(cfg_sign_doc, "testemunha2_cpf", None) or "").strip() if cfg_sign_doc else "",
+        "testemunha2_assinatura_b64": getattr(cfg_sign_doc, "testemunha2_assinatura_b64", None) if cfg_sign_doc else None,
     }
 
     return render_template("contrato_documento.html", contrato=contrato_dict)
@@ -8562,6 +8590,31 @@ def gestoor_sign_configuracoes():
                 )
 
             cfg.arquivar_ged_automatico = request.form.get("arquivar_ged_automatico") == "1"
+
+            # Assinaturas fixas do contrato (Secretaria + 2 Testemunhas)
+            cfg.testemunha1_nome = (request.form.get("testemunha1_nome") or "").strip().upper()[:150] or None
+            cfg.testemunha1_cpf = (request.form.get("testemunha1_cpf") or "").strip()[:20] or None
+            cfg.testemunha2_nome = (request.form.get("testemunha2_nome") or "").strip().upper()[:150] or None
+            cfg.testemunha2_cpf = (request.form.get("testemunha2_cpf") or "").strip()[:20] or None
+
+            campos_assinatura = [
+                ("assinatura_secretaria", "remover_assinatura_secretaria", "assinatura_secretaria_b64", "Assinatura da Secretaria"),
+                ("testemunha1_assinatura", "remover_testemunha1_assinatura", "testemunha1_assinatura_b64", "Assinatura da Testemunha 1"),
+                ("testemunha2_assinatura", "remover_testemunha2_assinatura", "testemunha2_assinatura_b64", "Assinatura da Testemunha 2"),
+            ]
+            for campo_file, campo_rem, attr_db, rotulo in campos_assinatura:
+                if request.form.get(campo_rem) == "1":
+                    setattr(cfg, attr_db, None)
+                arq_up = request.files.get(campo_file)
+                if arq_up and arq_up.filename:
+                    ok_img, img_b64, err_img = gestoor_sign_service.validar_imagem_assinatura_upload(arq_up)
+                    if not ok_img:
+                        db.session.rollback()
+                        flash(f"{rotulo}: {err_img}", "error")
+                        return redirect(url_for("gestoor_sign_configuracoes"))
+                    if img_b64:
+                        setattr(cfg, attr_db, img_b64)
+
             cfg.atualizado_por_id = current_user.id
             cfg.atualizado_em = datetime.utcnow()
 

@@ -20,6 +20,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+import io
 import json
 import os
 import re
@@ -29,6 +30,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pytz
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from PIL import Image as PILImage
 
 import gestoor_sign_pdf
 import sms_service
@@ -206,6 +208,41 @@ def obter_comtele_api_key(config, secret_key: str) -> str:
     return (os.getenv("COMTELE_API_KEY") or "").strip()
 
 
+MAX_ASSINATURA_IMG_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+def validar_imagem_assinatura_upload(file_storage) -> Tuple[bool, Optional[str], str]:
+    """
+    Valida, otimiza e converte uma imagem de assinatura (PNG/JPG/WebP) para data URI PNG base64.
+    Preserva transparência (RGBA) quando presente e limita dimensões a 800x320px para nitidez A4.
+    """
+    if not file_storage or not getattr(file_storage, "filename", ""):
+        return True, None, ""
+
+    raw = file_storage.read()
+    if not raw:
+        return False, None, "O arquivo de assinatura enviado está vazio."
+    if len(raw) > MAX_ASSINATURA_IMG_BYTES:
+        return False, None, "A imagem da assinatura excede o tamanho máximo de 2 MB."
+
+    try:
+        with PILImage.open(io.BytesIO(raw)) as img:
+            if (img.format or "").upper() not in ("PNG", "JPEG", "JPG", "WEBP"):
+                return False, None, "Formato de assinatura inválido. Use PNG, JPG ou WebP."
+            # Converte para RGBA para preservar transparência (ou RGB limpo)
+            if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+                img_proc = img.convert("RGBA")
+            else:
+                img_proc = img.convert("RGB")
+            img_proc.thumbnail((800, 320), PILImage.Resampling.LANCZOS)
+            out = io.BytesIO()
+            img_proc.save(out, format="PNG", optimize=True)
+            b64 = base64.b64encode(out.getvalue()).decode("ascii")
+            return True, f"data:image/png;base64,{b64}", ""
+    except Exception:
+        return False, None, "Não foi possível ler a imagem da assinatura. Envie um arquivo PNG, JPG ou WebP válido."
+
+
 def sha256_texto(texto: str, pepper: str = "") -> str:
     return hashlib.sha256(f"{pepper}:{texto}".encode("utf-8")).hexdigest()
 
@@ -380,10 +417,14 @@ def montar_contexto_contrato_pdf(contrato, db, models: Dict[str, Any], format_da
     """Constrói o dicionário completo e canônico de dados do contrato para geração determinística de PDF."""
     Secretaria = models["Secretaria"]
     Municipio = models["Municipio"]
+    ConfiguracaoGestoorSign = models.get("ConfiguracaoGestoorSign")
 
     sec = db.session.get(Secretaria, contrato.secretaria_id) if contrato.secretaria_id else None
     mun_id = contrato.municipio_id or (sec.municipio_id if sec else None)
     mun = db.session.get(Municipio, mun_id) if mun_id else Municipio.query.order_by(Municipio.id.asc()).first()
+    cfg_sign = None
+    if ConfiguracaoGestoorSign and mun:
+        cfg_sign = ConfiguracaoGestoorSign.query.filter_by(municipio_id=mun.id).first()
 
     dt_ass = contrato.dt_assinatura or contrato.dt_inicio or (contrato.funcionario.dt_inicio if contrato.funcionario else None)
     mun_nome_raw = mun.nome if mun else "Município de Valença do Piauí"
@@ -427,6 +468,14 @@ def montar_contexto_contrato_pdf(contrato, db, models: Dict[str, Any], format_da
         "representante_cargo": contrato.representante_cargo or "",
         "representante_rg_cpf": contrato.representante_rg_cpf or "",
         "representante_endereco": contrato.representante_endereco or "",
+        # Assinaturas fixas configuradas no município (Secretaria + 2 Testemunhas)
+        "assinatura_secretaria_b64": getattr(cfg_sign, "assinatura_secretaria_b64", None) if cfg_sign else None,
+        "testemunha1_nome": (getattr(cfg_sign, "testemunha1_nome", None) or "").strip() if cfg_sign else "",
+        "testemunha1_cpf": (getattr(cfg_sign, "testemunha1_cpf", None) or "").strip() if cfg_sign else "",
+        "testemunha1_assinatura_b64": getattr(cfg_sign, "testemunha1_assinatura_b64", None) if cfg_sign else None,
+        "testemunha2_nome": (getattr(cfg_sign, "testemunha2_nome", None) or "").strip() if cfg_sign else "",
+        "testemunha2_cpf": (getattr(cfg_sign, "testemunha2_cpf", None) or "").strip() if cfg_sign else "",
+        "testemunha2_assinatura_b64": getattr(cfg_sign, "testemunha2_assinatura_b64", None) if cfg_sign else None,
     }
 
 

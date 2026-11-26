@@ -385,6 +385,9 @@
 
                         <div class="space-y-8 text-center my-6">
                             <div class="max-w-sm mx-auto">
+                                {% if contrato_ctx.assinatura_secretaria_b64 %}
+                                <img src="{{ contrato_ctx.assinatura_secretaria_b64 }}" alt="Assinatura Secretaria" class="max-h-16 mx-auto object-contain -mb-2">
+                                {% endif %}
                                 <div class="border-t border-black pt-1.5">
                                     <strong>{{ contrato_ctx.municipio_nome }} – {{ contrato_ctx.secretaria_nome }}</strong>
                                     <div class="text-xs">{{ contrato_ctx.representante_nome }}</div>
@@ -417,10 +420,32 @@
                             </div>
                         </div>
 
-                        <div class="mt-8 space-y-2 text-sm">
-                            <div class="font-bold">Testemunhas:</div>
-                            <div>Nome: ________________________________________. &nbsp; CPF: _________________________.</div>
-                            <div>Nome: ________________________________________. &nbsp; CPF: _________________________.</div>
+                        <div class="mt-8 text-sm">
+                            <div class="font-bold mb-3">Testemunhas:</div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 text-center items-end">
+                                <div>
+                                    {% if contrato_ctx.testemunha1_assinatura_b64 %}
+                                    <img src="{{ contrato_ctx.testemunha1_assinatura_b64 }}" alt="Assinatura 1ª Testemunha" class="max-h-12 mx-auto object-contain -mb-1">
+                                    {% else %}
+                                    <div class="h-8"></div>
+                                    {% endif %}
+                                    <div class="border-t border-black pt-1 text-xs">
+                                        <div><strong>Nome:</strong> {{ contrato_ctx.testemunha1_nome or '_____________________________' }}</div>
+                                        <div><strong>CPF:</strong> {{ contrato_ctx.testemunha1_cpf or '_____________________' }}</div>
+                                    </div>
+                                </div>
+                                <div>
+                                    {% if contrato_ctx.testemunha2_assinatura_b64 %}
+                                    <img src="{{ contrato_ctx.testemunha2_assinatura_b64 }}" alt="Assinatura 2ª Testemunha" class="max-h-12 mx-auto object-contain -mb-1">
+                                    {% else %}
+                                    <div class="h-8"></div>
+                                    {% endif %}
+                                    <div class="border-t border-black pt-1 text-xs">
+                                        <div><strong>Nome:</strong> {{ contrato_ctx.testemunha2_nome or '_____________________________' }}</div>
+                                        <div><strong>CPF:</strong> {{ contrato_ctx.testemunha2_cpf or '_____________________' }}</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="rodape-rubrica-preview hidden mt-6 px-3 py-1.5 rounded bg-emerald-50 border border-[#10B981] font-sans text-[10px] font-bold text-[#0B3D2E]">

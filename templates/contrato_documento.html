@@ -306,10 +306,13 @@
 
         <div class="signatures-container">
             <div class="signature-box">
+                {% if contrato.assinatura_secretaria_b64 %}
+                <img src="{{ contrato.assinatura_secretaria_b64 }}" alt="Assinatura Secretaria" style="max-height: 58px; max-width: 240px; object-fit: contain; display: block; margin: 0 auto -6px auto;">
+                {% endif %}
                 <div class="signature-line"></div>
-                <strong>Município de Valença do Piauí – Secretaria de Educação</strong>
+                <strong>{{ contrato.municipio_nome or 'Município de Valença do Piauí' }} – {{ contrato.secretaria_nome or 'Secretaria de Educação' }}</strong>
             </div>
-            <div class="signature-box" style="margin-top: 40px;">
+            <div class="signature-box" style="margin-top: 32px;">
                 <div class="signature-line"></div>
                 <strong>Contratado</strong>
             </div>
@@ -317,10 +320,28 @@
 
         <div class="witnesses-section">
             <strong>Testemunhas:</strong>
-            <div class="witness-line">Nome: ___________________________.</div>
-            <div class="witness-line">CPF: ____________________________.</div>
-            <div class="witness-line" style="margin-top: 15px;">Nome: ___________________________.</div>
-            <div class="witness-line">CPF: ____________________________.</div>
+            <div style="display: flex; justify-content: space-between; gap: 24px; margin-top: 12px; align-items: flex-end; text-align: center;">
+                <div style="flex: 1;">
+                    {% if contrato.testemunha1_assinatura_b64 %}
+                    <img src="{{ contrato.testemunha1_assinatura_b64 }}" alt="Assinatura 1ª Testemunha" style="max-height: 46px; max-width: 180px; object-fit: contain; display: block; margin: 0 auto -4px auto;">
+                    {% else %}
+                    <div style="height: 28px;"></div>
+                    {% endif %}
+                    <div class="signature-line"></div>
+                    <div class="witness-line" style="margin-top: 4px;">Nome: {{ contrato.testemunha1_nome or '___________________________' }}.</div>
+                    <div class="witness-line" style="margin-top: 2px;">CPF: {{ contrato.testemunha1_cpf or '____________________________' }}.</div>
+                </div>
+                <div style="flex: 1;">
+                    {% if contrato.testemunha2_assinatura_b64 %}
+                    <img src="{{ contrato.testemunha2_assinatura_b64 }}" alt="Assinatura 2ª Testemunha" style="max-height: 46px; max-width: 180px; object-fit: contain; display: block; margin: 0 auto -4px auto;">
+                    {% else %}
+                    <div style="height: 28px;"></div>
+                    {% endif %}
+                    <div class="signature-line"></div>
+                    <div class="witness-line" style="margin-top: 4px;">Nome: {{ contrato.testemunha2_nome or '___________________________' }}.</div>
+                    <div class="witness-line" style="margin-top: 2px;">CPF: {{ contrato.testemunha2_cpf or '____________________________' }}.</div>
+                </div>
+            </div>
         </div>
     </div>
 

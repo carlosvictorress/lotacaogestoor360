@@ -250,6 +250,25 @@ def _timbre_flowable(timbre_path: Optional[str]) -> Optional[Image]:
         return None
 
 
+def _assinatura_img_flowable(data_uri: Optional[str], max_w_mm: float = 54.0, max_h_mm: float = 16.0) -> Optional[Image]:
+    """Converte data URI base64 de assinatura em flowable Image proporcional para ReportLab."""
+    if not data_uri or not isinstance(data_uri, str):
+        return None
+    try:
+        b64_part = data_uri.split(",", 1)[1] if "," in data_uri else data_uri
+        raw = base64.b64decode(b64_part)
+        img = Image(io.BytesIO(raw))
+        iw, ih = img.imageWidth, img.imageHeight
+        if iw > 0 and ih > 0:
+            ratio = min((max_w_mm * mm) / iw, (max_h_mm * mm) / ih)
+            img.drawWidth = iw * ratio
+            img.drawHeight = ih * ratio
+        img.hAlign = "CENTER"
+        return img
+    except Exception:
+        return None
+
+
 def _draw_custom_seal_on_canvas(canvas, selo: Dict[str, Any], x_pct: float, y_pct: float):
     """Desenha o selo eletrônico oficial com QR Code diretamente no ponto (x_pct, y_pct) da página A4."""
     page_w, page_h = A4
@@ -623,13 +642,20 @@ def _montar_corpo_contrato_story(
     )
     story.append(Spacer(1, 8 * mm))
 
-    # Bloco de assinaturas
-    sig_blocks: List[Any] = [
-        Paragraph("____________________________________________________________", styles["center"]),
-        Paragraph(f"<b>{_esc(municipio_nome)} – {_esc(secretaria_nome)}</b>", styles["center"]),
-        Paragraph(f"{_esc(contrato.get('representante_nome') or '')} — {_esc(rep_cargo)}", styles["center"]),
-        Spacer(1, 8 * mm),
-    ]
+    # Bloco de assinaturas (Contratante com assinatura fixa da Secretaria quando configurada)
+    sig_blocks: List[Any] = []
+    img_sec = _assinatura_img_flowable(contrato.get("assinatura_secretaria_b64"), max_w_mm=58.0, max_h_mm=18.0)
+    if img_sec:
+        sig_blocks.append(img_sec)
+        sig_blocks.append(Spacer(1, -2 * mm))
+    sig_blocks.extend(
+        [
+            Paragraph("____________________________________________________________", styles["center"]),
+            Paragraph(f"<b>{_esc(municipio_nome)} – {_esc(secretaria_nome)}</b>", styles["center"]),
+            Paragraph(f"{_esc(contrato.get('representante_nome') or '')} — {_esc(rep_cargo)}", styles["center"]),
+            Spacer(1, 7 * mm),
+        ]
+    )
 
     local_cfg = (selo_eletronico or {}).get("local_assinatura") or {}
     modo_local = str(local_cfg.get("modo") or "BLOCO_CONTRATADO").upper()
@@ -679,11 +705,47 @@ def _montar_corpo_contrato_story(
 
     story.append(KeepTogether(sig_blocks))
 
-    # Testemunhas (mesma estrutura oficial da página 4)
+    # Testemunhas (com assinaturas, nomes e CPFs fixos quando configurados no município)
     story.append(Spacer(1, 6 * mm))
     story.append(Paragraph("<b>Testemunhas:</b>", styles["clause"]))
-    story.append(Paragraph("Nome: ________________________________________.  CPF: _________________________.", styles["clause"]))
-    story.append(Paragraph("Nome: ________________________________________.  CPF: _________________________.", styles["clause"]))
+
+    def _bloco_testemunha(nome_t: str, cpf_t: str, img_b64: Optional[str]) -> List[Any]:
+        itens: List[Any] = []
+        img_t = _assinatura_img_flowable(img_b64, max_w_mm=44.0, max_h_mm=13.0)
+        if img_t:
+            itens.append(img_t)
+        else:
+            itens.append(Spacer(1, 10 * mm))
+        itens.append(Paragraph("___________________________________", styles["center"]))
+        nome_txt = _esc(nome_t) if nome_t else "_____________________________"
+        cpf_txt = _esc(cpf_t) if cpf_t else "_____________________"
+        itens.append(Paragraph(f"<b>Nome:</b> {nome_txt}", styles["center"]))
+        itens.append(Paragraph(f"<b>CPF:</b> {cpf_txt}", styles["center"]))
+        return itens
+
+    col_t1 = _bloco_testemunha(
+        (contrato.get("testemunha1_nome") or "").strip(),
+        (contrato.get("testemunha1_cpf") or "").strip(),
+        contrato.get("testemunha1_assinatura_b64"),
+    )
+    col_t2 = _bloco_testemunha(
+        (contrato.get("testemunha2_nome") or "").strip(),
+        (contrato.get("testemunha2_cpf") or "").strip(),
+        contrato.get("testemunha2_assinatura_b64"),
+    )
+    tbl_testemunhas = Table([[col_t1, col_t2]], colWidths=[87 * mm, 87 * mm])
+    tbl_testemunhas.setStyle(
+        TableStyle(
+            [
+                ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]
+        )
+    )
+    story.append(KeepTogether([tbl_testemunhas]))
 
     # PÁGINA 5: EXTRATO DO CONTRATO
     story.append(PageBreak())
