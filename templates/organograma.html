@@ -105,9 +105,11 @@
                     <i class="ph ph-user-plus text-base"></i> Nomear Servidor
                 </button>
 
+                {% if has_perm('delete_permanently') %}
                 <button onclick="limparEstruturaExercicio()" class="px-3 py-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm" title="Zerar dados de teste e começar seu cadastro do zero">
                     <i class="ph ph-trash text-base"></i> Zerar Quadro
                 </button>
+                {% endif %}
 
                 <div class="h-6 w-px bg-gray-300 dark:bg-gray-600 mx-1 hidden sm:block"></div>
 
@@ -818,7 +820,9 @@
                         <td class="p-3 text-right space-x-1 whitespace-nowrap">
                             <button onclick="abrirModalNomear('${n.id}', '${n.title.replace(/'/g, "\\'")}')" class="px-2 py-1 bg-emerald-600 text-white rounded font-bold text-[11px] hover:bg-emerald-700">+ Nomear</button>
                             <button onclick="abrirModalNode('${n.id}')" class="px-2 py-1 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 rounded font-bold text-[11px]">Editar</button>
+                            {% if has_perm('delete_permanently') %}
                             <button onclick="deletarNode('${n.id}')" class="px-2 py-1 bg-rose-100 text-rose-700 rounded font-bold text-[11px]">Excluir</button>
+                            {% endif %}
                         </td>
                     </tr>
                 `;

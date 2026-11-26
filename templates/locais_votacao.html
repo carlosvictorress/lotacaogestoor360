@@ -260,12 +260,14 @@
                                         <i class="ph ph-pencil-simple text-lg"></i>
                                     </button>
 
+                                    {% if has_perm('delete_permanently') %}
                                     <!-- BOTÃO EXCLUIR -->
                                     <form method="POST" action="{{ url_for('eleitoral_local_excluir', id=loc.id) }}" onsubmit="return confirm('Tem certeza que deseja excluir o local {{ loc.nome }}?');" class="inline">
                                         <button type="submit" class="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition" title="Excluir">
                                             <i class="ph ph-trash text-lg"></i>
                                         </button>
                                     </form>
+                                    {% endif %}
                                 </div>
                             </div>
 

@@ -384,10 +384,12 @@
                                         class="p-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 transition">
                                         <i class="ph ph-clock-counter-clockwise text-base"></i>
                                     </button>
+                                    {% if has_perm('delete_permanently') %}
                                     <button type="button" onclick="abrirModalExcluirBackup({{ h.id }}, {{ h.nome_arquivo|tojson }})" title="Remover arquivo do disco"
                                         class="p-2 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300 transition">
                                         <i class="ph ph-trash text-base"></i>
                                     </button>
+                                    {% endif %}
                                 </div>
                                 {% else %}
                                 <span class="text-gray-400 text-[11px]">—</span>

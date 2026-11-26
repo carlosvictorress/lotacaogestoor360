@@ -24,118 +24,108 @@ from flask import abort, flash, jsonify, redirect, request, session, url_for
 from flask_login import current_user
 
 # ==============================================================================
-# 1. DEFINIÇÃO DOS 7 NÍVEIS DE ACESSO (RBAC)
+# 1. DEFINIÇÃO DOS 5 NÍVEIS OFICIAIS DE ACESSO (RBAC)
 # ==============================================================================
 
 ROLE_METADATA: Dict[str, Dict[str, Any]] = {
     "super_admin": {
-        "label": "Super Admin (Master TI)",
-        "short": "Master TI",
+        "label": "Super Admin (TI / Desenvolvedor)",
+        "short": "Super Admin",
         "scope": "global",
         "level": 100,
-        "desc": "Controle total de infraestrutura, secretarias, usuários, backups e auditoria.",
+        "desc": "Nível supremo de acesso a tudo no sistema (TI e desenvolvedor), único autorizado a excluir registros.",
     },
     "prefeito": {
-        "label": "Prefeito / Gestor Maior",
+        "label": "Prefeito Gestor",
         "short": "Prefeito",
         "scope": "global",
         "level": 90,
-        "desc": "Visão global 360° de todas as secretarias, comissionados, custos, organograma e inteligência eleitoral.",
+        "desc": "Acesso global a todos os módulos e secretarias, sem permissão de excluir qualquer registro.",
     },
     "estrategia_eleitoral": {
-        "label": "Coordenação Estratégica (Eleitoral)",
-        "short": "Estratégia",
+        "label": "Coordenação Estratégica (Só Eleitoral)",
+        "short": "Coord. Estratégica",
         "scope": "global",
         "level": 70,
-        "desc": "Acesso exclusivo ao módulo de inteligência eleitoral, colégios, seções e indicações.",
-    },
-    "auditor": {
-        "label": "Auditor / Controle Interno",
-        "short": "Auditor",
-        "scope": "global",
-        "level": 60,
-        "desc": "Acesso global somente leitura a servidores, contratos, folha, organograma e auditoria (TCE/MP).",
+        "desc": "Acesso exclusivo ao módulo de inteligência eleitoral, locais de votação, seções e lideranças.",
     },
     "secretario": {
-        "label": "Secretário(a) Municipal",
+        "label": "Secretário(a)",
         "short": "Secretário(a)",
         "scope": "secretaria",
         "level": 50,
-        "desc": "Gestão completa e isolada da sua secretaria (servidores, validação, contratos, rescisões, ponto e organograma).",
+        "desc": "Acesso a todos os módulos na sua secretaria (igual ao Prefeito), sem permissão de excluir registros.",
     },
     "rh_secretaria": {
-        "label": "RH Secretaria (Operador)",
+        "label": "RH Secretaria",
         "short": "RH Secretaria",
         "scope": "secretaria",
         "level": 30,
-        "desc": "Cadastro, edição de fichas, encaminhamentos, ponto e atestados somente da sua secretaria.",
-    },
-    "chefe_unidade": {
-        "label": "Chefe de Unidade (Escola/UBS/Setor)",
-        "short": "Chefe Unidade",
-        "scope": "unidade",
-        "level": 20,
-        "desc": "Visualização de servidores e controle de frequência exclusivamente da sua unidade de trabalho.",
+        "desc": "Fichas cadastrais, contratos, Gestoor Sign, organograma, ponto, reconhecimento facial, atestados, rescisões, quantitativos por cargo, folha, apoio pedagógico, lista de servidores e relatórios (sem indicações políticas e sem exclusão).",
     },
 }
 
-# Mapeamento de papéis legados (2026) para os novos papéis sem quebrar usuários existentes
+# Mapeamento de papéis legados para os 5 papéis oficiais sem quebrar usuários existentes no banco
 LEGACY_ROLE_MAP = {
     "admin": "super_admin",
     "rh_supervisor": "secretario",
+    "auditor": "rh_secretaria",
+    "chefe_unidade": "rh_secretaria",
 }
 
 PERMISSIONS: Dict[str, set] = {
     # Painéis principais
-    "view_admin_panel": {"super_admin", "prefeito", "secretario", "auditor"},
-    "view_prefeito_panel": {"super_admin", "prefeito"},
-    # Cadastros estruturais globais
-    "manage_secretarias": {"super_admin"},
-    "manage_users": {"super_admin"},
-    "manage_funcoes": {"super_admin", "prefeito", "secretario"},
-    "manage_locais": {"super_admin", "prefeito", "secretario"},
-    "manage_padrinhos": {"super_admin", "prefeito", "estrategia_eleitoral"},
-    "view_padrinhos": {"super_admin", "prefeito", "estrategia_eleitoral", "secretario"},
-    # Backup & Restauração
-    "manage_backup": {"super_admin"},
-    # RH & Fichas
-    "view_rh": {"super_admin", "prefeito", "secretario", "rh_secretaria", "auditor", "chefe_unidade"},
-    "write_rh": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
-    "validate_cadastros": {"super_admin", "prefeito", "secretario"},
+    "view_admin_panel": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "view_prefeito_panel": {"super_admin", "prefeito", "secretario"},
+    # Cadastros estruturais
+    "manage_secretarias": {"super_admin", "prefeito"},
+    "manage_users": {"super_admin", "prefeito"},
+    "manage_funcoes": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "manage_locais": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    # Indicações Políticas / Padrinhos (BLOQUEADO para RH Secretaria)
+    "manage_padrinhos": {"super_admin", "prefeito", "secretario", "estrategia_eleitoral"},
+    "view_padrinhos": {"super_admin", "prefeito", "secretario", "estrategia_eleitoral"},
+    # Backup & Restauração (Prefeito pode gerar/baixar/verificar; excluir backup exige delete_permanently)
+    "manage_backup": {"super_admin", "prefeito"},
+    # EXCLUSÃO DE QUALQUER REGISTRO — EXCLUSIVO DO SUPER ADMIN (TI / DESENVOLVEDOR)
     "delete_permanently": {"super_admin"},
-    "move_servidores": {"super_admin", "prefeito", "secretario"},
-    "export_rh": {"super_admin", "prefeito", "secretario", "auditor"},
-    "scan_duplicados": {"super_admin", "prefeito", "secretario", "auditor"},
+    # RH, Fichas, Lista de Servidores & Relatórios
+    "view_rh": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "write_rh": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "validate_cadastros": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "move_servidores": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "export_rh": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "scan_duplicados": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     # Contratos & Rescisões
-    "view_contratos": {"super_admin", "prefeito", "secretario", "rh_secretaria", "auditor"},
+    "view_contratos": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "manage_contratos": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
-    "view_rescisoes": {"super_admin", "prefeito", "secretario", "auditor"},
-    "manage_rescisoes": {"super_admin", "prefeito", "secretario"},
+    "view_rescisoes": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "manage_rescisoes": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     # Gestoor Sign (Assinatura Eletrônica Presencial de Contratos)
-    "view_gestoor_sign": {"super_admin", "prefeito", "secretario", "rh_secretaria", "auditor"},
+    "view_gestoor_sign": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "operate_gestoor_sign": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "cancel_gestoor_sign": {"super_admin", "prefeito", "secretario"},
-    "config_gestoor_sign": {"super_admin", "prefeito"},
-    # Folha & Relatórios
-    "view_folha": {"super_admin", "prefeito", "secretario", "auditor"},
-    # Ponto & Atestados
-    "view_ponto": {"super_admin", "prefeito", "secretario", "rh_secretaria", "chefe_unidade", "auditor"},
+    "config_gestoor_sign": {"super_admin", "prefeito", "secretario"},
+    # Folha de Pagamento & Relatórios
+    "view_folha": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    # Unidades de Ponto, Reconhecimento Facial & Atestados Médicos
+    "view_ponto": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "manage_biometria": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
-    "view_atestados": {"super_admin", "prefeito", "secretario", "rh_secretaria", "chefe_unidade", "auditor"},
+    "view_atestados": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "decide_atestados": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     # Organograma
-    "view_organograma": {"super_admin", "prefeito", "secretario", "auditor"},
-    "manage_organograma": {"super_admin", "prefeito", "secretario"},
-    # Dossiê Digital (GED) & Virada de Exercício 2027
-    "view_ged": {"super_admin", "prefeito", "secretario", "rh_secretaria", "auditor"},
+    "view_organograma": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "manage_organograma": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    # Dossiê Digital (GED) & Virada de Exercício
+    "view_ged": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "manage_ged": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
-    "validate_ged": {"super_admin", "prefeito", "secretario"},
+    "validate_ged": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "manage_virada_exercicio": {"super_admin", "prefeito", "secretario"},
-    # Módulo Estratégico Eleitoral (100% sigiloso e restrito)
-    "view_eleitoral": {"super_admin", "prefeito", "estrategia_eleitoral"},
-    "manage_eleitoral": {"super_admin", "prefeito", "estrategia_eleitoral"},
+    # Módulo Estratégico Eleitoral (Restrito: Super Admin, Prefeito, Secretário e Coord. Estratégica)
+    "view_eleitoral": {"super_admin", "prefeito", "secretario", "estrategia_eleitoral"},
+    "manage_eleitoral": {"super_admin", "prefeito", "secretario", "estrategia_eleitoral"},
     # Auditoria Forense
-    "view_auditoria": {"super_admin", "prefeito", "secretario", "auditor"},
+    "view_auditoria": {"super_admin", "prefeito", "secretario"},
 }
 
 
@@ -191,10 +181,8 @@ def get_default_home_endpoint(user) -> str:
         return "painel_prefeito"
     if role == "estrategia_eleitoral":
         return "eleitoral_estrategia"
-    if role in ("super_admin", "secretario", "auditor"):
+    if role in ("super_admin", "secretario", "rh_secretaria"):
         return "admin_dashboard"
-    if role == "chefe_unidade":
-        return "painel_ponto"
     return "sistema"
 
 

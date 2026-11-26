@@ -1559,6 +1559,9 @@ def admin_dashboard():
                 return redirect(url_for("admin_dashboard", tab="config"))
 
             norm_role = security.LEGACY_ROLE_MAP.get(role_form, role_form)
+            if norm_role == "super_admin" and not security.is_super_admin(current_user):
+                flash("Acesso negado: apenas Super Admin (TI) pode criar usuários Super Admin.", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
             role_scope = security.ROLE_METADATA[norm_role]["scope"]
 
             if role_scope != "global" and not sec_id_form:
@@ -2254,6 +2257,10 @@ def update_user():
     u = db.session.get(User, user_id)
 
     if u:
+        if security.normalize_role(u) == "super_admin" and not security.is_super_admin(current_user):
+            flash("Acesso negado: apenas Super Admin (TI) pode editar contas Super Admin.", "error")
+            return redirect(url_for("admin_dashboard", tab="config"))
+
         new_username = (request.form.get("username") or "").strip()
         if new_username and new_username != u.username:
             if User.query.filter_by(username=new_username).first():
@@ -2281,16 +2288,19 @@ def update_user():
 
         if role:
             norm_role = security.LEGACY_ROLE_MAP.get(role, role)
+            if norm_role == "super_admin" and not security.is_super_admin(current_user):
+                flash("Acesso negado: apenas Super Admin (TI) pode atribuir nível Super Admin.", "error")
+                return redirect(url_for("admin_dashboard", tab="config"))
             if norm_role in security.ROLE_METADATA:
                 u.role = norm_role
                 u.is_admin = norm_role == "super_admin"
-                if norm_role in ("super_admin", "prefeito", "estrategia_eleitoral", "auditor"):
+                if norm_role in ("super_admin", "prefeito", "estrategia_eleitoral"):
                     u.secretaria_id = sec_id or None
                     u.local_trabalho_id = None
                 else:
                     if sec_id:
                         u.secretaria_id = sec_id
-                    u.local_trabalho_id = local_id if norm_role == "chefe_unidade" else None
+                    u.local_trabalho_id = None
         elif sec_id:
             u.secretaria_id = sec_id
 
@@ -2321,7 +2331,7 @@ def desbloquear_usuario(user_id):
 
 @app.route("/admin/delete_user/<int:user_id>", methods=["GET", "POST"])
 @login_required
-@security.require_permission("manage_users")
+@security.require_permission("delete_permanently")
 def delete_user(user_id):
     u = db.session.get(User, user_id)
     if u and u.username != "admin" and u.id != current_user.id:
@@ -2335,7 +2345,7 @@ def delete_user(user_id):
 
 @app.route("/admin/delete_secretaria/<int:sec_id>", methods=["GET", "POST"])
 @login_required
-@security.require_permission("manage_secretarias")
+@security.require_permission("delete_permanently")
 def delete_secretaria(sec_id):
     if (
         User.query.filter_by(secretaria_id=sec_id).first()
@@ -2401,7 +2411,7 @@ def editar_funcao():
 
 @app.route("/admin/delete_funcao/<int:id>", methods=["GET", "POST"])
 @login_required
-@security.require_permission("manage_funcoes")
+@security.require_permission("delete_permanently")
 def delete_funcao(id):
     f = db.session.get(Funcao, id)
     funcoes_protegidas = [
@@ -2425,7 +2435,7 @@ def delete_funcao(id):
 
 @app.route("/admin/delete_local/<int:id>", methods=["GET", "POST"])
 @login_required
-@security.require_permission("manage_locais")
+@security.require_permission("delete_permanently")
 def delete_local(id):
     l = db.session.get(LocalTrabalho, id)
     if l and not security.can_access_record(current_user, l):
@@ -2444,7 +2454,7 @@ def delete_local(id):
 
 @app.route("/admin/delete_padrinho/<int:id>", methods=["GET", "POST"])
 @login_required
-@security.require_permission("manage_padrinhos")
+@security.require_permission("delete_permanently")
 def delete_padrinho(id):
     if Funcionario.query.filter_by(padrinho_id=id).first():
         flash("Erro: Existem funcionários indicados por este padrinho.", "error")
@@ -5328,7 +5338,7 @@ def api_organograma_exercicio_salvar():
 
 @app.route('/api/organograma/exercicio/limpar', methods=['POST'])
 @login_required
-@security.require_permission("manage_organograma", api=True)
+@security.require_permission("delete_permanently", api=True)
 def api_organograma_exercicio_limpar():
     try:
         data = request.json or {}
@@ -5468,7 +5478,7 @@ def api_organograma_node_salvar():
 
 @app.route('/api/organograma/node/deletar', methods=['POST'])
 @login_required
-@security.require_permission("manage_organograma", api=True)
+@security.require_permission("delete_permanently", api=True)
 def api_organograma_node_deletar():
     try:
         data = request.json or {}
@@ -6523,7 +6533,7 @@ def eleitoral_local_editar(id):
 
 @app.route("/eleitoral/local/<int:id>/excluir", methods=["POST"])
 @login_required
-@security.require_permission("manage_eleitoral")
+@security.require_permission("delete_permanently")
 def eleitoral_local_excluir(id):
     local = LocalVotacao.query.get_or_404(id)
     nome = local.nome
@@ -6753,7 +6763,8 @@ def _prefeito_models_ctx():
 @login_required
 @security.require_permission("view_prefeito_panel")
 def painel_prefeito():
-    sec_id = request.args.get("secretaria_id", type=int)
+    is_global = security.has_global_scope(current_user)
+    sec_id = request.args.get("secretaria_id", type=int) if is_global else current_user.secretaria_id
     escopo = (request.args.get("escopo") or "comissionados_contratados").strip()
     if escopo not in ("comissionados_contratados", "todos", "comissionado", "contratado", "efetivo", "terceirizado"):
         escopo = "comissionados_contratados"
@@ -6776,6 +6787,9 @@ def painel_prefeito():
 @login_required
 @security.require_permission("view_prefeito_panel", api=True)
 def api_prefeito_servidor_360(func_id):
+    f_chk = db.session.get(Funcionario, func_id)
+    if not f_chk or not security.can_access_record(current_user, f_chk):
+        return jsonify({"success": False, "message": "Acesso negado ou servidor não encontrado."}), 403
     dossie = prefeito_service.get_dossie_servidor_360(_prefeito_models_ctx(), func_id)
     if not dossie:
         return jsonify({"success": False, "message": "Servidor não encontrado."}), 404
@@ -6792,6 +6806,9 @@ def api_prefeito_atualizar_teto():
         sec_id = int(sec_id)
     except (TypeError, ValueError):
         return jsonify({"success": False, "message": "Secretaria inválida."}), 400
+
+    if not security.has_global_scope(current_user) and int(sec_id) != int(current_user.secretaria_id or -1):
+        return jsonify({"success": False, "message": "Acesso negado: você só pode alterar tetos da sua própria secretaria."}), 403
 
     sec = db.session.get(Secretaria, sec_id)
     if not sec:
@@ -6825,7 +6842,8 @@ def api_prefeito_atualizar_teto():
 @login_required
 @security.require_permission("view_prefeito_panel")
 def prefeito_exportar_excel():
-    sec_id = request.args.get("secretaria_id", type=int)
+    is_global = security.has_global_scope(current_user)
+    sec_id = request.args.get("secretaria_id", type=int) if is_global else current_user.secretaria_id
     escopo = (request.args.get("escopo") or "comissionados_contratados").strip()
     padrinho_id = request.args.get("padrinho_id", type=int)
     validacao = (request.args.get("validacao") or "").strip()
@@ -6859,7 +6877,8 @@ def prefeito_exportar_excel():
 @login_required
 @security.require_permission("view_prefeito_panel")
 def prefeito_relatorio_executivo():
-    sec_id = request.args.get("secretaria_id", type=int)
+    is_global = security.has_global_scope(current_user)
+    sec_id = request.args.get("secretaria_id", type=int) if is_global else current_user.secretaria_id
     escopo = (request.args.get("escopo") or "comissionados_contratados").strip()
     padrinho_id = request.args.get("padrinho_id", type=int)
     validacao = (request.args.get("validacao") or "").strip()
@@ -6975,6 +6994,7 @@ def api_ged_listar(func_id):
         "documentos": docs_json,
         "pode_gerenciar": security.has_permission(current_user, "manage_ged"),
         "pode_validar": security.has_permission(current_user, "validate_ged"),
+        "pode_excluir": security.has_permission(current_user, "delete_permanently"),
     })
 
 
@@ -7064,7 +7084,7 @@ def api_ged_validar(doc_id):
 
 @app.route("/api/ged/excluir/<int:doc_id>", methods=["POST"])
 @login_required
-@security.require_permission("manage_ged", api=True)
+@security.require_permission("delete_permanently", api=True)
 def api_ged_excluir(doc_id):
     doc = db.session.get(DocumentoServidor, doc_id)
     if not doc or not security.can_access_record(current_user, doc):
@@ -7664,8 +7684,8 @@ def api_backup_verificar(backup_id):
 @app.route("/api/backup/excluir/<int:backup_id>", methods=["POST"])
 @login_required
 def api_backup_excluir(backup_id):
-    if not _is_backup_admin():
-        return jsonify({"success": False, "message": "Acesso não autorizado."}), 403
+    if not _is_backup_admin() or not security.has_permission(current_user, "delete_permanently"):
+        return jsonify({"success": False, "message": "Acesso negado: apenas Super Admin (TI) pode excluir backups."}), 403
     if not _validate_backup_csrf():
         return jsonify({"success": False, "message": "Token de segurança inválido. Recarregue a página."}), 400
 

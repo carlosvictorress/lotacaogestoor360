@@ -2278,7 +2278,7 @@
                         <a href="${d.view_url}" target="_blank" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px]">Ver</a>
                         <a href="${d.download_url}" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[11px]">Baixar</a>
                         ${data.pode_validar ? `<button type="button" onclick="validarDocumentoGED(${d.id}, ${funcId})" class="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px]">${d.validado ? 'Revogar' : 'Validar'}</button>` : ''}
-                        ${data.pode_gerenciar ? `<button type="button" onclick="excluirDocumentoGED(${d.id}, ${funcId})" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px]">Excluir</button>` : ''}
+                        ${data.pode_excluir ? `<button type="button" onclick="excluirDocumentoGED(${d.id}, ${funcId})" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px]">Excluir</button>` : ''}
                     </div>
                 </div>
             `).join('');

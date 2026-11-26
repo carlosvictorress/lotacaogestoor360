@@ -753,8 +753,10 @@
                                 <th class="px-6 py-4">Nome / CPF</th>
                                 <th class="px-6 py-4">Lotação / Local</th>
                                 <th class="px-6 py-4">Função / Vínculo</th>
-                                <th class="px-6 py-4 text-center">Indicação</th>
-                                <th class="px-6 py-4">Quem Indicou</th>
+                                {% if has_perm('view_padrinhos') %}
+                                <th class="px-6 py-4 text-center" data-col="indicacao">Indicação</th>
+                                <th class="px-6 py-4" data-col="indicacao">Quem Indicou</th>
+                                {% endif %}
                                 <th class="px-6 py-4 text-center">Ações</th>
                             </tr>
                         </thead>
@@ -791,12 +793,14 @@
                                         f.funcao else 'Não Definido' }}</span><span
                                         class="text-xs bg-gray-100 px-1 rounded dark:bg-gray-600 dark:text-gray-200">{{
                                         f.tipo_vinculo }}</span></td>
-                                <td class="px-6 py-4 text-center">{% if has_perm('view_padrinhos') %}{% if f.foi_indicacao %}<span
+                                {% if has_perm('view_padrinhos') %}
+                                <td class="px-6 py-4 text-center" data-col="indicacao">{% if f.foi_indicacao %}<span
                                         class="w-2 h-2 bg-red-500 rounded-full inline-block" title="Sim"></span>{% else
                                     %}<span class="w-2 h-2 bg-gray-200 rounded-full inline-block" title="Não"></span>{%
-                                    endif %}{% else %}<span class="text-xs text-gray-400">—</span>{% endif %}</td>
-                                <td class="px-6 py-4 text-xs font-bold text-blue-800 uppercase dark:text-blue-400">{{
-                                    (f.padrinho.nome if f.padrinho else '---') if has_perm('view_padrinhos') else 'RESTRITO' }}</td>
+                                    endif %}</td>
+                                <td class="px-6 py-4 text-xs font-bold text-blue-800 uppercase dark:text-blue-400" data-col="indicacao">{{
+                                    f.padrinho.nome if f.padrinho else '---' }}</td>
+                                {% endif %}
                                 <td class="px-6 py-4 text-center flex justify-center gap-2">
                                     <button
                                         onclick="abrirModalMovimentacao({{ f.id }}, '{{ f.nome }}', '{{ f.funcao_id }}', '{{ f.local_trabalho_id }}')"
@@ -811,7 +815,7 @@
                             </tr>
                             {% else %}<tr
                                 class="bg-white border-b hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
-                                <td colspan="6" class="px-6 py-4 text-center dark:text-gray-400">Nenhum registro
+                                <td colspan="{{ 6 if has_perm('view_padrinhos') else 4 }}" class="px-6 py-4 text-center dark:text-gray-400">Nenhum registro
                                     encontrado.</td>
                             </tr>{% endfor %}
                         </tbody>
@@ -933,8 +937,10 @@
                                         class="text-blue-500 hover:text-blue-700 p-1" title="Editar Perfil Institucional">
                                         <i class="ph ph-pencil-simple"></i>
                                     </button>
+                                    {% if has_perm('delete_permanently') %}
                                     <button onclick="confirmAction('{{ url_for('delete_secretaria', sec_id=sec.id) }}', 'Excluir Secretaria', 'Tem certeza? Só é possível excluir secretarias sem vínculos.')"
                                         class="text-red-500 hover:text-red-700 p-1"><i class="ph ph-trash"></i></button>
+                                    {% endif %}
                                 </div>
                             </li>
                             {% endfor %}
@@ -970,9 +976,11 @@
                                         <button onclick="abrirModalEditarFuncao({{ f.id }}, '{{ f.nome }}')" class="text-blue-500 hover:text-blue-700 p-1 transition" title="Editar Função">
                                             <i class="ph ph-pencil text-base"></i>
                                         </button>
+                                        {% if has_perm('delete_permanently') %}
                                         <button onclick="confirmAction('{{ url_for('delete_funcao', id=f.id) }}', 'Excluir Função', 'Tem certeza? Verifique se não há servidores com esta função.')" class="text-red-500 hover:text-red-700 p-1 transition" title="Excluir Função">
                                             <i class="ph ph-trash text-base"></i>
                                         </button>
+                                        {% endif %}
                                     {% endif %}
                                 </div>
                             </li>
@@ -1073,8 +1081,10 @@
                                 <div class="flex gap-1 flex-shrink-0">
                                     <button onclick='abrirModalEditarLocal({{ l.id }}, {{ l.nome|tojson }}, {{ (l.latitude or "")|tojson }}, {{ (l.longitude or "")|tojson }}, {{ l.raio_permitido or 50 }}, {{ (l.secretaria_id or "")|tojson }}, {{ (l.tipo_unidade or "UNIDADE")|tojson }})'
                                         class="text-blue-500 hover:text-blue-700 p-1.5 bg-blue-50 rounded-lg dark:bg-blue-900/30 transition"><i class="ph ph-pencil-simple"></i></button>
+                                    {% if has_perm('delete_permanently') %}
                                     <button onclick="confirmAction('{{ url_for('delete_local', id=l.id) }}', 'Excluir Local', 'Tem certeza? Verifique se não há servidores neste local.')"
                                         class="text-red-500 hover:text-red-700 p-1.5 bg-red-50 rounded-lg dark:bg-red-900/30 transition"><i class="ph ph-trash"></i></button>
+                                    {% endif %}
                                 </div>
                             </li>
                             {% endfor %}
@@ -1099,9 +1109,9 @@
                         </form>
                         <ul class="space-y-2 max-h-72 overflow-y-auto menu-scroll">{% for p in padrinhos %}<li
                                 class="flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded dark:text-gray-300 dark:hover:bg-gray-700">
-                                <span>{{ p.nome }}</span><button
+                                <span>{{ p.nome }}</span>{% if has_perm('delete_permanently') %}<button
                                     onclick="confirmAction('{{ url_for('delete_padrinho', id=p.id) }}', 'Excluir Padrinho', 'Tem certeza? Verifique se não há servidores indicados por ele.')"
-                                    class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button>
+                                    class="text-red-500 hover:text-red-700"><i class="ph ph-trash"></i></button>{% endif %}
                             </li>{%
                             endfor %}</ul>
                     </div>
@@ -1112,7 +1122,7 @@
                         class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 dark:bg-gray-800 dark:border-gray-700 md:col-span-2">
                         <div class="flex justify-between items-center mb-4">
                             <div>
-                                <h3 class="font-bold text-gray-800 dark:text-white">Usuários & 7 Níveis de Acesso (RBAC)</h3>
+                                <h3 class="font-bold text-gray-800 dark:text-white">Usuários & 5 Níveis de Acesso (RBAC)</h3>
                                 <p class="text-[11px] text-gray-400">Controle isolado por secretaria, unidade e papel institucional</p>
                             </div>
                             <button onclick="document.getElementById('formUser').classList.toggle('hidden')"
@@ -1138,13 +1148,13 @@
                             <select name="role" id="create_user_role" onchange="toggleUnidadeCreateUser(this.value)"
                                 class="w-full border p-2 rounded text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white" required>
                                 <option value="" disabled selected>Selecione o Nível de Acesso...</option>
-                                <option value="super_admin">1. Super Admin (Master TI — Total + Backup)</option>
-                                <option value="prefeito">2. Prefeito / Gestor Maior (Global + Eleitoral)</option>
+                                {% if has_perm('delete_permanently') %}
+                                <option value="super_admin">1. Super Admin (TI / Desenvolvedor — Acesso Total + Excluir)</option>
+                                {% endif %}
+                                <option value="prefeito">2. Prefeito Gestor (Acesso a Tudo — Sem Excluir)</option>
                                 <option value="estrategia_eleitoral">3. Coordenação Estratégica (Só Eleitoral)</option>
-                                <option value="auditor">4. Auditor / Controle Interno (Global Leitura)</option>
-                                <option value="secretario">5. Secretário(a) Municipal (Isolado na Pasta)</option>
-                                <option value="rh_secretaria">6. RH Secretaria (Operador Isolado na Pasta)</option>
-                                <option value="chefe_unidade">7. Chefe de Unidade (Só sua Escola/UBS/Setor)</option>
+                                <option value="secretario">4. Secretário(a) (Todos os Módulos na Pasta — Sem Excluir)</option>
+                                <option value="rh_secretaria">5. RH Secretaria (RH + Relatórios sem Indicações — Sem Excluir)</option>
                             </select>
 
                             <select name="secretaria_id"
@@ -1194,7 +1204,7 @@
                                     {% endif %}
                                     <button onclick='openEditUserModal({{ u.id }}, {{ u.username|tojson }}, {{ u.normalized_role|tojson }}, {{ (u.secretaria_id or "")|tojson }}, {{ (u.local_trabalho_id or "")|tojson }}, {{ (u.nome_completo or "")|tojson }}, {{ (u.email or "")|tojson }}, {{ "true" if (u.ativo is not sameas false) else "false" }})'
                                         class="text-blue-500 hover:text-blue-700 p-1" title="Editar"><i class="ph ph-pencil-simple text-base"></i></button>
-                                    {% if u.username != 'admin' %}
+                                    {% if has_perm('delete_permanently') and u.username != 'admin' %}
                                     <button onclick="confirmAction('{{ url_for('delete_user', user_id=u.id) }}', 'Excluir Usuário', 'Tem certeza que deseja excluir este usuário?')"
                                         class="text-red-500 hover:text-red-700 p-1" title="Excluir"><i class="ph ph-trash text-base"></i></button>
                                     {% endif %}
@@ -1538,10 +1548,12 @@
                             <input type="checkbox" id="chk_col_dados_bancarios" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
                             <span>Dados Bancários</span>
                         </label>
+                        {% if has_perm('view_padrinhos') %}
                         <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
                             <input type="checkbox" id="chk_col_padrinho" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
                             <span>Quem Indicou</span>
                         </label>
+                        {% endif %}
                         <label class="flex items-center gap-2.5 text-sm text-gray-700 dark:text-gray-300 cursor-pointer hover:text-indigo-700">
                             <input type="checkbox" id="chk_col_tipo_sanguineo" class="chk-pdf-field w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500">
                             <span>Tipo Sanguíneo</span>
@@ -1796,13 +1808,13 @@
                     <label class="block text-xs font-bold text-gray-500 uppercase mb-1 dark:text-gray-400">Nível de Acesso (RBAC)</label>
                     <select name="role" id="edit_role" onchange="toggleUnidadeEditUser(this.value)"
                         class="w-full border p-2 rounded-lg text-sm dark:bg-gray-600 dark:border-gray-500 dark:text-white">
-                        <option value="super_admin">1. Super Admin (Master TI — Total + Backup)</option>
-                        <option value="prefeito">2. Prefeito / Gestor Maior (Global + Eleitoral)</option>
+                        {% if has_perm('delete_permanently') %}
+                        <option value="super_admin">1. Super Admin (TI / Desenvolvedor — Acesso Total + Excluir)</option>
+                        {% endif %}
+                        <option value="prefeito">2. Prefeito Gestor (Acesso a Tudo — Sem Excluir)</option>
                         <option value="estrategia_eleitoral">3. Coordenação Estratégica (Só Eleitoral)</option>
-                        <option value="auditor">4. Auditor / Controle Interno (Global Leitura)</option>
-                        <option value="secretario">5. Secretário(a) Municipal (Isolado na Pasta)</option>
-                        <option value="rh_secretaria">6. RH Secretaria (Operador Isolado na Pasta)</option>
-                        <option value="chefe_unidade">7. Chefe de Unidade (Só sua Escola/UBS/Setor)</option>
+                        <option value="secretario">4. Secretário(a) (Todos os Módulos na Pasta — Sem Excluir)</option>
+                        <option value="rh_secretaria">5. RH Secretaria (RH + Relatórios sem Indicações — Sem Excluir)</option>
                     </select>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2164,9 +2176,9 @@ function abrirModalAuditoria(btn) {
             }
             document.getElementById('loading').style.display = 'flex';
             const selectSec = document.getElementById('filter_sec');
-            const selectedText = selectSec.options[selectSec.selectedIndex].text;
+            const selectedText = (selectSec && selectSec.options && selectSec.selectedIndex >= 0) ? selectSec.options[selectSec.selectedIndex].text : "SECRETARIA";
 
-            let subtitle = (selectSec.value === "") ? "FILTRO: GERAL" : "FILTRO: " + selectedText;
+            let subtitle = (!selectSec || selectSec.value === "") ? "FILTRO: GERAL" : "FILTRO: " + selectedText;
             if (simplified) subtitle += " (SIMPLIFICADO)";
 
             document.getElementById('report-subtitle').innerText = subtitle;
@@ -2186,12 +2198,11 @@ function abrirModalAuditoria(btn) {
             rows.forEach(row => {
                 if (row.cells.length > 0) {
                     row.deleteCell(-1);
-                    if (simplified) {
-                        row.deleteCell(-1);
-                        row.deleteCell(-1);
-                    }
                 }
             });
+            if (simplified) {
+                cloneTable.querySelectorAll('[data-col="indicacao"]').forEach(el => el.remove());
+            }
 
             const container = document.getElementById('pdf-table-container');
             container.innerHTML = '';
@@ -2553,7 +2564,9 @@ function abrirModalAuditoria(btn) {
                 { id: 'dt_inicio', chkId: 'chk_col_dt_inicio', label: 'Data Admissão', getValue: tr => tr.dataset.admissao, style: 'white-space: nowrap; text-align: center;' },
                 { id: 'remuneracao', chkId: 'chk_col_remuneracao', label: 'Remuneração', getValue: tr => tr.dataset.remuneracao, style: 'white-space: nowrap;' },
                 { id: 'dados_bancarios', chkId: 'chk_col_dados_bancarios', label: 'Dados Bancários', getValue: tr => tr.dataset.banco },
+                {% if has_perm('view_padrinhos') %}
                 { id: 'padrinho', chkId: 'chk_col_padrinho', label: 'Quem Indicou', getValue: tr => tr.dataset.padrinho },
+                {% endif %}
                 { id: 'tipo_sanguineo', chkId: 'chk_col_tipo_sanguineo', label: 'Tipo Sang.', getValue: tr => tr.dataset.sangue, style: 'white-space: nowrap; text-align: center;' },
                 { id: 'dependentes', chkId: 'chk_col_dependentes', label: 'Dep.', getValue: tr => tr.dataset.dependentes, style: 'text-align: center;' },
                 { id: 'assinatura', chkId: 'chk_col_assinatura', label: 'Assinatura do Servidor', getValue: () => '', style: 'min-width: 140px; text-align: center;' }
@@ -3189,9 +3202,11 @@ function abrirModalAuditoria(btn) {
                                     </div>
                                 </div>
 
+                                {% if has_perm('delete_permanently') %}
                                 <button type="button" onclick="excluirCadastroDuplicado('${d.id}', '${d.nome.replace(/'/g, "\\'")}', '${g.cpf_clean}')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800 text-xs font-semibold rounded-lg transition inline-flex items-center gap-1.5 shrink-0">
                                     <i class="ph ph-trash text-sm"></i> Excluir Duplicado
                                 </button>
+                                {% endif %}
                             </div>
                         `).join('')}
                     </div>
