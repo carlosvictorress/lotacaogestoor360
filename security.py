@@ -113,6 +113,9 @@ PERMISSIONS: Dict[str, set] = {
     "manage_biometria": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "view_atestados": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "decide_atestados": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    # App do Servidor (SERVIDOR 360) — Fila de Solicitações de Alteração Cadastral & Reset de Acesso
+    "view_solicitacoes_dados": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
+    "decide_solicitacoes_dados": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     # Organograma
     "view_organograma": {"super_admin", "prefeito", "secretario", "rh_secretaria"},
     "manage_organograma": {"super_admin", "prefeito", "secretario", "rh_secretaria"},

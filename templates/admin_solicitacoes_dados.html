@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SERVIDOR 360 • Solicitações do App (RH)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
+</head>
+<body class="bg-[#F3F7F5] text-slate-800 min-h-screen">
+    <!-- Barra Superior -->
+    <header class="bg-gradient-to-r from-[#0B3D2E] to-[#14532D] text-white shadow-lg sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <a href="{{ url_for('admin_dashboard') }}"
+                   class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition">
+                    <i class="ph-bold ph-arrow-left text-lg"></i>
+                </a>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-lg font-extrabold tracking-tight">Central do App SERVIDOR 360</h1>
+                        <span class="px-2 py-0.5 rounded-full bg-[#FACC15] text-[#0B3D2E] text-[10px] font-extrabold uppercase">PWA</span>
+                    </div>
+                    <p class="text-xs text-emerald-200">Aprovação de alterações cadastrais e gestão de acessos dos servidores</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="document.getElementById('modalDivulgarApp').classList.remove('hidden')"
+                        class="px-3.5 py-2 rounded-xl bg-[#FACC15] hover:bg-yellow-300 text-[#0B3D2E] text-xs font-extrabold shadow flex items-center gap-1.5 transition">
+                    <i class="ph-bold ph-qr-code text-base"></i>
+                    <span>QR Code / Link do App</span>
+                </button>
+                <a href="{{ url_for('app_servidor_acesso') }}" target="_blank"
+                   class="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold flex items-center gap-1.5 transition">
+                    <i class="ph-bold ph-device-mobile text-base"></i>
+                    <span>Abrir App</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="space-y-2">
+                    {% for cat, msg in messages %}
+                        <div class="rounded-xl px-4 py-3 text-xs font-bold border flex items-center gap-2
+                            {% if cat in ('error', 'danger') %}bg-rose-50 text-rose-900 border-rose-200
+                            {% elif cat == 'warning' %}bg-amber-50 text-amber-900 border-amber-200
+                            {% else %}bg-emerald-50 text-emerald-900 border-emerald-200{% endif %}">
+                            <i class="ph-fill ph-info text-base"></i>
+                            <span>{{ msg }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- KPIs -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <a href="{{ url_for('admin_solicitacoes_dados', status='PENDENTE') }}"
+               class="bg-white rounded-2xl p-4 border {% if status_filtro == 'PENDENTE' %}border-amber-400 ring-2 ring-amber-200{% else %}border-slate-200{% endif %} shadow-sm hover:shadow transition">
+                <p class="text-[11px] font-bold uppercase text-amber-600">Pendentes de Análise</p>
+                <p class="text-3xl font-extrabold text-slate-900 mt-1">{{ total_pendentes }}</p>
+            </a>
+            <a href="{{ url_for('admin_solicitacoes_dados', status='APROVADO') }}"
+               class="bg-white rounded-2xl p-4 border {% if status_filtro == 'APROVADO' %}border-emerald-500 ring-2 ring-emerald-200{% else %}border-slate-200{% endif %} shadow-sm hover:shadow transition">
+                <p class="text-[11px] font-bold uppercase text-emerald-700">Aprovadas e Aplicadas</p>
+                <p class="text-3xl font-extrabold text-slate-900 mt-1">{{ total_aprovadas }}</p>
+            </a>
+            <a href="{{ url_for('admin_solicitacoes_dados', status='RECUSADO') }}"
+               class="bg-white rounded-2xl p-4 border {% if status_filtro == 'RECUSADO' %}border-rose-400 ring-2 ring-rose-200{% else %}border-slate-200{% endif %} shadow-sm hover:shadow transition">
+                <p class="text-[11px] font-bold uppercase text-rose-600">Recusadas</p>
+                <p class="text-3xl font-extrabold text-slate-900 mt-1">{{ total_recusadas }}</p>
+            </a>
+            <div class="bg-gradient-to-br from-[#0B3D2E] to-[#14532D] rounded-2xl p-4 text-white shadow-sm">
+                <p class="text-[11px] font-bold uppercase text-[#FACC15]">Servidores Ativos no App</p>
+                <p class="text-3xl font-extrabold mt-1">{{ contas_ativas|length }}</p>
+            </div>
+        </section>
+
+        <!-- Barra de Busca e Filtro -->
+        <section class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+                {% for st, lbl in [('PENDENTE', 'Pendentes'), ('APROVADO', 'Aprovadas'), ('RECUSADO', 'Recusadas'), ('TODAS', 'Todas')] %}
+                <a href="{{ url_for('admin_solicitacoes_dados', status=st, q=busca) }}"
+                   class="px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition {% if status_filtro == st %}bg-[#0B3D2E] text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">
+                    {{ lbl }}
+                </a>
+                {% endfor %}
+            </div>
+
+            <form method="GET" action="{{ url_for('admin_solicitacoes_dados') }}" class="flex items-center gap-2">
+                <input type="hidden" name="status" value="{{ status_filtro }}">
+                <input type="text" name="q" value="{{ busca }}" placeholder="Buscar nome, CPF ou protocolo..."
+                       class="px-3.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold outline-none focus:border-emerald-600 w-60">
+                <button type="submit" class="px-3.5 py-1.5 rounded-xl bg-[#0B3D2E] text-white text-xs font-bold">
+                    Filtrar
+                </button>
+            </form>
+        </section>
+
+        <!-- Fila de Solicitações -->
+        <section class="space-y-4">
+            {% if solicitacoes %}
+                {% for item in solicitacoes %}
+                {% set s = item.obj %}
+                <article class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="p-4 sm:p-5 flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/50">
+                        <div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="font-mono text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-[#0B3D2E] text-[#FACC15]">{{ s.protocolo }}</span>
+                                <span class="text-xs font-extrabold px-2.5 py-0.5 rounded-lg bg-emerald-100 text-emerald-900">{{ item.categoria_label }}</span>
+                                {% if s.status == 'PENDENTE' %}
+                                <span class="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800">Pendente</span>
+                                {% elif s.status == 'APROVADO' %}
+                                <span class="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Aprovado</span>
+                                {% else %}
+                                <span class="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800">Recusado</span>
+                                {% endif %}
+                            </div>
+                            <h2 class="text-base font-extrabold text-[#0B3D2E] mt-2">
+                                {{ s.funcionario.nome if s.funcionario else 'Servidor' }}
+                            </h2>
+                            <p class="text-xs text-slate-500">
+                                CPF: {{ s.funcionario.cpf if s.funcionario else '—' }} •
+                                {{ s.secretaria.nome if s.secretaria else '' }} •
+                                Solicitado em {{ s.data_solicitacao.strftime('%d/%m/%Y às %H:%M') if s.data_solicitacao else '' }}
+                            </p>
+                        </div>
+
+                        {% if s.anexo_nome %}
+                        <a href="{{ url_for('app_servidor_solicitacao_anexo', sol_id=s.id) }}" target="_blank"
+                           class="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-[#0B3D2E] text-xs font-extrabold flex items-center gap-1.5">
+                            <i class="ph-bold ph-paperclip"></i>
+                            <span>Ver Comprovante ({{ s.anexo_nome[:24] }})</span>
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    <div class="p-4 sm:p-5 space-y-4">
+                        {% if item.itens %}
+                        <div class="overflow-x-auto rounded-xl border border-slate-200">
+                            <table class="w-full text-xs">
+                                <thead class="bg-slate-50 text-slate-500 uppercase text-[10px]">
+                                    <tr>
+                                        <th class="text-left px-3.5 py-2 font-extrabold">Campo Cadastral</th>
+                                        <th class="text-left px-3.5 py-2 font-extrabold">Valor Atual na Ficha</th>
+                                        <th class="text-left px-3.5 py-2 font-extrabold text-emerald-800">Novo Valor Solicitado</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100">
+                                    {% for d in item.itens %}
+                                    <tr>
+                                        <td class="px-3.5 py-2.5 font-bold text-slate-700">{{ d.label }}</td>
+                                        <td class="px-3.5 py-2.5 text-slate-500 line-through">{{ d.antes }}</td>
+                                        <td class="px-3.5 py-2.5 font-extrabold text-emerald-800 bg-emerald-50/40">{{ d.depois }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% endif %}
+
+                        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 text-xs">
+                            <span class="text-[10px] font-extrabold uppercase text-slate-400 block mb-1">Justificativa do Servidor</span>
+                            <p class="text-slate-700 leading-relaxed">{{ s.justificativa }}</p>
+                        </div>
+
+                        {% if s.status == 'PENDENTE' and has_perm('decide_solicitacoes_dados') %}
+                        <div class="flex flex-wrap items-center justify-end gap-2.5 pt-2">
+                            <button type="button" onclick="abrirModalRecusa({{ s.id }}, '{{ s.protocolo }}')"
+                                    class="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-xs font-extrabold flex items-center gap-1.5 transition">
+                                <i class="ph-bold ph-x-circle"></i>
+                                <span>Recusar</span>
+                            </button>
+
+                            <form method="POST" action="{{ url_for('admin_solicitacao_dados_decidir', sol_id=s.id) }}"
+                                  onsubmit="return confirm('Confirma aprovar o protocolo {{ s.protocolo }} e aplicar automaticamente os novos dados na ficha do servidor?')">
+                                <input type="hidden" name="acao" value="APROVAR">
+                                <button type="submit"
+                                        class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#0B3D2E] to-[#14532D] hover:brightness-110 text-white text-xs font-extrabold shadow flex items-center gap-1.5 transition">
+                                    <i class="ph-bold ph-check-circle text-[#FACC15]"></i>
+                                    <span>Aprovar e Aplicar na Ficha</span>
+                                </button>
+                            </form>
+                        </div>
+                        {% elif s.status != 'PENDENTE' %}
+                        <div class="text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                            <span>
+                                Analisado por <strong>{{ s.analisado_por.nome_completo or s.analisado_por.username if s.analisado_por else 'RH' }}</strong>
+                                {% if s.data_analise %} em {{ s.data_analise.strftime('%d/%m/%Y às %H:%M') }}{% endif %}
+                            </span>
+                            {% if s.motivo_recusa %}
+                            <span class="text-rose-700 font-semibold">Motivo: {{ s.motivo_recusa }}</span>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </article>
+                {% endfor %}
+            {% else %}
+                <div class="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+                    <i class="ph-duotone ph-tray text-4xl text-slate-300"></i>
+                    <p class="text-sm font-extrabold text-slate-600 mt-2">Nenhuma solicitação encontrada para este filtro.</p>
+                </div>
+            {% endif %}
+        </section>
+
+        <!-- Contas Ativadas no SERVIDOR 360 (com opção de Reiniciar 1º Acesso) -->
+        <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                <div>
+                    <h2 class="text-sm font-extrabold text-[#0B3D2E]">Servidores com Acesso Ativado no SERVIDOR 360</h2>
+                    <p class="text-xs text-slate-500">Controle de validação facial e reinício de primeiro acesso quando o servidor esquecer a senha</p>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead class="bg-slate-50 text-[10px] uppercase text-slate-500">
+                        <tr>
+                            <th class="text-left px-4 py-2.5 font-extrabold">Servidor</th>
+                            <th class="text-left px-4 py-2.5 font-extrabold">CPF</th>
+                            <th class="text-left px-4 py-2.5 font-extrabold">Biometria Facial</th>
+                            <th class="text-left px-4 py-2.5 font-extrabold">Último Acesso</th>
+                            <th class="text-right px-4 py-2.5 font-extrabold">Ação RH</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        {% for c in contas_ativas %}
+                        <tr class="hover:bg-slate-50/70">
+                            <td class="px-4 py-3 font-bold text-slate-800">{{ c.funcionario.nome if c.funcionario else '—' }}</td>
+                            <td class="px-4 py-3 font-mono text-slate-600">{{ c.funcionario.cpf if c.funcionario else '—' }}</td>
+                            <td class="px-4 py-3">
+                                {% if c.facial_verificado %}
+                                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold">
+                                    Validado ({{ c.facial_score or 0 }}%)
+                                </span>
+                                {% else %}
+                                <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold">Pendente</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-4 py-3 text-slate-500">{{ c.ultimo_login_em.strftime('%d/%m/%Y %H:%M') if c.ultimo_login_em else '—' }}</td>
+                            <td class="px-4 py-3 text-right">
+                                {% if has_perm('decide_solicitacoes_dados') and c.funcionario %}
+                                <form method="POST" action="{{ url_for('admin_app_servidor_resetar_acesso', func_id=c.funcionario.id) }}" class="inline"
+                                      onsubmit="return confirm('Reiniciar o acesso de {{ c.funcionario.nome }}? O servidor precisará fazer o Primeiro Acesso novamente com reconhecimento facial.')">
+                                    <button type="submit" class="px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-[11px] font-extrabold">
+                                        Reiniciar 1º Acesso
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="px-4 py-6 text-center text-slate-400">Nenhum servidor ativou o aplicativo ainda.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modal Recusa -->
+    <div id="modalRecusa" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <h3 class="text-base font-extrabold text-rose-800">Recusar Solicitação <span id="recusaProtocolo"></span></h3>
+            <form id="formRecusa" method="POST" action="">
+                <input type="hidden" name="acao" value="RECUSAR">
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Motivo da Recusa (será exibido ao servidor no App) *</label>
+                <textarea name="motivo_recusa" rows="3" required
+                          placeholder="Ex.: O comprovante de residência enviado está ilegível. Reenvie uma foto nítida..."
+                          class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs outline-none focus:border-rose-500"></textarea>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" onclick="document.getElementById('modalRecusa').classList.add('hidden')"
+                            class="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold">Cancelar</button>
+                    <button type="submit"
+                            class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold">Confirmar Recusa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal QR Code / Divulgação do SERVIDOR 360 -->
+    <div id="modalDivulgarApp" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl">
+            <div class="bg-gradient-to-r from-[#0B3D2E] to-[#14532D] p-5 text-white flex items-center justify-between">
+                <div>
+                    <p class="text-[10px] font-extrabold uppercase tracking-widest text-[#FACC15]">Utilidade Pública Municipal</p>
+                    <h3 class="text-lg font-extrabold">Divulgar App SERVIDOR 360</h3>
+                </div>
+                <button type="button" onclick="document.getElementById('modalDivulgarApp').classList.add('hidden')"
+                        class="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center">
+                    <i class="ph-bold ph-x"></i>
+                </button>
+            </div>
+            <div class="p-6 text-center space-y-4">
+                <img src="{{ qr_app_publico }}" alt="QR Code SERVIDOR 360" class="w-48 h-48 mx-auto rounded-2xl border-2 border-emerald-100 p-2 shadow">
+                <p class="text-xs text-slate-600">
+                    Os servidores validados podem apontar a câmera do celular para este QR Code ou acessar o link abaixo e instalar o <strong>SERVIDOR 360</strong> diretamente na tela inicial:
+                </p>
+                <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl p-2">
+                    <input type="text" id="urlAppShare" readonly value="{{ url_app_publico }}"
+                           class="flex-1 bg-transparent text-xs font-mono text-slate-700 outline-none px-2">
+                    <button type="button" onclick="copiarLinkApp()"
+                            class="px-3 py-1.5 rounded-lg bg-[#0B3D2E] text-[#FACC15] text-xs font-extrabold shrink-0">
+                        Copiar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function abrirModalRecusa(solId, protocolo) {
+            document.getElementById('recusaProtocolo').textContent = protocolo;
+            document.getElementById('formRecusa').action = `/admin/solicitacoes-dados/${solId}/decidir`;
+            document.getElementById('modalRecusa').classList.remove('hidden');
+        }
+        function copiarLinkApp() {
+            const inp = document.getElementById('urlAppShare');
+            inp.select();
+            navigator.clipboard?.writeText(inp.value);
+            alert('Link do SERVIDOR 360 copiado!');
+        }
+    </script>
+</body>
+</html>

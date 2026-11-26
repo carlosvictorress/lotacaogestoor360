@@ -1,0 +1,112 @@
+{% extends "app_servidor_base.html" %}
+{% block title %}Atestados • SERVIDOR 360{% endblock %}
+
+{% block body %}
+<div class="flex-1 pb-24">
+    <header class="relative overflow-hidden bg-gradient-to-br from-[#0B3D2E] via-[#104936] to-[#14532D] pt-7 pb-14 px-6 safe-top">
+        <div class="relative z-10">
+            <p class="text-[10px] font-extrabold uppercase tracking-widest text-[#FACC15]">Frequência e Saúde</p>
+            <h1 class="text-xl font-extrabold text-white mt-0.5">Atestados e Justificativas</h1>
+            <p class="text-[11px] text-emerald-200/90 mt-0.5">Envie seu atestado médico e acompanhe o parecer do RH</p>
+        </div>
+        <svg class="absolute bottom-0 left-0 w-full h-9 text-[#F3F7F5]" viewBox="0 0 1440 120" preserveAspectRatio="none">
+            <path fill="currentColor" d="M0,115 C420,105 980,55 1440,0 L1440,120 L0,120 Z"></path>
+        </svg>
+    </header>
+
+    <main class="px-5 -mt-2 space-y-5">
+        <!-- Formulário de Envio -->
+        <section class="app-card p-5 space-y-4 anim-fade-up">
+            <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2">
+                <i class="ph-fill ph-first-aid-kit text-rose-600 text-lg"></i> Enviar Novo Atestado / Justificativa
+            </h2>
+
+            <form method="POST" action="{{ url_for('app_servidor_atestados_novo') }}" enctype="multipart/form-data" class="space-y-3.5">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-[10px] font-extrabold uppercase text-[#0B3D2E] mb-1">Início do Afastamento</label>
+                        <input type="date" name="data_inicio_afastamento"
+                               class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 outline-none focus:border-[#10B981]">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-extrabold uppercase text-[#0B3D2E] mb-1">Qtd. de Dias *</label>
+                        <input type="number" name="dias_solicitados" min="1" max="365" value="1" required
+                               class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-800 outline-none focus:border-[#10B981]">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-extrabold uppercase text-[#0B3D2E] mb-1">Motivo da Ausência *</label>
+                    <textarea name="motivo_ausencia" rows="2" required
+                              placeholder="Descreva o motivo (ex.: Consulta médica / Atestado odontológico)..."
+                              class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 outline-none focus:border-[#10B981]"></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-[10px] font-extrabold uppercase text-[#0B3D2E] mb-1">Foto ou PDF do Atestado (até 5 MB)</label>
+                    <input type="file" name="anexo" accept=".pdf,.jpg,.jpeg,.png,.webp" capture="environment"
+                           class="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-3.5 file:rounded-xl file:border-0 file:text-xs file:font-extrabold file:bg-emerald-100 file:text-[#0B3D2E]">
+                </div>
+
+                <button type="submit"
+                        class="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#0B3D2E] to-[#14532D] text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition">
+                    <i class="ph-bold ph-upload-simple text-base text-[#FACC15]"></i>
+                    <span>Protocolar Atestado no RH</span>
+                </button>
+            </form>
+        </section>
+
+        <!-- Histórico de Atestados -->
+        <section class="space-y-3 anim-fade-up delay-2">
+            <h2 class="text-xs font-extrabold uppercase tracking-wider text-[#0B3D2E]/70 px-1">
+                Meus Atestados Enviados ({{ justificativas|length }})
+            </h2>
+
+            {% if justificativas %}
+                {% for j in justificativas %}
+                <article class="app-card p-4 space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <div>
+                            <span class="text-[11px] font-mono font-extrabold text-[#0B3D2E]">{{ j.protocolo }}</span>
+                            <p class="text-[10px] text-slate-500">
+                                {{ j.data_solicitacao.strftime('%d/%m/%Y %H:%M') if j.data_solicitacao else '' }} • {{ j.dias_solicitados }} dia(s)
+                            </p>
+                        </div>
+                        {% if j.status == 'APROVADO' %}
+                        <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase">Aprovado</span>
+                        {% elif j.status == 'REJEITADO' %}
+                        <span class="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 text-[10px] font-extrabold uppercase">Recusado</span>
+                        {% else %}
+                        <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold uppercase">Pendente</span>
+                        {% endif %}
+                    </div>
+
+                    <p class="text-xs text-slate-700 leading-relaxed">{{ j.motivo_ausencia }}</p>
+
+                    {% if j.anexo_base64 %}
+                    <a href="{{ url_for('portal_servidor_download_atestado', id=j.id) }}" target="_blank"
+                       class="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 hover:underline">
+                        <i class="ph ph-file-arrow-down"></i> Visualizar atestado anexado
+                    </a>
+                    {% endif %}
+
+                    {% if j.status == 'REJEITADO' and j.motivo_rejeicao %}
+                    <div class="p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-[11px] text-rose-900">
+                        <strong>Parecer RH:</strong> {{ j.motivo_rejeicao }}
+                    </div>
+                    {% elif j.observacao_rh %}
+                    <div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100 text-[11px] text-emerald-950">
+                        <strong>Observação RH:</strong> {{ j.observacao_rh }}
+                    </div>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            {% else %}
+                <div class="app-card p-6 text-center text-xs text-slate-500">
+                    Nenhum atestado ou justificativa enviado até o momento.
+                </div>
+            {% endif %}
+        </section>
+    </main>
+</div>
+{% endblock %}

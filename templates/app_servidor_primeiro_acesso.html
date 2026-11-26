@@ -1,0 +1,612 @@
+{% extends "app_servidor_base.html" %}
+{% block title %}Primeiro Acesso • SERVIDOR 360{% endblock %}
+
+{% block extra_head %}
+<script defer src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+<style>
+    @keyframes scanSweep {
+        0% { top: 8%; opacity: 0.2; }
+        50% { top: 86%; opacity: 0.95; }
+        100% { top: 8%; opacity: 0.2; }
+    }
+    .scanner-beam {
+        position: absolute;
+        left: 8%;
+        right: 8%;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #FACC15, #10B981, #FACC15, transparent);
+        box-shadow: 0 0 14px rgba(250, 204, 21, 0.85);
+        border-radius: 999px;
+        animation: scanSweep 2.1s ease-in-out infinite;
+    }
+    .face-ring-idle { border-color: rgba(255, 255, 255, 0.35); }
+    .face-ring-searching { border-color: #FACC15; box-shadow: 0 0 0 6px rgba(250, 204, 21, 0.18); }
+    .face-ring-matched { border-color: #10B981; box-shadow: 0 0 0 8px rgba(16, 185, 129, 0.28); }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="flex-1 flex flex-col justify-between min-h-[100dvh]">
+    <div>
+        <!-- Header Curvo com Stepper -->
+        <header class="relative overflow-hidden bg-gradient-to-br from-[#0B3D2E] via-[#104936] to-[#14532D] pt-8 pb-16 px-6 safe-top">
+            <div class="relative z-10 flex items-center gap-3">
+                <a href="{{ url_for('app_servidor_acesso') }}" onclick="pararCameraFacial()"
+                   class="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white active:scale-95 transition">
+                    <i class="ph-bold ph-arrow-left text-lg"></i>
+                </a>
+                <div class="flex-1">
+                    <h1 class="text-xl font-extrabold text-white leading-tight">Primeiro Acesso</h1>
+                    <p class="text-[11px] text-emerald-200/90">Validação cadastral + reconhecimento facial</p>
+                </div>
+                <span class="px-2.5 py-1 rounded-full bg-white/10 text-[#FACC15] text-[10px] font-extrabold tracking-wider">
+                    SERVIDOR 360
+                </span>
+            </div>
+
+            <!-- Indicador de 3 Etapas -->
+            <div class="relative z-10 mt-5 grid grid-cols-3 gap-2">
+                <div id="pillStep1" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/15 border border-[#FACC15]/60 text-white text-[10px] font-extrabold transition">
+                    <span class="w-4 h-4 rounded-full bg-[#FACC15] text-[#0B3D2E] flex items-center justify-center text-[10px]">1</span>
+                    <span>Dados</span>
+                </div>
+                <div id="pillStep2" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-emerald-200/70 text-[10px] font-bold transition">
+                    <span class="w-4 h-4 rounded-full bg-white/15 text-white flex items-center justify-center text-[10px]">2</span>
+                    <span>Senha</span>
+                </div>
+                <div id="pillStep3" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-emerald-200/70 text-[10px] font-bold transition">
+                    <span class="w-4 h-4 rounded-full bg-white/15 text-white flex items-center justify-center text-[10px]">3</span>
+                    <span>Facial</span>
+                </div>
+            </div>
+
+            <svg class="absolute bottom-0 left-0 w-full h-10 text-[#F3F7F5]" viewBox="0 0 1440 120" preserveAspectRatio="none">
+                <path fill="currentColor" d="M0,115 C420,105 980,55 1440,0 L1440,120 L0,120 Z"></path>
+            </svg>
+        </header>
+
+        <main class="px-6 mt-1 pb-8">
+            <!-- Alerta Dinâmico -->
+            <div id="wizardAlert" class="hidden mb-4 rounded-2xl p-4 text-xs font-semibold border flex items-start gap-2.5 anim-scale-in">
+                <i id="wizardAlertIcon" class="ph-fill text-lg shrink-0 mt-0.5"></i>
+                <div class="flex-1">
+                    <p id="wizardAlertText" class="leading-relaxed"></p>
+                </div>
+            </div>
+
+            <!-- ==================== ETAPA 1: CONFERÊNCIA CADASTRAL ==================== -->
+            <section id="step1Box" class="app-card p-6 space-y-4 anim-fade-up">
+                <div>
+                    <h2 class="text-base font-extrabold text-[#0B3D2E]">Confirme sua identidade</h2>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Apenas servidores <strong>ativos, validados e com foto cadastrada no RH</strong> podem ativar o aplicativo.
+                    </p>
+                </div>
+
+                <div>
+                    <label for="onbCpf" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                        CPF *
+                    </label>
+                    <input type="text" id="onbCpf" inputmode="numeric" placeholder="000.000.000-00"
+                           class="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                </div>
+
+                <div>
+                    <label for="onbNasc" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                        Data de Nascimento *
+                    </label>
+                    <input type="date" id="onbNasc"
+                           class="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                </div>
+
+                <div>
+                    <label for="onbExtra" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                        Confirmação Adicional *
+                    </label>
+                    <input type="text" id="onbExtra" placeholder="Primeiro nome da mãe OU 4 últimos dígitos do celular"
+                           class="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                    <p class="text-[11px] text-slate-400 mt-1">
+                        Ex.: <code>MARIA</code> ou <code>6683</code> (conforme cadastrado no RH).
+                    </p>
+                </div>
+
+                <button type="button" id="btnAvancarStep1" onclick="validarDadosEtapa1()"
+                        class="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#0B3D2E] to-[#14532D] text-white font-extrabold text-sm shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition">
+                    <span>Verificar Cadastro no RH</span>
+                    <i class="ph-bold ph-arrow-right text-base text-[#FACC15]"></i>
+                </button>
+            </section>
+
+            <!-- ==================== ETAPA 2: CRIAÇÃO DE SENHA & LGPD ==================== -->
+            <section id="step2Box" class="hidden space-y-4 anim-fade-up">
+                <!-- Card resumo do servidor localizado -->
+                <div class="rounded-2xl p-4 bg-gradient-to-r from-[#0B3D2E] to-[#14532D] text-white shadow-lg flex items-center gap-3.5">
+                    <div class="w-11 h-11 rounded-2xl bg-[#FACC15] text-[#0B3D2E] flex items-center justify-center shrink-0">
+                        <i class="ph-fill ph-seal-check text-2xl"></i>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="text-[10px] font-extrabold uppercase tracking-wider text-[#FACC15]">Cadastro Validado no RH</p>
+                        <p id="resumoNome" class="text-sm font-extrabold truncate mt-0.5">—</p>
+                        <p id="resumoCargo" class="text-[11px] text-emerald-200 truncate">—</p>
+                    </div>
+                </div>
+
+                <div class="app-card p-6 space-y-4">
+                    <div>
+                        <h2 class="text-base font-extrabold text-[#0B3D2E]">Crie sua senha pessoal</h2>
+                        <p class="text-xs text-slate-500 mt-0.5">
+                            Mínimo de 8 caracteres, com pelo menos uma letra e um número.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label for="onbSenha" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                            Nova Senha *
+                        </label>
+                        <input type="password" id="onbSenha" autocomplete="new-password" oninput="atualizarForcaSenha()"
+                               placeholder="Crie uma senha forte"
+                               class="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                        <div class="flex items-center gap-2 mt-2 text-[10px] font-bold">
+                            <span id="ruleLen" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">8+ caracteres</span>
+                            <span id="ruleLetter" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">1+ letra</span>
+                            <span id="ruleNum" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">1+ número</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="onbSenhaConf" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                            Confirmar Senha *
+                        </label>
+                        <input type="password" id="onbSenhaConf" autocomplete="new-password"
+                               placeholder="Repita a senha digitada"
+                               class="w-full px-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                    </div>
+
+                    <label class="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-50/70 border border-emerald-100 cursor-pointer">
+                        <input type="checkbox" id="onbTermo" class="mt-0.5 rounded text-[#0B3D2E] focus:ring-[#10B981]">
+                        <span class="text-[11px] text-slate-700 leading-relaxed">
+                            Autorizo a comparação biométrica facial com minha foto cadastrada no RH para fins exclusivos de validação de identidade no <strong>SERVIDOR 360</strong>, em conformidade com a LGPD (Lei nº 13.709/2018).
+                        </span>
+                    </label>
+
+                    <div class="grid grid-cols-3 gap-2.5 pt-1">
+                        <button type="button" onclick="irParaEtapa(1)"
+                                class="py-3.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs active:scale-95 transition">
+                            Voltar
+                        </button>
+                        <button type="button" onclick="avancarParaFacial()"
+                                class="col-span-2 py-3.5 rounded-xl bg-gradient-to-r from-[#0B3D2E] to-[#14532D] text-white font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition">
+                            <span>Ir para Reconhecimento Facial</span>
+                            <i class="ph-bold ph-camera text-base text-[#FACC15]"></i>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== ETAPA 3: RECONHECIMENTO FACIAL AO VIVO ==================== -->
+            <section id="step3Box" class="hidden app-card p-5 space-y-4 text-center anim-fade-up">
+                <div>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-extrabold uppercase tracking-wider text-[#0B3D2E]">
+                        <i class="ph-fill ph-scan text-emerald-600"></i>
+                        Biometria Facial • <span id="lblFonteFoto">Foto do RH</span>
+                    </span>
+                    <h2 class="text-base font-extrabold text-[#0B3D2E] mt-2">Posicione seu rosto no círculo</h2>
+                    <p class="text-[11px] text-slate-500 mt-0.5">
+                        Olhe diretamente para a câmera em local iluminado, sem óculos escuros ou boné.
+                    </p>
+                </div>
+
+                <!-- Moldura Circular da Câmera -->
+                <div class="relative mx-auto w-60 h-60 rounded-full overflow-hidden border-[5px] face-ring-idle bg-slate-900 shadow-2xl transition-all duration-300" id="faceRingWrap">
+                    <video id="videoFacial" autoplay muted playsinline class="w-full h-full object-cover scale-x-[-1]"></video>
+                    <div id="scannerBeam" class="scanner-beam hidden"></div>
+
+                    <!-- Overlay de Sucesso -->
+                    <div id="facialSuccessOverlay" class="hidden absolute inset-0 bg-[#0B3D2E]/85 backdrop-blur-sm flex flex-col items-center justify-center text-white p-4">
+                        <div class="w-14 h-14 rounded-full bg-[#10B981] flex items-center justify-center shadow-lg mb-2">
+                            <i class="ph-bold ph-check text-3xl text-white"></i>
+                        </div>
+                        <p class="text-sm font-extrabold">Identidade Confirmada!</p>
+                        <p id="facialScoreBadge" class="text-xs font-bold text-[#FACC15] mt-0.5"></p>
+                    </div>
+                </div>
+
+                <!-- Barra de progresso de confirmação (3 quadros estáveis) -->
+                <div class="max-w-[240px] mx-auto">
+                    <div class="h-2 rounded-full bg-slate-100 overflow-hidden">
+                        <div id="facialProgressBar" class="h-full w-0 bg-gradient-to-r from-[#FACC15] to-[#10B981] transition-all duration-300"></div>
+                    </div>
+                    <p id="facialStatusText" class="text-xs font-bold text-[#0B3D2E] mt-2.5">
+                        Preparando motor de reconhecimento facial...
+                    </p>
+                </div>
+
+                <div class="pt-2 flex items-center justify-center gap-3">
+                    <button type="button" onclick="voltarDaFacial()"
+                            class="px-4 py-2.5 rounded-xl bg-slate-100 text-slate-600 font-bold text-xs active:scale-95 transition">
+                        Voltar
+                    </button>
+                    <button type="button" id="btnReiniciarCam" onclick="iniciarFluxoFacial()"
+                            class="hidden px-4 py-2.5 rounded-xl bg-[#0B3D2E] text-white font-extrabold text-xs shadow active:scale-95 transition">
+                        Tentar Novamente
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="px-6 py-5 text-center safe-bottom">
+        <p class="text-[10px] font-bold text-[#0B3D2E]/55 uppercase tracking-wider">
+            {{ municipio.nome if municipio else 'Prefeitura Municipal' }} • SERVIDOR 360
+        </p>
+    </footer>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    aplicarMascaraCPF(document.getElementById('onbCpf'));
+
+    const FACIAL_MAX_DISTANCE = {{ facial_max_distance }};
+    const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+
+    let onboardingToken = null;
+    let faceModelsPromise = null;
+    let refFaceMatcher = null;
+    let cameraStream = null;
+    let detectTimer = null;
+    let consecutiveMatches = 0;
+    let bestDistance = 9.9;
+    let isSubmittingFinal = false;
+
+    function getCsrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        return meta ? meta.getAttribute('content') : '';
+    }
+
+    function mostrarAlerta(msg, tipo = 'error') {
+        const box = document.getElementById('wizardAlert');
+        const txt = document.getElementById('wizardAlertText');
+        const ic = document.getElementById('wizardAlertIcon');
+        box.classList.remove('hidden', 'bg-rose-50', 'text-rose-900', 'border-rose-200', 'bg-amber-50', 'text-amber-950', 'border-amber-200', 'bg-emerald-50', 'text-emerald-950', 'border-emerald-200');
+        if (tipo === 'warning') {
+            box.classList.add('bg-amber-50', 'text-amber-950', 'border-amber-200');
+            ic.className = 'ph-fill ph-warning text-lg text-amber-600 shrink-0 mt-0.5';
+        } else if (tipo === 'success') {
+            box.classList.add('bg-emerald-50', 'text-emerald-950', 'border-emerald-200');
+            ic.className = 'ph-fill ph-check-circle text-lg text-emerald-600 shrink-0 mt-0.5';
+        } else {
+            box.classList.add('bg-rose-50', 'text-rose-900', 'border-rose-200');
+            ic.className = 'ph-fill ph-warning-circle text-lg text-rose-600 shrink-0 mt-0.5';
+        }
+        txt.textContent = msg;
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function ocultarAlerta() {
+        document.getElementById('wizardAlert').classList.add('hidden');
+    }
+
+    function irParaEtapa(n) {
+        ocultarAlerta();
+        document.getElementById('step1Box').classList.toggle('hidden', n !== 1);
+        document.getElementById('step2Box').classList.toggle('hidden', n !== 2);
+        document.getElementById('step3Box').classList.toggle('hidden', n !== 3);
+
+        [1, 2, 3].forEach((i) => {
+            const p = document.getElementById('pillStep' + i);
+            const badge = p.querySelector('span');
+            if (i === n) {
+                p.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/15 border border-[#FACC15]/70 text-white text-[10px] font-extrabold transition';
+                badge.className = 'w-4 h-4 rounded-full bg-[#FACC15] text-[#0B3D2E] flex items-center justify-center text-[10px]';
+            } else if (i < n) {
+                p.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-500/25 border border-emerald-400/50 text-white text-[10px] font-bold transition';
+                badge.className = 'w-4 h-4 rounded-full bg-[#10B981] text-white flex items-center justify-center text-[10px]';
+            } else {
+                p.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-emerald-200/70 text-[10px] font-bold transition';
+                badge.className = 'w-4 h-4 rounded-full bg-white/15 text-white flex items-center justify-center text-[10px]';
+            }
+        });
+    }
+
+    function precarregarModelosFaciais() {
+        if (faceModelsPromise) return faceModelsPromise;
+        faceModelsPromise = (async () => {
+            // Aguarda script defer faceapi carregar
+            for (let i = 0; i < 40 && typeof faceapi === 'undefined'; i++) {
+                await new Promise(r => setTimeout(r, 150));
+            }
+            if (typeof faceapi === 'undefined') {
+                throw new Error('Não foi possível carregar o motor de reconhecimento facial. Verifique sua conexão.');
+            }
+            await Promise.all([
+                faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+            ]);
+            return true;
+        })();
+        return faceModelsPromise;
+    }
+
+    async function validarDadosEtapa1() {
+        ocultarAlerta();
+        const cpf = document.getElementById('onbCpf').value.trim();
+        const data_nasc = document.getElementById('onbNasc').value.trim();
+        const confirmacao_extra = document.getElementById('onbExtra').value.trim();
+
+        if (cpf.replace(/\D/g, '').length !== 11 || !data_nasc) {
+            mostrarAlerta('Preencha seu CPF completo e sua data de nascimento.', 'warning');
+            return;
+        }
+
+        const btn = document.getElementById('btnAvancarStep1');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="ph ph-spinner-gap animate-spin text-lg"></i><span>Consultando RH...</span>';
+
+        try {
+            const resp = await fetch('/app-servidor/api/primeiro-acesso/validar-dados', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken(),
+                },
+                body: JSON.stringify({ cpf, data_nasc, confirmacao_extra }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                mostrarAlerta(data.message || 'Não foi possível validar seus dados.', data.code === 'SEM_FOTO' || data.code === 'NAO_VALIDADO' ? 'warning' : 'error');
+                return;
+            }
+
+            onboardingToken = data.onboarding_token;
+            document.getElementById('resumoNome').textContent = data.nome_completo;
+            document.getElementById('resumoCargo').textContent = `${data.cargo} • ${data.secretaria}`;
+            document.getElementById('lblFonteFoto').textContent = data.fonte_foto || 'Foto do RH';
+
+            // Já começa a baixar os modelos de IA em segundo plano enquanto o usuário cria a senha
+            precarregarModelosFaciais().catch(() => {});
+            irParaEtapa(2);
+        } catch (err) {
+            mostrarAlerta('Falha de conexão com o servidor. Tente novamente.', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<span>Verificar Cadastro no RH</span><i class="ph-bold ph-arrow-right text-base text-[#FACC15]"></i>';
+        }
+    }
+
+    function atualizarForcaSenha() {
+        const s = document.getElementById('onbSenha').value || '';
+        const setRule = (id, ok) => {
+            const el = document.getElementById(id);
+            el.className = ok
+                ? 'px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold'
+                : 'px-2 py-0.5 rounded-full bg-slate-100 text-slate-500';
+        };
+        setRule('ruleLen', s.length >= 8);
+        setRule('ruleLetter', /[A-Za-z]/.test(s));
+        setRule('ruleNum', /\d/.test(s));
+    }
+
+    function avancarParaFacial() {
+        ocultarAlerta();
+        const s1 = document.getElementById('onbSenha').value;
+        const s2 = document.getElementById('onbSenhaConf').value;
+        const termo = document.getElementById('onbTermo').checked;
+
+        if (s1.length < 8 || !/[A-Za-z]/.test(s1) || !/\d/.test(s1)) {
+            mostrarAlerta('A senha precisa ter no mínimo 8 caracteres, incluindo letras e números.', 'warning');
+            return;
+        }
+        if (s1 !== s2) {
+            mostrarAlerta('A confirmação de senha não confere.', 'error');
+            return;
+        }
+        if (!termo) {
+            mostrarAlerta('Marque a autorização de validação biométrica (LGPD) para prosseguir.', 'warning');
+            return;
+        }
+
+        irParaEtapa(3);
+        iniciarFluxoFacial();
+    }
+
+    function voltarDaFacial() {
+        pararCameraFacial();
+        irParaEtapa(2);
+    }
+
+    function pararCameraFacial() {
+        if (detectTimer) {
+            clearInterval(detectTimer);
+            detectTimer = null;
+        }
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(t => t.stop());
+            cameraStream = null;
+        }
+        const beam = document.getElementById('scannerBeam');
+        if (beam) beam.classList.add('hidden');
+    }
+
+    async function iniciarFluxoFacial() {
+        pararCameraFacial();
+        ocultarAlerta();
+        consecutiveMatches = 0;
+        bestDistance = 9.9;
+        isSubmittingFinal = false;
+
+        const statusEl = document.getElementById('facialStatusText');
+        const progEl = document.getElementById('facialProgressBar');
+        const ringEl = document.getElementById('faceRingWrap');
+        const btnRetry = document.getElementById('btnReiniciarCam');
+        btnRetry.classList.add('hidden');
+        progEl.style.width = '10%';
+        ringEl.classList.remove('face-ring-matched');
+        ringEl.classList.add('face-ring-searching');
+
+        try {
+            statusEl.textContent = 'Carregando IA de reconhecimento facial...';
+            await precarregarModelosFaciais();
+            progEl.style.width = '30%';
+
+            statusEl.textContent = 'Processando foto oficial do cadastro no RH...';
+            const refResp = await fetch(`/app-servidor/api/primeiro-acesso/foto-referencia?token=${encodeURIComponent(onboardingToken)}`, {
+                cache: 'no-store',
+            });
+            const refData = await refResp.json();
+            if (!refResp.ok || !refData.success || !refData.foto_data_uri) {
+                throw new Error(refData.message || 'Não foi possível obter a foto de referência do RH.');
+            }
+
+            // Carrega imagem de referência em memória e extrai descritor facial 128D
+            const refImg = new Image();
+            refImg.src = refData.foto_data_uri;
+            await new Promise((resolve, reject) => {
+                refImg.onload = resolve;
+                refImg.onerror = () => reject(new Error('A foto armazenada no RH está corrompida. Solicite atualização ao RH.'));
+            });
+
+            const refDet = await faceapi
+                .detectSingleFace(refImg, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.35 }))
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+
+            if (!refDet) {
+                throw new Error('Não foi possível identificar um rosto nítido na sua foto cadastrada no RH. Procure o RH para atualizar sua foto 3x4.');
+            }
+
+            refFaceMatcher = new faceapi.FaceMatcher(
+                [new faceapi.LabeledFaceDescriptors('SERVIDOR', [refDet.descriptor])],
+                FACIAL_MAX_DISTANCE
+            );
+            progEl.style.width = '45%';
+
+            // Abre câmera frontal
+            statusEl.textContent = 'Abrindo câmera frontal...';
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Seu navegador não permite acesso à câmera. Abra o SERVIDOR 360 pelo Chrome ou Safari em conexão HTTPS.');
+            }
+
+            cameraStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 480 } },
+                audio: false,
+            });
+            const video = document.getElementById('videoFacial');
+            video.srcObject = cameraStream;
+            await video.play();
+
+            document.getElementById('scannerBeam').classList.remove('hidden');
+            statusEl.textContent = 'Olhe para a câmera. Comparando com sua foto do RH...';
+
+            detectTimer = setInterval(async () => {
+                if (isSubmittingFinal || !video || video.readyState < 2) return;
+                try {
+                    const liveDet = await faceapi
+                        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 256, scoreThreshold: 0.45 }))
+                        .withFaceLandmarks()
+                        .withFaceDescriptor();
+
+                    if (!liveDet) {
+                        consecutiveMatches = 0;
+                        progEl.style.width = '45%';
+                        statusEl.textContent = 'Centralize seu rosto no círculo com boa iluminação...';
+                        return;
+                    }
+
+                    const match = refFaceMatcher.findBestMatch(liveDet.descriptor);
+                    if (match.label === 'SERVIDOR' && match.distance <= FACIAL_MAX_DISTANCE) {
+                        consecutiveMatches += 1;
+                        if (match.distance < bestDistance) bestDistance = match.distance;
+
+                        const pct = Math.min(95, 50 + consecutiveMatches * 16);
+                        progEl.style.width = pct + '%';
+                        statusEl.textContent = `Rosto reconhecido! Confirmando estabilidade (${consecutiveMatches}/3)...`;
+
+                        if (consecutiveMatches >= 3) {
+                            isSubmittingFinal = true;
+                            await finalizarAtivacaoFacial(video, bestDistance, consecutiveMatches);
+                        }
+                    } else {
+                        consecutiveMatches = 0;
+                        progEl.style.width = '48%';
+                        statusEl.textContent = 'Rosto ainda não compatível com a foto do RH. Ajuste luz e posição...';
+                    }
+                } catch (loopErr) {
+                    // ignora erro pontual de frame
+                }
+            }, 420);
+
+        } catch (err) {
+            pararCameraFacial();
+            progEl.style.width = '0%';
+            statusEl.textContent = 'Validação facial interrompida.';
+            btnRetry.classList.remove('hidden');
+            mostrarAlerta(err.message || 'Erro ao iniciar reconhecimento facial.', 'error');
+        }
+    }
+
+    function capturarSelfieAuditoria(video) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 320;
+        canvas.height = 320;
+        const ctx = canvas.getContext('2d');
+        ctx.translate(320, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, 320, 320);
+        return canvas.toDataURL('image/jpeg', 0.72);
+    }
+
+    async function finalizarAtivacaoFacial(video, distancia, frames) {
+        const selfie_b64 = capturarSelfieAuditoria(video);
+        pararCameraFacial();
+
+        const ringEl = document.getElementById('faceRingWrap');
+        ringEl.classList.remove('face-ring-searching');
+        ringEl.classList.add('face-ring-matched');
+        document.getElementById('facialProgressBar').style.width = '100%';
+        document.getElementById('facialStatusText').textContent = 'Ativando sua conta segura no SERVIDOR 360...';
+
+        try {
+            const resp = await fetch('/app-servidor/api/primeiro-acesso/concluir', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    onboarding_token: onboardingToken,
+                    senha: document.getElementById('onbSenha').value,
+                    senha_confirmacao: document.getElementById('onbSenhaConf').value,
+                    termo_aceito: document.getElementById('onbTermo').checked,
+                    facial_confirmado: true,
+                    facial_distancia: distancia,
+                    frames_validos: frames,
+                    selfie_b64: selfie_b64,
+                }),
+            });
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                isSubmittingFinal = false;
+                document.getElementById('btnReiniciarCam').classList.remove('hidden');
+                mostrarAlerta(data.message || 'Erro ao concluir ativação.', 'error');
+                return;
+            }
+
+            document.getElementById('facialScoreBadge').textContent = `Similaridade: ${data.score}%`;
+            document.getElementById('facialSuccessOverlay').classList.remove('hidden');
+            document.getElementById('facialStatusText').textContent = 'Tudo pronto! Entrando no aplicativo...';
+
+            setTimeout(() => {
+                window.location.href = data.redirect || '/app-servidor/inicio';
+            }, 1200);
+        } catch (err) {
+            isSubmittingFinal = false;
+            document.getElementById('btnReiniciarCam').classList.remove('hidden');
+            mostrarAlerta('Erro de conexão ao salvar ativação. Tente novamente.', 'error');
+        }
+    }
+
+    window.addEventListener('beforeunload', pararCameraFacial);
+</script>
+{% endblock %}

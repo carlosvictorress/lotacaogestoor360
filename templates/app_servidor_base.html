@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>{% block title %}SERVIDOR 360 — App do Servidor{% endblock %}</title>
+
+    <!-- PWA Meta Tags (Android + iOS Standalone) -->
+    <link rel="manifest" href="{{ url_for('app_servidor_manifest') }}">
+    <meta name="theme-color" content="#0B3D2E">
+    <meta name="background-color" content="#0B3D2E">
+    <meta name="application-name" content="SERVIDOR 360">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SERVIDOR 360">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='pwa/icon-192.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='pwa/apple-touch-icon.png') }}">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --g360-dark: #0B3D2E;
+            --g360-mid: #14532D;
+            --g360-green: #10B981;
+            --g360-yellow: #FACC15;
+            --g360-bg: #F3F7F5;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #E7EFEA;
+            color: #0F2921;
+            overscroll-behavior-y: contain;
+        }
+
+        .pwa-shell {
+            max-width: 460px;
+            min-height: 100dvh;
+            margin: 0 auto;
+            background: var(--g360-bg);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 60px -15px rgba(11, 61, 46, 0.22);
+            overflow-x: hidden;
+        }
+
+        @media (max-width: 500px) {
+            body { background: var(--g360-bg); }
+            .pwa-shell {
+                max-width: 100%;
+                box-shadow: none;
+            }
+        }
+
+        /* Animações suaves de aplicativo nativo */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes floatSubtle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+        @keyframes shimmerSlow {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+
+        .anim-fade-up {
+            opacity: 0;
+            animation: fadeUp 0.48s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .anim-scale-in {
+            opacity: 0;
+            animation: scaleIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+        .delay-1 { animation-delay: 0.06s; }
+        .delay-2 { animation-delay: 0.12s; }
+        .delay-3 { animation-delay: 0.18s; }
+        .delay-4 { animation-delay: 0.24s; }
+        .delay-5 { animation-delay: 0.30s; }
+
+        .app-card {
+            background: #FFFFFF;
+            border: 1px solid rgba(11, 61, 46, 0.07);
+            border-radius: 1.25rem;
+            box-shadow: 0 8px 24px -10px rgba(11, 61, 46, 0.10);
+            transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .app-card-interactive:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 14px 28px -12px rgba(11, 61, 46, 0.18);
+            border-color: rgba(16, 185, 129, 0.35);
+        }
+        .app-card-interactive:active {
+            transform: scale(0.98);
+        }
+        .app-card-interactive .card-arrow {
+            transition: transform 0.22s ease, color 0.22s ease;
+        }
+        .app-card-interactive:hover .card-arrow {
+            transform: translateX(4px);
+            color: #0B3D2E;
+        }
+
+        .brand-pill {
+            background: linear-gradient(135deg, #0B3D2E 0%, #14532D 100%);
+            box-shadow: 0 10px 26px -8px rgba(11, 61, 46, 0.45);
+        }
+
+        .safe-top {
+            padding-top: max(1rem, env(safe-area-inset-top));
+        }
+        .safe-bottom {
+            padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+        }
+
+        .bottom-nav-wrap {
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 460px;
+            z-index: 40;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-top: 1px solid rgba(11, 61, 46, 0.08);
+            box-shadow: 0 -8px 24px -12px rgba(11, 61, 46, 0.14);
+        }
+
+        /* Oculta scrollbar em trilhos horizontais */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="pwa-shell">
+        <!-- Toasts / Mensagens Flash -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div id="pwaFlashContainer" class="fixed top-4 left-1/2 -translate-x-1/2 w-[92%] max-w-[420px] z-50 space-y-2 pointer-events-none">
+                    {% for cat, msg in messages %}
+                        {% set is_err = cat in ('error', 'danger') %}
+                        {% set is_warn = cat == 'warning' %}
+                        <div class="pointer-events-auto anim-scale-in rounded-2xl px-4 py-3 text-xs font-semibold shadow-xl border flex items-start gap-2.5 backdrop-blur-md
+                            {% if is_err %}bg-rose-50/95 text-rose-900 border-rose-200
+                            {% elif is_warn %}bg-amber-50/95 text-amber-900 border-amber-200
+                            {% else %}bg-emerald-50/95 text-emerald-950 border-emerald-200{% endif %}">
+                            <i class="ph-fill text-lg shrink-0 mt-0.5
+                                {% if is_err %}ph-warning-circle text-rose-600
+                                {% elif is_warn %}ph-info text-amber-600
+                                {% else %}ph-check-circle text-emerald-600{% endif %}"></i>
+                            <span class="flex-1 leading-relaxed">{{ msg }}</span>
+                            <button type="button" onclick="this.parentElement.remove()" class="opacity-60 hover:opacity-100 p-0.5">
+                                <i class="ph ph-x text-sm"></i>
+                            </button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Conteúdo Principal da Tela -->
+        {% block body %}{% endblock %}
+
+        <!-- Navegação Inferior Nativa (quando autenticado) -->
+        {% if active_tab is defined %}
+        <nav class="bottom-nav-wrap safe-bottom" aria-label="Navegação principal do aplicativo">
+            <div class="grid grid-cols-5 px-2 pt-2 pb-1">
+                <a href="{{ url_for('app_servidor_inicio') }}"
+                   class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all {% if active_tab == 'inicio' %}text-[#0B3D2E] font-extrabold{% else %}text-slate-400 hover:text-slate-600 font-medium{% endif %}">
+                    <span class="w-10 h-7 rounded-full flex items-center justify-center transition-all {% if active_tab == 'inicio' %}bg-emerald-100 text-[#0B3D2E]{% endif %}">
+                        <i class="{% if active_tab == 'inicio' %}ph-fill{% else %}ph{% endif %} ph-house text-xl"></i>
+                    </span>
+                    <span class="text-[10px] tracking-tight">Início</span>
+                </a>
+
+                <a href="{{ url_for('app_servidor_dados') }}"
+                   class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all {% if active_tab == 'dados' %}text-[#0B3D2E] font-extrabold{% else %}text-slate-400 hover:text-slate-600 font-medium{% endif %}">
+                    <span class="w-10 h-7 rounded-full flex items-center justify-center transition-all {% if active_tab == 'dados' %}bg-emerald-100 text-[#0B3D2E]{% endif %}">
+                        <i class="{% if active_tab == 'dados' %}ph-fill{% else %}ph{% endif %} ph-identification-card text-xl"></i>
+                    </span>
+                    <span class="text-[10px] tracking-tight">Dados</span>
+                </a>
+
+                <a href="{{ url_for('app_servidor_contratos') }}"
+                   class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all {% if active_tab == 'contratos' %}text-[#0B3D2E] font-extrabold{% else %}text-slate-400 hover:text-slate-600 font-medium{% endif %}">
+                    <span class="w-10 h-7 rounded-full flex items-center justify-center transition-all {% if active_tab == 'contratos' %}bg-emerald-100 text-[#0B3D2E]{% endif %}">
+                        <i class="{% if active_tab == 'contratos' %}ph-fill{% else %}ph{% endif %} ph-file-text text-xl"></i>
+                    </span>
+                    <span class="text-[10px] tracking-tight">Contrato</span>
+                </a>
+
+                <a href="{{ url_for('app_servidor_solicitacoes') }}"
+                   class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all {% if active_tab == 'solicitacoes' %}text-[#0B3D2E] font-extrabold{% else %}text-slate-400 hover:text-slate-600 font-medium{% endif %}">
+                    <span class="w-10 h-7 rounded-full flex items-center justify-center transition-all {% if active_tab == 'solicitacoes' %}bg-emerald-100 text-[#0B3D2E]{% endif %}">
+                        <i class="{% if active_tab == 'solicitacoes' %}ph-fill{% else %}ph{% endif %} ph-pencil-simple-line text-xl"></i>
+                    </span>
+                    <span class="text-[10px] tracking-tight">Alterar</span>
+                </a>
+
+                <a href="{{ url_for('app_servidor_atestados') }}"
+                   class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all {% if active_tab == 'atestados' %}text-[#0B3D2E] font-extrabold{% else %}text-slate-400 hover:text-slate-600 font-medium{% endif %}">
+                    <span class="w-10 h-7 rounded-full flex items-center justify-center transition-all {% if active_tab == 'atestados' %}bg-emerald-100 text-[#0B3D2E]{% endif %}">
+                        <i class="{% if active_tab == 'atestados' %}ph-fill{% else %}ph{% endif %} ph-first-aid text-xl"></i>
+                    </span>
+                    <span class="text-[10px] tracking-tight">Atestados</span>
+                </a>
+            </div>
+        </nav>
+        {% endif %}
+    </div>
+
+    <!-- Modal Guia de Instalação iOS (Safari) -->
+    <div id="iosInstallModal" class="hidden fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-end sm:items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl anim-scale-in">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2.5">
+                    <img src="{{ url_for('static', filename='pwa/icon-192.png') }}" alt="SERVIDOR 360" class="w-10 h-10 rounded-xl shadow">
+                    <div>
+                        <h3 class="text-sm font-extrabold text-[#0B3D2E]">Instalar SERVIDOR 360</h3>
+                        <p class="text-[11px] text-slate-500">Adicionar à tela inicial do iPhone</p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('iosInstallModal').classList.add('hidden')" class="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200">
+                    <i class="ph ph-x text-base"></i>
+                </button>
+            </div>
+            <ol class="space-y-3 text-xs text-slate-700 mb-5">
+                <li class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl">
+                    <span class="w-7 h-7 rounded-full bg-[#0B3D2E] text-[#FACC15] font-extrabold flex items-center justify-center shrink-0">1</span>
+                    <span>Toque no ícone <strong>Compartilhar</strong> <i class="ph ph-export inline text-base text-[#0B3D2E]"></i> na barra inferior do Safari.</span>
+                </li>
+                <li class="flex items-center gap-3 bg-slate-50 p-3 rounded-xl">
+                    <span class="w-7 h-7 rounded-full bg-[#0B3D2E] text-[#FACC15] font-extrabold flex items-center justify-center shrink-0">2</span>
+                    <span>Role e toque em <strong>"Adicionar à Tela de Início"</strong> e depois em <strong>Adicionar</strong>.</span>
+                </li>
+            </ol>
+            <button type="button" onclick="document.getElementById('iosInstallModal').classList.add('hidden')"
+                    class="w-full py-3 rounded-xl bg-[#0B3D2E] text-white font-bold text-xs shadow-lg active:scale-95 transition">
+                Entendi
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Registro do Service Worker do PWA SERVIDOR 360
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/app-servidor/sw.js', { scope: '/app-servidor/' })
+                    .catch(() => {});
+            });
+        }
+
+        // Controle inteligente do botão de instalação PWA (Android + iOS)
+        let deferredInstallPrompt = null;
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+        function mostrarCartaoInstalacao() {
+            if (isStandalone) return;
+            const box = document.getElementById('pwaInstallCard');
+            if (box) box.classList.remove('hidden');
+        }
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            mostrarCartaoInstalacao();
+        });
+
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!isStandalone && isIOS) {
+                mostrarCartaoInstalacao();
+            }
+            // Auto-fechar toasts de sucesso após 5s
+            setTimeout(() => {
+                const c = document.getElementById('pwaFlashContainer');
+                if (c) {
+                    c.style.transition = 'opacity 0.4s ease';
+                    c.style.opacity = '0';
+                    setTimeout(() => c.remove(), 450);
+                }
+            }, 6000);
+        });
+
+        async function acionarInstalacaoPWA() {
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                const { outcome } = await deferredInstallPrompt.userChoice;
+                if (outcome === 'accepted') {
+                    const box = document.getElementById('pwaInstallCard');
+                    if (box) box.classList.add('hidden');
+                }
+                deferredInstallPrompt = null;
+            } else if (isIOS) {
+                document.getElementById('iosInstallModal').classList.remove('hidden');
+            } else {
+                alert('Para instalar, abra o menu do navegador (⋮) e toque em "Instalar aplicativo" ou "Adicionar à tela inicial".');
+            }
+        }
+
+        // Máscara padrão de CPF reutilizável
+        function aplicarMascaraCPF(el) {
+            if (!el) return;
+            el.addEventListener('input', (e) => {
+                let v = e.target.value.replace(/\D/g, '').slice(0, 11);
+                v = v.replace(/(\d{3})(\d)/, '$1.$2');
+                v = v.replace(/(\d{3})(\d)/, '$1.$2');
+                v = v.replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+                e.target.value = v;
+            });
+        }
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

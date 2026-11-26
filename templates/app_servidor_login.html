@@ -1,0 +1,110 @@
+{% extends "app_servidor_base.html" %}
+{% block title %}Entrar • SERVIDOR 360{% endblock %}
+
+{% block body %}
+<div class="flex-1 flex flex-col justify-between min-h-[100dvh]">
+    <div>
+        <!-- Header Curvo -->
+        <header class="relative overflow-hidden bg-gradient-to-br from-[#0B3D2E] via-[#104936] to-[#14532D] pt-8 pb-16 px-6 safe-top">
+            <div class="relative z-10 flex items-center gap-3">
+                <a href="{{ url_for('app_servidor_acesso') }}"
+                   class="w-10 h-10 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center text-white active:scale-95 transition">
+                    <i class="ph-bold ph-arrow-left text-lg"></i>
+                </a>
+                <div>
+                    <h1 class="text-xl font-extrabold text-white leading-tight">Entrar no Aplicativo</h1>
+                    <p class="text-[11px] text-emerald-200/90">SERVIDOR 360 • Área do Servidor</p>
+                </div>
+            </div>
+
+            <svg class="absolute bottom-0 left-0 w-full h-11 text-[#F3F7F5]" viewBox="0 0 1440 120" preserveAspectRatio="none">
+                <path fill="currentColor" d="M0,115 C420,105 980,55 1440,0 L1440,120 L0,120 Z"></path>
+            </svg>
+        </header>
+
+        <main class="px-6 mt-2">
+            <form method="POST" action="{{ url_for('app_servidor_entrar') }}" class="app-card p-6 space-y-5 anim-fade-up">
+                <div>
+                    <label for="cpfLogin" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                        CPF do Servidor
+                    </label>
+                    <div class="relative">
+                        <i class="ph ph-identification-card absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-emerald-700"></i>
+                        <input type="text" id="cpfLogin" name="cpf" inputmode="numeric" autocomplete="username" required
+                               value="{{ cpf_informado or '' }}"
+                               placeholder="000.000.000-00"
+                               class="w-full pl-11 pr-4 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="senhaLogin" class="block text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E] mb-1.5">
+                        Senha Pessoal
+                    </label>
+                    <div class="relative">
+                        <i class="ph ph-lock-key absolute left-3.5 top-1/2 -translate-y-1/2 text-lg text-emerald-700"></i>
+                        <input type="password" id="senhaLogin" name="senha" autocomplete="current-password" required
+                               placeholder="Digite sua senha"
+                               class="w-full pl-11 pr-12 py-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold text-slate-800 focus:bg-white focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/25 outline-none transition">
+                        <button type="button" onclick="toggleSenhaLogin()"
+                                class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0B3D2E] p-1">
+                            <i id="eyeLoginIcon" class="ph ph-eye text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <button type="submit"
+                        class="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#0B3D2E] to-[#14532D] hover:brightness-110 text-white font-extrabold text-sm shadow-lg shadow-emerald-950/20 flex items-center justify-center gap-2 active:scale-[0.98] transition">
+                    <span>Acessar Meus Dados</span>
+                    <i class="ph-bold ph-arrow-right text-base text-[#FACC15]"></i>
+                </button>
+            </form>
+
+            <!-- Atalhos de ajuda -->
+            <div class="mt-5 space-y-3 anim-fade-up delay-2">
+                <a href="{{ url_for('app_servidor_primeiro_acesso') }}"
+                   class="app-card app-card-interactive p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700">
+                            <i class="ph-fill ph-sparkle text-lg"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-extrabold text-[#0B3D2E]">Ainda não ativou sua conta?</p>
+                            <p class="text-[11px] text-slate-500">Fazer Primeiro Acesso com reconhecimento facial</p>
+                        </div>
+                    </div>
+                    <i class="ph ph-caret-right text-slate-400 card-arrow"></i>
+                </a>
+
+                <p class="text-[11px] text-center text-slate-500 px-3 leading-relaxed">
+                    Esqueceu sua senha? Solicite ao <strong>RH da sua secretaria</strong> o reinício do acesso ao SERVIDOR 360 para cadastrar uma nova senha com validação facial.
+                </p>
+            </div>
+        </main>
+    </div>
+
+    <footer class="px-6 py-6 text-center safe-bottom">
+        <span class="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#0B3D2E]/60">
+            <i class="ph-fill ph-lock-simple text-emerald-600"></i>
+            Conexão Protegida • {{ municipio.nome if municipio else 'Prefeitura Municipal' }}
+        </span>
+    </footer>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    aplicarMascaraCPF(document.getElementById('cpfLogin'));
+    function toggleSenhaLogin() {
+        const inp = document.getElementById('senhaLogin');
+        const ic = document.getElementById('eyeLoginIcon');
+        if (inp.type === 'password') {
+            inp.type = 'text';
+            ic.className = 'ph ph-eye-slash text-lg';
+        } else {
+            inp.type = 'password';
+            ic.className = 'ph ph-eye text-lg';
+        }
+    }
+</script>
+{% endblock %}

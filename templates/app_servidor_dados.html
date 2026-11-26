@@ -1,0 +1,234 @@
+{% extends "app_servidor_base.html" %}
+{% block title %}Meus Dados • SERVIDOR 360{% endblock %}
+
+{% block body %}
+<div class="flex-1 pb-24">
+    <!-- Header Compacto -->
+    <header class="relative overflow-hidden bg-gradient-to-br from-[#0B3D2E] via-[#104936] to-[#14532D] pt-7 pb-14 px-6 safe-top">
+        <div class="relative z-10 flex items-center justify-between">
+            <div>
+                <p class="text-[10px] font-extrabold uppercase tracking-widest text-[#FACC15]">Ficha Oficial do RH</p>
+                <h1 class="text-xl font-extrabold text-white mt-0.5">Meus Dados Cadastrais</h1>
+            </div>
+            <a href="{{ url_for('app_servidor_solicitacoes') }}"
+               class="px-3 py-1.5 rounded-xl bg-[#FACC15] text-[#0B3D2E] text-[11px] font-extrabold shadow flex items-center gap-1 active:scale-95 transition">
+                <i class="ph-bold ph-pencil-simple"></i>
+                <span>Corrigir</span>
+            </a>
+        </div>
+        <svg class="absolute bottom-0 left-0 w-full h-9 text-[#F3F7F5]" viewBox="0 0 1440 120" preserveAspectRatio="none">
+            <path fill="currentColor" d="M0,115 C420,105 980,55 1440,0 L1440,120 L0,120 Z"></path>
+        </svg>
+    </header>
+
+    <main class="px-5 -mt-2 space-y-4">
+        <!-- Abas Minimalistas -->
+        <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1 anim-fade-up">
+            <button type="button" onclick="mostrarSecaoDados('vinculo', this)" class="tab-dados-btn px-3.5 py-2 rounded-full text-xs font-extrabold whitespace-nowrap bg-[#0B3D2E] text-white shadow">Vínculo</button>
+            <button type="button" onclick="mostrarSecaoDados('pessoal', this)" class="tab-dados-btn px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white text-slate-600 border border-slate-200">Pessoais</button>
+            <button type="button" onclick="mostrarSecaoDados('contato', this)" class="tab-dados-btn px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white text-slate-600 border border-slate-200">Endereço</button>
+            <button type="button" onclick="mostrarSecaoDados('banco', this)" class="tab-dados-btn px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white text-slate-600 border border-slate-200">Bancários</button>
+            <button type="button" onclick="mostrarSecaoDados('docs', this)" class="tab-dados-btn px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white text-slate-600 border border-slate-200">Documentos & GED</button>
+        </div>
+
+        <!-- 1. VÍNCULO E LOTAÇÃO -->
+        <section id="sec-vinculo" class="sec-dados app-card p-5 space-y-3.5 anim-fade-up">
+            <div class="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2">
+                    <i class="ph-fill ph-briefcase text-emerald-600 text-lg"></i> Vínculo e Lotação
+                </h2>
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase">Ativo • Validado</span>
+            </div>
+            <div class="grid grid-cols-1 gap-3 text-xs">
+                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Secretaria</span><strong class="text-slate-800">{{ funcionario.secretaria.nome if funcionario.secretaria else '—' }}</strong></div>
+                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Unidade / Local de Trabalho</span><strong class="text-slate-800">{{ funcionario.local_trabalho.nome if funcionario.local_trabalho else (funcionario.lotacao or '—') }}</strong></div>
+                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Cargo / Função</span><strong class="text-slate-800">{{ funcionario.funcao.nome if funcionario.funcao else '—' }}</strong></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Tipo de Vínculo</span><strong class="text-slate-800">{{ funcionario.tipo_vinculo or '—' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Matrícula / Vínculo</span><strong class="text-slate-800">{{ funcionario.num_vinculo or ('#' ~ funcionario.id) }}</strong></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Jornada</span><strong class="text-slate-800">{{ funcionario.jornada_trabalho or '—' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Exercício Atual</span><strong class="text-slate-800">{{ funcionario.ano_exercicio_atual or '2026' }}</strong></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Data de Início</span><strong class="text-slate-800">{{ funcionario.dt_inicio.strftime('%d/%m/%Y') if funcionario.dt_inicio else '—' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Término Previsto</span><strong class="text-slate-800">{{ funcionario.dt_termino.strftime('%d/%m/%Y') if funcionario.dt_termino else 'Indeterminado' }}</strong></div>
+                </div>
+                {% if funcionario.remuneracao %}
+                <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-emerald-700 block">Remuneração Base Cadastrada</span>
+                        <strong class="text-sm font-extrabold text-[#0B3D2E]">{{ funcionario.remuneracao }}</strong>
+                    </div>
+                    <i class="ph-fill ph-currency-circle-dollar text-2xl text-emerald-600"></i>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- 2. DADOS PESSOAIS -->
+        <section id="sec-pessoal" class="sec-dados hidden app-card p-5 space-y-3.5 anim-fade-up">
+            <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2 pb-2.5 border-b border-slate-100">
+                <i class="ph-fill ph-user-circle text-emerald-600 text-lg"></i> Dados Pessoais
+            </h2>
+            <div class="grid grid-cols-1 gap-3 text-xs">
+                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Nome Completo</span><strong class="text-slate-800">{{ funcionario.nome }}</strong></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">CPF</span><strong class="text-slate-800">{{ cpf_formatado }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Nascimento</span><strong class="text-slate-800">{{ funcionario.data_nasc.strftime('%d/%m/%Y') if funcionario.data_nasc else '—' }}</strong></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">RG / Órgão</span><strong class="text-slate-800">{{ funcionario.rg or '—' }} {{ funcionario.orgao_emissor_rg or '' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Estado Civil</span><strong class="text-slate-800">{{ funcionario.estado_civil or '—' }}</strong></div>
+                </div>
+                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Nome da Mãe</span><strong class="text-slate-800">{{ funcionario.mae or '—' }}</strong></div>
+                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Nome do Pai</span><strong class="text-slate-800">{{ funcionario.pai or '—' }}</strong></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Escolaridade</span><strong class="text-slate-800">{{ funcionario.escolaridade or '—' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Especialidade</span><strong class="text-slate-800">{{ funcionario.especialidade or '—' }}</strong></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Tipo Sanguíneo</span><strong class="text-slate-800">{{ funcionario.tipo_sanguineo or '—' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Dependentes</span><strong class="text-slate-800">{{ funcionario.qtd_dependentes or 0 }}</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. ENDEREÇO E CONTATO -->
+        <section id="sec-contato" class="sec-dados hidden app-card p-5 space-y-3.5 anim-fade-up">
+            <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2 pb-2.5 border-b border-slate-100">
+                <i class="ph-fill ph-map-pin text-emerald-600 text-lg"></i> Endereço e Contato
+            </h2>
+            <div class="grid grid-cols-1 gap-3 text-xs">
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Telefone / WhatsApp</span><strong class="text-slate-800">{{ funcionario.telefone or '—' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">CEP</span><strong class="text-slate-800">{{ funcionario.cep or '—' }}</strong></div>
+                </div>
+                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">E-mail</span><strong class="text-slate-800 break-all">{{ funcionario.email or '—' }}</strong></div>
+                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Logradouro</span><strong class="text-slate-800">{{ funcionario.endereco or '—' }}</strong></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Bairro</span><strong class="text-slate-800">{{ funcionario.bairro or '—' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Cidade / UF</span><strong class="text-slate-800">{{ funcionario.cidade or '—' }} / {{ funcionario.uf or '—' }}</strong></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Zona</span><strong class="text-slate-800">{{ funcionario.zona_moradia or 'URBANA' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Povoado / Comunidade</span><strong class="text-slate-800">{{ funcionario.povoado_comunidade or '—' }}</strong></div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Contato de Emergência</span>
+                    <strong class="text-slate-800">{{ funcionario.contato_emergencia_nome or 'Não informado' }}</strong>
+                    {% if funcionario.contato_emergencia_tel %}<span class="text-slate-500 block">{{ funcionario.contato_emergencia_tel }}</span>{% endif %}
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. DADOS BANCÁRIOS (COM MÁSCARA LGPD) -->
+        <section id="sec-banco" class="sec-dados hidden app-card p-5 space-y-3.5 anim-fade-up">
+            <div class="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2">
+                    <i class="ph-fill ph-bank text-emerald-600 text-lg"></i> Dados Bancários
+                </h2>
+                <button type="button" onclick="alternarMascaraBanco()" id="btnRevelarBanco"
+                        class="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-bold text-[#0B3D2E] flex items-center gap-1">
+                    <i class="ph ph-eye"></i><span>Revelar</span>
+                </button>
+            </div>
+            <div class="grid grid-cols-1 gap-3 text-xs">
+                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Banco</span><strong class="text-slate-800">{{ funcionario.banco or 'Não informado' }}</strong></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Agência</span>
+                        <strong id="valAgencia" data-mask="{{ agencia_mascarada }}" data-real="{{ funcionario.agencia or '—' }}" class="text-slate-800">{{ agencia_mascarada }}</strong>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Conta</span>
+                        <strong id="valConta" data-mask="{{ conta_mascarada }}" data-real="{{ funcionario.conta or '—' }}" class="text-slate-800">{{ conta_mascarada }}</strong>
+                    </div>
+                </div>
+                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Tipo de Conta</span><strong class="text-slate-800">{{ funcionario.tipo_conta or '—' }}</strong></div>
+            </div>
+        </section>
+
+        <!-- 5. DOCUMENTOS & DOSSIÊ GED -->
+        <section id="sec-docs" class="sec-dados hidden space-y-4 anim-fade-up">
+            <div class="app-card p-5 space-y-3">
+                <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2 pb-2 border-b border-slate-100">
+                    <i class="ph-fill ph-files text-emerald-600 text-lg"></i> Documentação Oficial & e-Social
+                </h2>
+                <div class="grid grid-cols-2 gap-3 text-xs">
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">PIS / PASEP</span><strong class="text-slate-800">{{ funcionario.pis or '—' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">CTPS</span><strong class="text-slate-800">{{ funcionario.ctps or '—' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Título de Eleitor</span><strong class="text-slate-800">{{ funcionario.titulo_eleitor or '—' }}</strong></div>
+                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">CNH</span><strong class="text-slate-800">{{ funcionario.cnh or '—' }}</strong></div>
+                </div>
+            </div>
+
+            <div class="app-card p-5 space-y-3">
+                <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2">
+                    <i class="ph-fill ph-folder-open text-amber-600 text-lg"></i> Meu Dossiê Digital (GED)
+                </h2>
+                {% if documentos_ged %}
+                    <div class="space-y-2.5">
+                        {% for doc in documentos_ged %}
+                        <div class="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <p class="text-xs font-extrabold text-[#0B3D2E] truncate">{{ doc.tipo_documento|replace('_', ' ') }}</p>
+                                <p class="text-[10px] text-slate-500 truncate">{{ doc.nome_arquivo }} • {{ doc.data_upload.strftime('%d/%m/%Y') if doc.data_upload else '' }}</p>
+                            </div>
+                            <a href="{{ url_for('app_servidor_ged_download', doc_id=doc.id) }}"
+                               class="px-3 py-1.5 rounded-lg bg-[#0B3D2E] text-white text-[10px] font-extrabold shrink-0 active:scale-95 transition">
+                                Baixar
+                            </a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-xs text-slate-500">Nenhum documento arquivado no dossiê GED até o momento.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- Chamada para Solicitar Correção -->
+        <a href="{{ url_for('app_servidor_solicitacoes') }}"
+           class="app-card app-card-interactive p-4 flex items-center gap-3 border-emerald-200/70 bg-emerald-50/40">
+            <div class="w-10 h-10 rounded-xl bg-[#0B3D2E] text-[#FACC15] flex items-center justify-center shrink-0">
+                <i class="ph-bold ph-pencil-simple-line text-lg"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-xs font-extrabold text-[#0B3D2E]">Encontrou algum dado desatualizado?</p>
+                <p class="text-[11px] text-slate-600">Solicite a alteração diretamente ao RH pelo aplicativo</p>
+            </div>
+            <i class="ph ph-caret-right text-slate-400 card-arrow"></i>
+        </a>
+    </main>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function mostrarSecaoDados(id, btn) {
+        document.querySelectorAll('.sec-dados').forEach(s => s.classList.add('hidden'));
+        const target = document.getElementById('sec-' + id);
+        if (target) target.classList.remove('hidden');
+
+        document.querySelectorAll('.tab-dados-btn').forEach(b => {
+            b.className = 'tab-dados-btn px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white text-slate-600 border border-slate-200';
+        });
+        btn.className = 'tab-dados-btn px-3.5 py-2 rounded-full text-xs font-extrabold whitespace-nowrap bg-[#0B3D2E] text-white shadow';
+    }
+
+    let bancoRevelado = false;
+    function alternarMascaraBanco() {
+        bancoRevelado = !bancoRevelado;
+        ['valAgencia', 'valConta'].forEach(id => {
+            const el = document.getElementById(id);
+            el.textContent = bancoRevelado ? el.dataset.real : el.dataset.mask;
+        });
+        const btn = document.getElementById('btnRevelarBanco');
+        btn.innerHTML = bancoRevelado
+            ? '<i class="ph ph-eye-slash"></i><span>Ocultar</span>'
+            : '<i class="ph ph-eye"></i><span>Revelar</span>';
+    }
+</script>
+{% endblock %}

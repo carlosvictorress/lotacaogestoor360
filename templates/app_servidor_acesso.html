@@ -1,0 +1,115 @@
+{% extends "app_servidor_base.html" %}
+{% block title %}Acesso • SERVIDOR 360{% endblock %}
+
+{% block body %}
+<div class="flex-1 flex flex-col justify-between min-h-[100dvh]">
+    <div>
+        <!-- Cabeçalho Curvo Institucional (inspirado na referência, nas cores Gestoor360) -->
+        <header class="relative overflow-hidden bg-gradient-to-br from-[#0B3D2E] via-[#104936] to-[#14532D] pt-10 pb-20 px-7 safe-top">
+            <!-- Brilho geométrico sutil -->
+            <div class="absolute -top-12 -right-12 w-44 h-44 rounded-full bg-[#10B981]/20 blur-2xl pointer-events-none"></div>
+            <div class="absolute bottom-8 right-10 w-20 h-20 rounded-full bg-[#FACC15]/15 blur-xl pointer-events-none"></div>
+
+            <div class="relative z-10 flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-extrabold tracking-tight text-white">Acesso</h1>
+                    <p class="text-[11px] font-medium text-emerald-200/90 mt-0.5 flex items-center gap-1.5">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#FACC15] inline-block animate-pulse"></span>
+                        Utilidade Pública Municipal
+                    </p>
+                </div>
+                <div class="w-11 h-11 rounded-2xl bg-white/10 border border-white/15 backdrop-blur-md flex items-center justify-center shadow-lg">
+                    <i class="ph-fill ph-shield-check text-2xl text-[#FACC15]"></i>
+                </div>
+            </div>
+
+            <!-- Curva diagonal suave idêntica à referência -->
+            <svg class="absolute bottom-0 left-0 w-full h-14 text-[#F3F7F5]" viewBox="0 0 1440 120" preserveAspectRatio="none">
+                <path fill="currentColor" d="M0,115 C420,105 980,55 1440,0 L1440,120 L0,120 Z"></path>
+            </svg>
+        </header>
+
+        <!-- Bloco Central: Pill SERVIDOR 360 -->
+        <section class="px-7 -mt-2 text-center anim-scale-in">
+            <p class="text-[11px] font-extrabold uppercase tracking-[0.22em] text-[#0B3D2E]/70 mb-2.5">
+                PORTAL DO SERVIDOR
+            </p>
+
+            <div class="brand-pill inline-flex items-center justify-center gap-2 px-7 py-3 rounded-full select-none">
+                <span class="text-2xl sm:text-[26px] font-light tracking-[0.14em] text-white">SERVIDOR</span>
+                <span class="text-2xl sm:text-[26px] font-extrabold tracking-tight text-[#FACC15]">360</span>
+            </div>
+
+            <p class="text-xs font-semibold text-[#0B3D2E]/75 mt-3 max-w-[290px] mx-auto leading-relaxed">
+                Seus dados cadastrais, contrato assinado e serviços do RH na palma da mão
+            </p>
+        </section>
+
+        <!-- Saudação + Cards Animados Minimalistas -->
+        <main class="px-6 mt-8 space-y-4">
+            <div class="anim-fade-up delay-1">
+                <h2 class="text-2xl font-extrabold text-[#0B3D2E] tracking-tight">{{ saudacao }}</h2>
+                <p class="text-xs font-medium text-slate-500 mt-0.5">Selecione uma opção para continuar</p>
+            </div>
+
+            <!-- Card 1: Primeiro Acesso -->
+            <a href="{{ url_for('app_servidor_primeiro_acesso') }}"
+               class="app-card app-card-interactive anim-fade-up delay-2 flex items-center gap-4 p-4 sm:p-5 group">
+                <div class="relative w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-[#0B3D2E] transition-colors">
+                    <i class="ph-fill ph-user-plus text-2xl text-[#0B3D2E] group-hover:text-[#FACC15] transition-colors"></i>
+                    <span class="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#FACC15] border-2 border-white"></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-[15px] font-extrabold text-[#0B3D2E] leading-snug">Primeiro Acesso</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Validar identidade facial e criar senha</p>
+                </div>
+                <i class="ph ph-caret-right text-lg text-slate-400 card-arrow shrink-0"></i>
+            </a>
+
+            <!-- Card 2: Entrar no Aplicativo -->
+            <a href="{{ url_for('app_servidor_entrar') }}"
+               class="app-card app-card-interactive anim-fade-up delay-3 flex items-center gap-4 p-4 sm:p-5 group">
+                <div class="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0 group-hover:bg-[#0B3D2E] transition-colors">
+                    <i class="ph-fill ph-sign-in text-2xl text-[#0B3D2E] group-hover:text-white transition-colors"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <h3 class="text-[15px] font-extrabold text-[#0B3D2E] leading-snug">Entrar no Aplicativo</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Acessar com CPF e senha pessoal</p>
+                </div>
+                <i class="ph ph-caret-right text-lg text-slate-400 card-arrow shrink-0"></i>
+            </a>
+
+            <!-- Card Discreto de Instalação PWA (aparece se ainda não estiver instalado) -->
+            <button type="button" id="pwaInstallCard" onclick="acionarInstalacaoPWA()"
+                    class="hidden w-full text-left anim-fade-up delay-4 rounded-2xl p-3.5 bg-gradient-to-r from-[#0B3D2E] to-[#14532D] text-white shadow-lg flex items-center gap-3.5 active:scale-[0.98] transition">
+                <div class="w-10 h-10 rounded-xl bg-[#FACC15] text-[#0B3D2E] flex items-center justify-center shrink-0 shadow">
+                    <i class="ph-bold ph-device-mobile-camera text-xl"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-extrabold tracking-tight text-white">Instalar SERVIDOR 360 no celular</p>
+                    <p class="text-[11px] text-emerald-200 leading-tight mt-0.5">Use em tela cheia como aplicativo oficial</p>
+                </div>
+                <span class="px-2.5 py-1 rounded-full bg-[#FACC15] text-[#0B3D2E] text-[10px] font-extrabold uppercase shrink-0">
+                    Instalar
+                </span>
+            </button>
+        </main>
+    </div>
+
+    <!-- Rodapé Institucional (equivalente ao rodapé da referência) -->
+    <footer class="px-6 pt-8 pb-7 safe-bottom anim-fade-up delay-5">
+        <div class="border-t border-emerald-950/10 pt-5 flex items-center justify-center gap-3.5">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Brasão Municipal"
+                 class="h-9 w-auto object-contain opacity-90">
+            <div class="text-left">
+                <p class="text-[10px] font-extrabold uppercase tracking-wider text-[#0B3D2E] leading-tight">
+                    {{ municipio.nome if municipio else 'Prefeitura Municipal' }}
+                </p>
+                <p class="text-[10px] font-medium text-slate-500 leading-tight mt-0.5">
+                    Gestão de Pessoas • Acesso exclusivo a servidores validados
+                </p>
+            </div>
+        </div>
+    </footer>
+</div>
+{% endblock %}

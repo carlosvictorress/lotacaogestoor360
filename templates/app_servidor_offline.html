@@ -1,0 +1,23 @@
+{% extends "app_servidor_base.html" %}
+{% block title %}Sem Conexão • SERVIDOR 360{% endblock %}
+
+{% block body %}
+<div class="flex-1 flex flex-col items-center justify-center p-8 text-center min-h-[100dvh]">
+    <div class="w-20 h-20 rounded-3xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-5 shadow-inner">
+        <i class="ph-duotone ph-wifi-slash text-4xl text-[#0B3D2E]"></i>
+    </div>
+    <div class="brand-pill inline-flex items-center gap-1.5 px-5 py-1.5 rounded-full mb-4">
+        <span class="text-sm font-light tracking-widest text-white">SERVIDOR</span>
+        <span class="text-sm font-extrabold text-[#FACC15]">360</span>
+    </div>
+    <h1 class="text-lg font-extrabold text-[#0B3D2E]">Você está sem conexão</h1>
+    <p class="text-xs text-slate-500 mt-2 max-w-xs leading-relaxed">
+        Para proteger seus dados pessoais (LGPD), o SERVIDOR 360 consulta suas informações em tempo real. Conecte-se à internet e tente novamente.
+    </p>
+    <button type="button" onclick="window.location.reload()"
+            class="mt-6 px-6 py-3 rounded-xl bg-[#0B3D2E] text-white font-extrabold text-xs shadow-lg flex items-center gap-2 active:scale-95 transition">
+        <i class="ph-bold ph-arrows-clockwise text-base text-[#FACC15]"></i>
+        Tentar Novamente
+    </button>
+</div>
+{% endblock %}

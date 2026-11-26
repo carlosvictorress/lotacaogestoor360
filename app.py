@@ -16,7 +16,7 @@ import json
 import hmac
 import secrets
 
-from flask import Flask, render_template, request, redirect, url_for, flash, Response, has_request_context, session, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, Response, has_request_context, session, jsonify, send_file, abort
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import (
     LoginManager,
@@ -37,6 +37,7 @@ import eleitoral_service
 import sms_service
 import gestoor_sign_pdf
 import gestoor_sign_service
+import app_servidor_service
 
 load_dotenv()
 
@@ -65,9 +66,14 @@ def security_before_request():
     # 2. Validação CSRF global para requisições mutáveis autenticadas
     if request.method in ("POST", "PUT", "PATCH", "DELETE"):
         if not security.is_csrf_exempt(request.path):
-            # Exige CSRF em todas as rotas autenticadas (e no /login quando já há sessão CSRF)
-            needs_csrf = current_user.is_authenticated or (
-                request.path == "/login" and bool(session.get("_csrf_token"))
+            # Exige CSRF em todas as rotas autenticadas (admin ou App do Servidor) e no /login com sessão CSRF
+            needs_csrf = (
+                current_user.is_authenticated
+                or bool(session.get("app_servidor_id"))
+                or (
+                    (request.path == "/login" or request.path.startswith("/app-servidor/"))
+                    and bool(session.get("_csrf_token"))
+                )
             )
             if needs_csrf and not security.validate_csrf_request():
                 is_api = request.path.startswith("/api/") or request.is_json
@@ -895,6 +901,86 @@ def _proteger_arquivos_selados(mapper, connection, target):
     raise ValueError("VIOLAÇÃO DE INTEGRIDADE: PDFs selados do Gestoor Sign não podem ser alterados ou excluídos.")
 
 
+# ==============================================================================
+# MODELOS — APP DO SERVIDOR PWA (SERVIDOR 360)
+# ==============================================================================
+
+
+class ServidorContaApp(db.Model):
+    __tablename__ = "servidor_conta_app"
+
+    id = db.Column(db.Integer, primary_key=True)
+    funcionario_id = db.Column(
+        db.Integer, db.ForeignKey("funcionario.id"), unique=True, nullable=False, index=True
+    )
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), nullable=True, index=True)
+
+    senha_hash = db.Column(db.String(255), nullable=False)
+    ativo = db.Column(db.Boolean, default=True, nullable=False)
+    primeiro_acesso_concluido = db.Column(db.Boolean, default=False, nullable=False)
+    primeiro_acesso_em = db.Column(db.DateTime, nullable=True)
+
+    facial_verificado = db.Column(db.Boolean, default=False, nullable=False)
+    facial_score = db.Column(db.Float, nullable=True)
+    facial_distancia = db.Column(db.Float, nullable=True)
+    facial_fonte_referencia = db.Column(db.String(30), nullable=True)  # foto_3x4 | foto_biometria
+    facial_selfie_b64 = db.Column(db.Text, nullable=True)
+
+    termo_lgpd_aceito_em = db.Column(db.DateTime, nullable=True)
+    ultimo_login_em = db.Column(db.DateTime, nullable=True)
+    ultimo_login_ip = db.Column(db.String(64), nullable=True)
+    ultimo_user_agent = db.Column(db.String(255), nullable=True)
+    tentativas_falhas = db.Column(db.Integer, default=0, nullable=False)
+    bloqueado_ate = db.Column(db.DateTime, nullable=True)
+    criado_em = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    atualizado_em = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    funcionario = db.relationship(
+        "Funcionario",
+        backref=db.backref("conta_app", uselist=False, lazy=True, cascade="all, delete-orphan"),
+    )
+    municipio = db.relationship("Municipio", foreign_keys=[municipio_id])
+
+    def set_password(self, password: str) -> None:
+        self.senha_hash = generate_password_hash(password)
+
+    def check_password(self, password: str) -> bool:
+        return check_password_hash(self.senha_hash, password)
+
+
+class SolicitacaoAlteracaoCadastral(db.Model):
+    __tablename__ = "solicitacao_alteracao_cadastral"
+
+    id = db.Column(db.Integer, primary_key=True)
+    protocolo = db.Column(db.String(32), unique=True, nullable=False, index=True)
+    municipio_id = db.Column(db.Integer, db.ForeignKey("municipio.id"), nullable=True, index=True)
+    secretaria_id = db.Column(db.Integer, db.ForeignKey("secretaria.id"), nullable=False, index=True)
+    funcionario_id = db.Column(db.Integer, db.ForeignKey("funcionario.id"), nullable=False, index=True)
+
+    categoria = db.Column(db.String(40), nullable=False)  # CONTATO, ENDERECO, PESSOAL, BANCARIO, OUTROS
+    dados_anteriores_json = db.Column(db.Text, nullable=True)
+    dados_solicitados_json = db.Column(db.Text, nullable=True)
+    justificativa = db.Column(db.Text, nullable=False)
+
+    anexo_nome = db.Column(db.String(180), nullable=True)
+    anexo_mime = db.Column(db.String(80), nullable=True)
+    anexo_b64 = db.Column(db.Text, nullable=True)
+
+    status = db.Column(db.String(20), default="PENDENTE", nullable=False, index=True)  # PENDENTE, APROVADO, RECUSADO
+    motivo_recusa = db.Column(db.Text, nullable=True)
+    analisado_por_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    data_solicitacao = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    data_analise = db.Column(db.DateTime, nullable=True)
+
+    municipio = db.relationship("Municipio", foreign_keys=[municipio_id])
+    secretaria = db.relationship("Secretaria", foreign_keys=[secretaria_id])
+    funcionario = db.relationship(
+        "Funcionario",
+        backref=db.backref("solicitacoes_alteracao", lazy=True, cascade="all, delete-orphan"),
+    )
+    analisado_por = db.relationship("User", foreign_keys=[analisado_por_id])
+
+
 def normalizar_numero_eleitoral(val):
     if not val:
         return ""
@@ -1720,6 +1806,16 @@ def admin_dashboard():
     except Exception:
         atestados_pendentes_count = 0
 
+    try:
+        sol_dados_q = security.scope_query(
+            SolicitacaoAlteracaoCadastral.query.filter_by(status="PENDENTE"),
+            SolicitacaoAlteracaoCadastral,
+            current_user,
+        )
+        solicitacoes_dados_pendentes_count = sol_dados_q.count()
+    except Exception:
+        solicitacoes_dados_pendentes_count = 0
+
     return render_template(
         "admin.html",
         secretarias=secretarias,
@@ -1736,6 +1832,7 @@ def admin_dashboard():
         locais_stats=locais_stats,
         logs=logs,
         atestados_pendentes_count=atestados_pendentes_count,
+        solicitacoes_dados_pendentes_count=solicitacoes_dados_pendentes_count,
         filtros={
             "sec": filtro_secretaria if is_global else "",
             "vinculo": filtro_vinculo,
@@ -8730,6 +8827,1129 @@ def api_gestoor_sign_comtele_testar_sms():
         )
     except sms_service.SMSProviderError as exc:
         return jsonify({"success": False, "message": str(exc)}), 400
+
+
+# ==============================================================================
+# MÓDULO EXTRA PWA — SERVIDOR 360 (APP DO SERVIDOR MUNICIPAL)
+# ==============================================================================
+
+
+def obter_ip_cliente() -> str:
+    xff = (request.headers.get("X-Forwarded-For") or "").split(",")[0].strip()
+    return (xff or request.remote_addr or "0.0.0.0")[:50]
+
+
+def _obter_municipio_app(funcionario=None):
+    if funcionario and getattr(funcionario, "municipio", None):
+        return funcionario.municipio
+    if funcionario and getattr(funcionario, "secretaria", None) and getattr(funcionario.secretaria, "municipio", None):
+        return funcionario.secretaria.municipio
+    mun = Municipio.query.filter_by(ativo=True).order_by(Municipio.id.asc()).first()
+    return mun
+
+
+def _buscar_funcionario_por_cpf(cpf_raw: str):
+    cpf_limpo = app_servidor_service.normalizar_cpf(cpf_raw)
+    if len(cpf_limpo) != 11:
+        return None
+    func_obj = (
+        Funcionario.query.filter_by(cpf_limpo=cpf_limpo)
+        .order_by(Funcionario.ativo.desc(), Funcionario.validado.desc(), Funcionario.id.desc())
+        .first()
+    )
+    if func_obj:
+        return func_obj
+    cpf_fmt = app_servidor_service.formatar_cpf(cpf_limpo)
+    return (
+        Funcionario.query.filter(
+            (Funcionario.cpf == cpf_fmt) | (Funcionario.cpf == cpf_limpo)
+        )
+        .order_by(Funcionario.ativo.desc(), Funcionario.validado.desc(), Funcionario.id.desc())
+        .first()
+    )
+
+
+def _obter_servidor_app_autenticado():
+    """Retorna (funcionario, conta) se a sessão do PWA estiver válida, senão (None, None)."""
+    func_id = session.get("app_servidor_id")
+    if not func_id:
+        return None, None
+    func_obj = db.session.get(Funcionario, int(func_id))
+    if not func_obj or not getattr(func_obj, "ativo", True) or not getattr(func_obj, "validado", False):
+        session.pop("app_servidor_id", None)
+        return None, None
+    conta = ServidorContaApp.query.filter_by(funcionario_id=func_obj.id).first()
+    if not conta or not conta.ativo or not conta.primeiro_acesso_concluido:
+        session.pop("app_servidor_id", None)
+        return None, None
+    # Mantém compatibilidade com rotas unificadas de atestado (/portal/servidor/atestado/download)
+    session["servidor_id"] = func_obj.id
+    session["servidor_nome"] = func_obj.nome
+    session["servidor_cpf"] = func_obj.cpf
+    return func_obj, conta
+
+
+@app.route("/app-servidor/manifest.json")
+def app_servidor_manifest():
+    app_servidor_service.garantir_icones_pwa(os.path.join(app.root_path, "static"))
+    manifest = {
+        "id": "/app-servidor/",
+        "name": app_servidor_service.APP_FULL_NAME,
+        "short_name": app_servidor_service.APP_SHORT_NAME,
+        "description": "Aplicativo oficial de utilidade pública municipal para acesso aos dados cadastrais, contrato assinado, solicitações e atestados do servidor.",
+        "lang": "pt-BR",
+        "start_url": "/app-servidor/?source=pwa",
+        "scope": "/app-servidor/",
+        "display": "standalone",
+        "display_override": ["standalone", "minimal-ui"],
+        "orientation": "portrait",
+        "background_color": app_servidor_service.APP_BG_COLOR,
+        "theme_color": app_servidor_service.APP_THEME_COLOR,
+        "categories": ["government", "utilities", "productivity"],
+        "icons": [
+            {
+                "src": "/static/pwa/icon-192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+                "purpose": "any",
+            },
+            {
+                "src": "/static/pwa/icon-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any",
+            },
+            {
+                "src": "/static/pwa/icon-maskable-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "maskable",
+            },
+        ],
+        "shortcuts": [
+            {
+                "name": "Meus Dados",
+                "short_name": "Dados",
+                "url": "/app-servidor/dados",
+                "icons": [{"src": "/static/pwa/icon-192.png", "sizes": "192x192"}],
+            },
+            {
+                "name": "Meu Contrato",
+                "short_name": "Contrato",
+                "url": "/app-servidor/contratos",
+                "icons": [{"src": "/static/pwa/icon-192.png", "sizes": "192x192"}],
+            },
+            {
+                "name": "Solicitar Alteração",
+                "short_name": "Alteração",
+                "url": "/app-servidor/solicitacoes",
+                "icons": [{"src": "/static/pwa/icon-192.png", "sizes": "192x192"}],
+            },
+        ],
+    }
+    resp = Response(
+        json.dumps(manifest, ensure_ascii=False),
+        mimetype="application/manifest+json",
+    )
+    resp.headers["Cache-Control"] = "public, max-age=3600"
+    return resp
+
+
+@app.route("/app-servidor/sw.js")
+def app_servidor_sw():
+    sw_code = """/* SERVIDOR 360 — Service Worker (LGPD-safe: nunca faz cache de dados autenticados ou PDFs) */
+const CACHE_NAME = 'servidor360-shell-v1';
+const SHELL_ASSETS = [
+  '/app-servidor/offline',
+  '/static/pwa/icon-192.png',
+  '/static/pwa/icon-512.png',
+  '/static/pwa/apple-touch-icon.png',
+  '/static/logo.png'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(SHELL_ASSETS))
+      .then(() => self.skipWaiting())
+      .catch(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Nunca armazena em cache APIs, downloads de PDF/anexos ou páginas autenticadas
+  if (
+    url.pathname.startsWith('/app-servidor/api/') ||
+    url.pathname.includes('/arquivo/') ||
+    url.pathname.includes('/download') ||
+    url.pathname.includes('/anexo')
+  ) {
+    return;
+  }
+
+  // Assets estáticos seguros (ícones e logo) -> Cache-First
+  if (url.pathname.startsWith('/static/pwa/') || url.pathname === '/static/logo.png') {
+    event.respondWith(
+      caches.match(req).then((cached) => cached || fetch(req).then((res) => {
+        if (res && res.status === 200) {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(req, copy));
+        }
+        return res;
+      }))
+    );
+    return;
+  }
+
+  // Navegação -> Network-First com tela offline amigável
+  if (req.mode === 'navigate' && url.pathname.startsWith('/app-servidor')) {
+    event.respondWith(
+      fetch(req).catch(() => caches.match('/app-servidor/offline'))
+    );
+  }
+});
+"""
+    resp = Response(sw_code, mimetype="application/javascript")
+    resp.headers["Service-Worker-Allowed"] = "/app-servidor/"
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
+
+@app.route("/app-servidor/offline")
+def app_servidor_offline():
+    mun = _obter_municipio_app()
+    return render_template("app_servidor_offline.html", municipio=mun)
+
+
+@app.route("/app-servidor")
+@app.route("/app-servidor/")
+def app_servidor_acesso():
+    func_obj, _ = _obter_servidor_app_autenticado()
+    if func_obj:
+        return redirect(url_for("app_servidor_inicio"))
+    mun = _obter_municipio_app()
+    return render_template(
+        "app_servidor_acesso.html",
+        saudacao=app_servidor_service.saudacao_horario(),
+        municipio=mun,
+    )
+
+
+@app.route("/app-servidor/entrar", methods=["GET", "POST"])
+def app_servidor_entrar():
+    func_obj, _ = _obter_servidor_app_autenticado()
+    if func_obj:
+        return redirect(url_for("app_servidor_inicio"))
+
+    mun = _obter_municipio_app()
+    if request.method == "POST":
+        client_ip = obter_ip_cliente()
+        rate_key = f"app_srv_login:{client_ip}"
+        limited, retry_after = security.login_rate_limiter.is_limited(
+            rate_key, max_attempts=12, window_seconds=300
+        )
+        if limited:
+            flash(
+                f"Muitas tentativas de acesso. Aguarde {retry_after} segundos para tentar novamente.",
+                "error",
+            )
+            return render_template("app_servidor_login.html", municipio=mun)
+
+        cpf_raw = request.form.get("cpf", "").strip()
+        senha = request.form.get("senha", "")
+
+        func_found = _buscar_funcionario_por_cpf(cpf_raw)
+        if not func_found:
+            security.login_rate_limiter.register_failure(rate_key)
+            flash("CPF ou senha inválidos.", "error")
+            return render_template("app_servidor_login.html", municipio=mun, cpf_informado=cpf_raw)
+
+        if not getattr(func_found, "ativo", True):
+            flash("Seu vínculo consta como inativo. Procure o RH da sua secretaria.", "error")
+            return render_template("app_servidor_login.html", municipio=mun, cpf_informado=cpf_raw)
+
+        if not getattr(func_found, "validado", False):
+            flash("Seu cadastro ainda aguarda validação oficial do RH.", "error")
+            return render_template("app_servidor_login.html", municipio=mun, cpf_informado=cpf_raw)
+
+        conta = ServidorContaApp.query.filter_by(funcionario_id=func_found.id).first()
+        if not conta or not conta.primeiro_acesso_concluido:
+            flash(
+                "Você ainda não ativou seu acesso no SERVIDOR 360. Utilize a opção 'Primeiro Acesso' para validar sua identidade facial e criar sua senha.",
+                "warning",
+            )
+            return redirect(url_for("app_servidor_primeiro_acesso"))
+
+        if not conta.ativo:
+            flash("Sua conta do aplicativo foi suspensa pelo RH. Procure sua secretaria.", "error")
+            return render_template("app_servidor_login.html", municipio=mun, cpf_informado=cpf_raw)
+
+        agora = datetime.utcnow()
+        if conta.bloqueado_ate and conta.bloqueado_ate > agora:
+            restante = max(1, int((conta.bloqueado_ate - agora).total_seconds() // 60) + 1)
+            flash(
+                f"Acesso temporariamente bloqueado por tentativas incorretas. Tente novamente em {restante} minuto(s).",
+                "error",
+            )
+            return render_template("app_servidor_login.html", municipio=mun, cpf_informado=cpf_raw)
+
+        if not conta.check_password(senha):
+            security.login_rate_limiter.register_failure(rate_key)
+            conta.tentativas_falhas = (conta.tentativas_falhas or 0) + 1
+            if conta.tentativas_falhas >= app_servidor_service.MAX_LOGIN_ATTEMPTS:
+                conta.bloqueado_ate = agora + timedelta(minutes=app_servidor_service.LOCKOUT_MINUTES)
+            db.session.commit()
+            flash("CPF ou senha inválidos.", "error")
+            return render_template("app_servidor_login.html", municipio=mun, cpf_informado=cpf_raw)
+
+        # Login bem-sucedido
+        security.login_rate_limiter.reset(rate_key)
+        conta.tentativas_falhas = 0
+        conta.bloqueado_ate = None
+        conta.ultimo_login_em = agora
+        conta.ultimo_login_ip = client_ip
+        conta.ultimo_user_agent = (request.headers.get("User-Agent") or "")[:250]
+        db.session.commit()
+
+        session["app_servidor_id"] = func_found.id
+        session["servidor_id"] = func_found.id
+        session["servidor_nome"] = func_found.nome
+        session["servidor_cpf"] = func_found.cpf
+        session.permanent = True
+        return redirect(url_for("app_servidor_inicio"))
+
+    return render_template("app_servidor_login.html", municipio=mun)
+
+
+@app.route("/app-servidor/sair")
+def app_servidor_sair():
+    for key in ("app_servidor_id", "app_onboarding", "servidor_id", "servidor_nome", "servidor_cpf"):
+        session.pop(key, None)
+    flash("Você saiu do SERVIDOR 360 com segurança.", "success")
+    return redirect(url_for("app_servidor_acesso"))
+
+
+@app.route("/app-servidor/primeiro-acesso")
+def app_servidor_primeiro_acesso():
+    func_obj, _ = _obter_servidor_app_autenticado()
+    if func_obj:
+        return redirect(url_for("app_servidor_inicio"))
+    mun = _obter_municipio_app()
+    return render_template(
+        "app_servidor_primeiro_acesso.html",
+        municipio=mun,
+        facial_max_distance=app_servidor_service.FACIAL_MAX_DISTANCE,
+    )
+
+
+@app.route("/app-servidor/api/primeiro-acesso/validar-dados", methods=["POST"])
+def app_servidor_api_validar_dados():
+    client_ip = obter_ip_cliente()
+    rate_key = f"app_srv_onboard:{client_ip}"
+    limited, retry_after = security.login_rate_limiter.is_limited(
+        rate_key, max_attempts=15, window_seconds=300
+    )
+    if limited:
+        return jsonify({
+            "success": False,
+            "code": "RATE_LIMIT",
+            "message": f"Muitas tentativas. Aguarde {retry_after} segundos para tentar novamente.",
+        }), 429
+
+    data = request.get_json(silent=True) or {}
+    cpf_raw = (data.get("cpf") or "").strip()
+    data_nasc = (data.get("data_nasc") or "").strip()
+    confirmacao_extra = (data.get("confirmacao_extra") or "").strip()
+
+    func_found = _buscar_funcionario_por_cpf(cpf_raw)
+    elegivel, codigo, msg = app_servidor_service.verificar_elegibilidade_servidor(func_found)
+    if not elegivel:
+        security.login_rate_limiter.register_failure(rate_key)
+        return jsonify({"success": False, "code": codigo, "message": msg}), 400
+
+    conta_existente = ServidorContaApp.query.filter_by(funcionario_id=func_found.id).first()
+    if conta_existente and conta_existente.primeiro_acesso_concluido:
+        return jsonify({
+            "success": False,
+            "code": "JA_ATIVADO",
+            "message": "Seu primeiro acesso já foi concluído anteriormente. Use 'Entrar no Aplicativo' com seu CPF e senha. Caso tenha esquecido a senha, solicite ao RH o reinício do acesso.",
+        }), 400
+
+    ok_dados, msg_dados = app_servidor_service.conferir_dados_primeiro_acesso(
+        func_found, data_nasc, confirmacao_extra
+    )
+    if not ok_dados:
+        security.login_rate_limiter.register_failure(rate_key)
+        return jsonify({"success": False, "code": "DADOS_NAO_CONFEREM", "message": msg_dados}), 400
+
+    _, fonte_foto = app_servidor_service.extrair_foto_referencia(func_found)
+    if not fonte_foto:
+        return jsonify({
+            "success": False,
+            "code": "SEM_FOTO",
+            "message": "Seu cadastro não possui foto no RH. Procure o RH para cadastrar sua foto 3x4 e liberar o aplicativo.",
+        }), 400
+
+    token = secrets.token_urlsafe(32)
+    session["app_onboarding"] = {
+        "token": token,
+        "funcionario_id": func_found.id,
+        "fonte_foto": fonte_foto,
+        "exp": datetime.utcnow().timestamp() + app_servidor_service.ONBOARDING_TTL_SECONDS,
+    }
+    session.modified = True
+
+    primeiro_nome = (func_found.nome or "Servidor").strip().split(" ")[0].title()
+    return jsonify({
+        "success": True,
+        "onboarding_token": token,
+        "nome_curto": primeiro_nome,
+        "nome_completo": func_found.nome,
+        "cpf_mascarado": app_servidor_service.mascarar_cpf(func_found.cpf),
+        "secretaria": func_found.secretaria.nome if func_found.secretaria else "Prefeitura Municipal",
+        "cargo": func_found.funcao.nome if func_found.funcao else (func_found.lotacao or "Servidor Municipal"),
+        "fonte_foto": "Foto 3x4 do RH" if fonte_foto == "foto_3x4" else "Biometria do RH",
+    })
+
+
+@app.route("/app-servidor/api/primeiro-acesso/foto-referencia")
+def app_servidor_api_foto_referencia():
+    ob = session.get("app_onboarding") or {}
+    token_q = (request.args.get("token") or "").strip()
+    if (
+        not ob
+        or not token_q
+        or not hmac.compare_digest(str(ob.get("token", "")), token_q)
+        or datetime.utcnow().timestamp() > float(ob.get("exp") or 0)
+    ):
+        return jsonify({"success": False, "message": "Sessão de primeiro acesso expirada. Recomece a etapa 1."}), 401
+
+    func_obj = db.session.get(Funcionario, int(ob["funcionario_id"]))
+    elegivel, codigo, msg = app_servidor_service.verificar_elegibilidade_servidor(func_obj)
+    if not elegivel:
+        return jsonify({"success": False, "code": codigo, "message": msg}), 400
+
+    foto_uri, fonte = app_servidor_service.extrair_foto_referencia(func_obj)
+    if not foto_uri:
+        return jsonify({"success": False, "code": "SEM_FOTO", "message": "Foto de referência ausente no RH."}), 400
+
+    resp = jsonify({"success": True, "foto_data_uri": foto_uri, "fonte": fonte})
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
+@app.route("/app-servidor/api/primeiro-acesso/concluir", methods=["POST"])
+def app_servidor_api_concluir_primeiro_acesso():
+    ob = session.get("app_onboarding") or {}
+    data = request.get_json(silent=True) or {}
+    token_body = (data.get("onboarding_token") or "").strip()
+
+    if (
+        not ob
+        or not token_body
+        or not hmac.compare_digest(str(ob.get("token", "")), token_body)
+        or datetime.utcnow().timestamp() > float(ob.get("exp") or 0)
+    ):
+        return jsonify({"success": False, "message": "Sessão de cadastro expirada. Inicie novamente."}), 401
+
+    func_obj = db.session.get(Funcionario, int(ob["funcionario_id"]))
+    elegivel, codigo, msg = app_servidor_service.verificar_elegibilidade_servidor(func_obj)
+    if not elegivel:
+        return jsonify({"success": False, "code": codigo, "message": msg}), 400
+
+    senha = str(data.get("senha") or "")
+    senha_conf = str(data.get("senha_confirmacao") or "")
+    termo_aceito = bool(data.get("termo_aceito"))
+    facial_confirmado = bool(data.get("facial_confirmado"))
+    try:
+        facial_distancia = float(data.get("facial_distancia"))
+    except (TypeError, ValueError):
+        facial_distancia = 9.9
+    try:
+        frames_validos = int(data.get("frames_validos") or 0)
+    except (TypeError, ValueError):
+        frames_validos = 0
+
+    if not termo_aceito:
+        return jsonify({"success": False, "message": "É necessário aceitar o Termo de Uso e Privacidade (LGPD)."}), 400
+
+    if senha != senha_conf:
+        return jsonify({"success": False, "message": "As senhas digitadas não conferem."}), 400
+
+    ok_senha, msg_senha = security.validate_password_strength(senha)
+    if not ok_senha:
+        return jsonify({"success": False, "message": msg_senha}), 400
+
+    if (
+        not facial_confirmado
+        or frames_validos < 2
+        or facial_distancia < 0.0
+        or facial_distancia > app_servidor_service.FACIAL_MAX_DISTANCE
+    ):
+        return jsonify({
+            "success": False,
+            "message": "O reconhecimento facial ainda não atingiu a confirmação mínima necessária. Posicione seu rosto em ambiente iluminado e tente novamente.",
+        }), 400
+
+    selfie_b64 = app_servidor_service.validar_selfie_b64(data.get("selfie_b64"))
+    if not selfie_b64:
+        return jsonify({"success": False, "message": "Selfie de auditoria facial não recebida. Refaça a captura."}), 400
+
+    agora = datetime.utcnow()
+    score = app_servidor_service.calcular_score_similaridade(facial_distancia)
+    client_ip = obter_ip_cliente()
+    ua = (request.headers.get("User-Agent") or "")[:250]
+
+    conta = ServidorContaApp.query.filter_by(funcionario_id=func_obj.id).first()
+    if not conta:
+        conta = ServidorContaApp(
+            funcionario_id=func_obj.id,
+            municipio_id=func_obj.municipio_id or (func_obj.secretaria.municipio_id if func_obj.secretaria else None),
+        )
+        db.session.add(conta)
+
+    conta.set_password(senha)
+    conta.ativo = True
+    conta.primeiro_acesso_concluido = True
+    conta.primeiro_acesso_em = agora
+    conta.facial_verificado = True
+    conta.facial_score = score
+    conta.facial_distancia = round(facial_distancia, 4)
+    conta.facial_fonte_referencia = ob.get("fonte_foto") or "foto_3x4"
+    conta.facial_selfie_b64 = selfie_b64
+    conta.termo_lgpd_aceito_em = agora
+    conta.ultimo_login_em = agora
+    conta.ultimo_login_ip = client_ip
+    conta.ultimo_user_agent = ua
+    conta.tentativas_falhas = 0
+    conta.bloqueado_ate = None
+    db.session.commit()
+
+    # Log de auditoria da ativação facial
+    try:
+        log = LogAuditoria(
+            usuario_id=None,
+            secretaria_id=func_obj.secretaria_id,
+            nivel="INFO",
+            acao="APP_SERVIDOR_ATIVADO_FACIAL",
+            alvo=f"{func_obj.nome} (CPF {app_servidor_service.mascarar_cpf(func_obj.cpf)}) — Similaridade {score}%",
+            tabela_afetada="servidor_conta_app",
+            registro_id=conta.id,
+            ip_origem=client_ip,
+            user_agent=ua,
+            rota_acessada=request.path,
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+
+    session.pop("app_onboarding", None)
+    session["app_servidor_id"] = func_obj.id
+    session["servidor_id"] = func_obj.id
+    session["servidor_nome"] = func_obj.nome
+    session["servidor_cpf"] = func_obj.cpf
+    session.permanent = True
+
+    return jsonify({
+        "success": True,
+        "score": score,
+        "message": f"Identidade facial confirmada ({score}%)! Seu acesso ao SERVIDOR 360 foi ativado.",
+        "redirect": url_for("app_servidor_inicio"),
+    })
+
+
+@app.route("/app-servidor/inicio")
+def app_servidor_inicio():
+    func_obj, conta = _obter_servidor_app_autenticado()
+    if not func_obj:
+        return redirect(url_for("app_servidor_acesso"))
+
+    mun = _obter_municipio_app(func_obj)
+    foto_uri, _ = app_servidor_service.extrair_foto_referencia(func_obj)
+    contratos_assinados_qtd = ContratoGerado.query.filter_by(
+        funcionario_id=func_obj.id, status_assinatura="ASSINADO_ELETRONICAMENTE"
+    ).count()
+    contratos_total_qtd = ContratoGerado.query.filter_by(funcionario_id=func_obj.id).count()
+    solicitacoes_pendentes_qtd = SolicitacaoAlteracaoCadastral.query.filter_by(
+        funcionario_id=func_obj.id, status="PENDENTE"
+    ).count()
+    atestados_pendentes_qtd = JustificativaFalta.query.filter_by(
+        funcionario_id=func_obj.id, status="PENDENTE"
+    ).count()
+    ged_qtd = DocumentoServidor.query.filter_by(funcionario_id=func_obj.id).count()
+
+    url_validar = url_for("validar_documento", codigo=func_obj.token_validacao, _external=True)
+    qr_carteira = app_servidor_service.gerar_qr_code_data_uri(url_validar)
+
+    return render_template(
+        "app_servidor_home.html",
+        active_tab="inicio",
+        funcionario=func_obj,
+        conta=conta,
+        municipio=mun,
+        saudacao=app_servidor_service.saudacao_horario(),
+        foto_uri=foto_uri,
+        contratos_assinados_qtd=contratos_assinados_qtd,
+        contratos_total_qtd=contratos_total_qtd,
+        solicitacoes_pendentes_qtd=solicitacoes_pendentes_qtd,
+        atestados_pendentes_qtd=atestados_pendentes_qtd,
+        ged_qtd=ged_qtd,
+        qr_carteira=qr_carteira,
+        url_validar=url_validar,
+    )
+
+
+@app.route("/app-servidor/dados")
+def app_servidor_dados():
+    func_obj, conta = _obter_servidor_app_autenticado()
+    if not func_obj:
+        return redirect(url_for("app_servidor_acesso"))
+
+    mun = _obter_municipio_app(func_obj)
+    foto_uri, _ = app_servidor_service.extrair_foto_referencia(func_obj)
+    documentos_ged = (
+        DocumentoServidor.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(DocumentoServidor.data_upload.desc())
+        .all()
+    )
+
+    return render_template(
+        "app_servidor_dados.html",
+        active_tab="dados",
+        funcionario=func_obj,
+        conta=conta,
+        municipio=mun,
+        foto_uri=foto_uri,
+        documentos_ged=documentos_ged,
+        cpf_formatado=app_servidor_service.formatar_cpf(func_obj.cpf),
+        conta_mascarada=app_servidor_service.mascarar_valor_sensivel(func_obj.conta, 3),
+        agencia_mascarada=app_servidor_service.mascarar_valor_sensivel(func_obj.agencia, 2),
+    )
+
+
+@app.route("/app-servidor/ged/<int:doc_id>/download")
+def app_servidor_ged_download(doc_id):
+    func_obj, _ = _obter_servidor_app_autenticado()
+    if not func_obj:
+        return redirect(url_for("app_servidor_acesso"))
+
+    doc = DocumentoServidor.query.get_or_404(doc_id)
+    if doc.funcionario_id != func_obj.id:
+        abort(403)
+
+    raw = base64.b64decode(doc.conteudo_b64)
+    return send_file(
+        io.BytesIO(raw),
+        mimetype=doc.mime_type or "application/pdf",
+        as_attachment=True,
+        download_name=doc.nome_arquivo or f"documento_{doc.id}.pdf",
+    )
+
+
+@app.route("/app-servidor/contratos")
+def app_servidor_contratos():
+    func_obj, conta = _obter_servidor_app_autenticado()
+    if not func_obj:
+        return redirect(url_for("app_servidor_acesso"))
+
+    mun = _obter_municipio_app(func_obj)
+    contratos = (
+        ContratoGerado.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(ContratoGerado.data_geracao.desc())
+        .all()
+    )
+
+    itens_contrato = []
+    for c in contratos:
+        ass = (
+            AssinaturaContrato.query.filter_by(contrato_id=c.id, status="ASSINADO")
+            .order_by(AssinaturaContrato.id.desc())
+            .first()
+        )
+        arq_assinado = None
+        arq_evidencias = None
+        if ass:
+            for a in ass.arquivos:
+                if a.tipo_arquivo == "CONTRATO_ASSINADO_PDF":
+                    arq_assinado = a
+                elif a.tipo_arquivo == "RELATORIO_EVIDENCIAS_PDF":
+                    arq_evidencias = a
+        codigo_val = (ass.codigo_validacao if ass else None) or c.codigo_validacao
+        qr_val = (
+            app_servidor_service.gerar_qr_code_data_uri(
+                url_for("validar_documento", codigo=codigo_val, _external=True)
+            )
+            if codigo_val
+            else None
+        )
+        itens_contrato.append({
+            "contrato": c,
+            "assinatura": ass,
+            "tem_pdf_assinado": bool(arq_assinado),
+            "tem_evidencias": bool(arq_evidencias),
+            "codigo_validacao": codigo_val,
+            "qr_val": qr_val,
+        })
+
+    return render_template(
+        "app_servidor_contratos.html",
+        active_tab="contratos",
+        funcionario=func_obj,
+        conta=conta,
+        municipio=mun,
+        itens_contrato=itens_contrato,
+    )
+
+
+@app.route("/app-servidor/contratos/<int:contrato_id>/arquivo/<tipo>")
+def app_servidor_contrato_download(contrato_id, tipo):
+    func_obj, _ = _obter_servidor_app_autenticado()
+    if not func_obj:
+        return redirect(url_for("app_servidor_acesso"))
+
+    contrato = ContratoGerado.query.get_or_404(contrato_id)
+    if contrato.funcionario_id != func_obj.id:
+        abort(403)
+
+    tipo_map = {
+        "assinado": "CONTRATO_ASSINADO_PDF",
+        "evidencias": "RELATORIO_EVIDENCIAS_PDF",
+    }
+    tipo_db = tipo_map.get((tipo or "").lower())
+    if not tipo_db:
+        abort(404)
+
+    ass = (
+        AssinaturaContrato.query.filter_by(contrato_id=contrato.id, status="ASSINADO")
+        .order_by(AssinaturaContrato.id.desc())
+        .first()
+    )
+    if not ass:
+        flash("Este contrato ainda não possui assinatura eletrônica concluída.", "warning")
+        return redirect(url_for("app_servidor_contratos"))
+
+    arq = (
+        AssinaturaDocumentoArquivo.query.filter_by(assinatura_id=ass.id, tipo_arquivo=tipo_db)
+        .order_by(AssinaturaDocumentoArquivo.id.desc())
+        .first()
+    )
+    if not arq or not arq.conteudo_b64:
+        flash("Arquivo PDF ainda não disponível para este contrato.", "warning")
+        return redirect(url_for("app_servidor_contratos"))
+
+    raw = base64.b64decode(arq.conteudo_b64)
+    return send_file(
+        io.BytesIO(raw),
+        mimetype=arq.mime_type or "application/pdf",
+        as_attachment=True,
+        download_name=arq.nome_arquivo or f"contrato_{contrato.id}_{tipo}.pdf",
+    )
+
+
+@app.route("/app-servidor/solicitacoes", methods=["GET"])
+def app_servidor_solicitacoes():
+    func_obj, conta = _obter_servidor_app_autenticado()
+    if not func_obj:
+        return redirect(url_for("app_servidor_acesso"))
+
+    mun = _obter_municipio_app(func_obj)
+    solicitacoes_raw = (
+        SolicitacaoAlteracaoCadastral.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(SolicitacaoAlteracaoCadastral.data_solicitacao.desc())
+        .all()
+    )
+    solicitacoes = [
+        {
+            "obj": s,
+            "categoria_label": app_servidor_service.CATEGORIAS_ALTERACAO.get(s.categoria, {}).get("label", s.categoria),
+            "itens": app_servidor_service.formatar_diff_solicitacao(s.dados_anteriores_json, s.dados_solicitados_json),
+        }
+        for s in solicitacoes_raw
+    ]
+
+    valores_atuais = {}
+    for fname in app_servidor_service.FIELD_META:
+        val = getattr(func_obj, fname, None)
+        valores_atuais[fname] = "" if val is None else str(val)
+
+    return render_template(
+        "app_servidor_solicitacoes.html",
+        active_tab="solicitacoes",
+        funcionario=func_obj,
+        conta=conta,
+        municipio=mun,
+        categorias=app_servidor_service.CATEGORIAS_ALTERACAO,
+        valores_atuais=valores_atuais,
+        solicitacoes=solicitacoes,
+    )
+
+
+@app.route("/app-servidor/solicitacoes/nova", methods=["POST"])
+def app_servidor_solicitacoes_nova():
+    func_obj, _ = _obter_servidor_app_autenticado()
+    if not func_obj:
+        return redirect(url_for("app_servidor_acesso"))
+
+    categoria = (request.form.get("categoria") or "").strip().upper()
+    justificativa = (request.form.get("justificativa") or "").strip()
+
+    if not justificativa or len(justificativa) < 5:
+        flash("Informe uma justificativa clara (mínimo 5 caracteres) para sua solicitação.", "error")
+        return redirect(url_for("app_servidor_solicitacoes"))
+
+    try:
+        dados_antes, dados_novos = app_servidor_service.preparar_dados_solicitacao(
+            func_obj, categoria, request.form
+        )
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("app_servidor_solicitacoes"))
+
+    if categoria != "OUTROS" and not dados_novos:
+        flash("Preencha ao menos um campo com o novo valor diferente do cadastro atual.", "warning")
+        return redirect(url_for("app_servidor_solicitacoes"))
+
+    try:
+        anexo_nome, anexo_mime, anexo_b64 = app_servidor_service.validar_anexo_solicitacao(
+            request.files.get("anexo")
+        )
+    except ValueError as exc:
+        flash(str(exc), "error")
+        return redirect(url_for("app_servidor_solicitacoes"))
+
+    protocolo = app_servidor_service.gerar_protocolo_alteracao()
+    sol = SolicitacaoAlteracaoCadastral(
+        protocolo=protocolo,
+        municipio_id=func_obj.municipio_id or (func_obj.secretaria.municipio_id if func_obj.secretaria else None),
+        secretaria_id=func_obj.secretaria_id,
+        funcionario_id=func_obj.id,
+        categoria=categoria,
+        dados_anteriores_json=json.dumps(dados_antes, ensure_ascii=False),
+        dados_solicitados_json=json.dumps(dados_novos, ensure_ascii=False),
+        justificativa=justificativa[:1500],
+        anexo_nome=anexo_nome,
+        anexo_mime=anexo_mime,
+        anexo_b64=anexo_b64,
+        status="PENDENTE",
+    )
+    db.session.add(sol)
+    db.session.commit()
+
+    flash(f"Solicitação enviada ao RH! Protocolo: {protocolo}.", "success")
+    return redirect(url_for("app_servidor_solicitacoes"))
+
+
+@app.route("/app-servidor/solicitacoes/<int:sol_id>/anexo")
+def app_servidor_solicitacao_anexo(sol_id):
+    sol = SolicitacaoAlteracaoCadastral.query.get_or_404(sol_id)
+    is_owner = session.get("app_servidor_id") == sol.funcionario_id
+    is_rh = (
+        current_user.is_authenticated
+        and security.has_permission(current_user, "view_solicitacoes_dados")
+        and security.can_access_record(current_user, sol)
+    )
+    if not (is_owner or is_rh):
+        abort(403)
+    if not sol.anexo_b64:
+        abort(404)
+    raw = base64.b64decode(sol.anexo_b64)
+    return send_file(
+        io.BytesIO(raw),
+        mimetype=sol.anexo_mime or "application/octet-stream",
+        as_attachment=False,
+        download_name=sol.anexo_nome or f"anexo_{sol.protocolo}",
+    )
+
+
+@app.route("/app-servidor/atestados", methods=["GET"])
+def app_servidor_atestados():
+    func_obj, conta = _obter_servidor_app_autenticado()
+    if not func_obj:
+        return redirect(url_for("app_servidor_acesso"))
+
+    mun = _obter_municipio_app(func_obj)
+    justificativas = (
+        JustificativaFalta.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(JustificativaFalta.data_solicitacao.desc())
+        .all()
+    )
+    return render_template(
+        "app_servidor_atestados.html",
+        active_tab="atestados",
+        funcionario=func_obj,
+        conta=conta,
+        municipio=mun,
+        justificativas=justificativas,
+    )
+
+
+@app.route("/app-servidor/atestados/novo", methods=["POST"])
+def app_servidor_atestados_novo():
+    func_obj, _ = _obter_servidor_app_autenticado()
+    if not func_obj:
+        return redirect(url_for("app_servidor_acesso"))
+
+    motivo = (request.form.get("motivo_ausencia") or "").strip()
+    dt_inicio_str = (request.form.get("data_inicio_afastamento") or "").strip()
+    dias_str = (request.form.get("dias_solicitados") or "1").strip()
+
+    if not motivo:
+        flash("Informe o motivo da ausência ou atestado.", "error")
+        return redirect(url_for("app_servidor_atestados"))
+
+    dt_inicio = None
+    if dt_inicio_str:
+        try:
+            dt_inicio = datetime.strptime(dt_inicio_str, "%Y-%m-%d").date()
+        except ValueError:
+            pass
+    try:
+        dias_req = max(1, min(365, int(dias_str)))
+    except ValueError:
+        dias_req = 1
+
+    file = request.files.get("anexo")
+    anexo_b64 = None
+    ext = None
+    ocr_res = {"crm": None, "cid": None, "dias": None}
+    if file and file.filename:
+        file_bytes = file.read()
+        if len(file_bytes) > 5 * 1024 * 1024:
+            flash("O arquivo do atestado ultrapassa o limite de 5 MB.", "error")
+            return redirect(url_for("app_servidor_atestados"))
+        if file_bytes:
+            anexo_b64 = base64.b64encode(file_bytes).decode("utf-8")
+            ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "jpg"
+            try:
+                ocr_res = extrair_dados_ocr_atestado(file_bytes, file.filename)
+            except Exception:
+                ocr_res = {"crm": None, "cid": None, "dias": None}
+
+    ano_atual = app_servidor_service.now_br().year
+    protocolo = f"JUST-{ano_atual}-{str(uuid.uuid4().hex[:6]).upper()}"
+    just = JustificativaFalta(
+        protocolo=protocolo,
+        funcionario_id=func_obj.id,
+        secretaria_id=func_obj.secretaria_id,
+        motivo_ausencia=motivo[:1500],
+        data_inicio_afastamento=dt_inicio,
+        dias_solicitados=dias_req,
+        anexo_base64=anexo_b64,
+        extensao_anexo=ext,
+        crm_medico_ocr=ocr_res.get("crm"),
+        cid_ocr=ocr_res.get("cid"),
+        dias_atestado_ocr=ocr_res.get("dias"),
+        status="PENDENTE",
+    )
+    db.session.add(just)
+    db.session.commit()
+
+    flash(f"Atestado/Justificativa enviado com sucesso! Protocolo: {protocolo}.", "success")
+    return redirect(url_for("app_servidor_atestados"))
+
+
+# ==============================================================================
+# FILA DO RH — SOLICITAÇÕES DE ALTERAÇÃO CADASTRAL & GESTÃO DO APP SERVIDOR 360
+# ==============================================================================
+
+
+@app.route("/admin/solicitacoes-dados")
+@login_required
+@security.require_permission("view_solicitacoes_dados")
+def admin_solicitacoes_dados():
+    status_filtro = (request.args.get("status") or "PENDENTE").strip().upper()
+    busca = (request.args.get("q") or "").strip().lower()
+
+    base_q = security.scope_query(
+        SolicitacaoAlteracaoCadastral.query, SolicitacaoAlteracaoCadastral, current_user
+    )
+    total_pendentes = base_q.filter(SolicitacaoAlteracaoCadastral.status == "PENDENTE").count()
+    total_aprovadas = base_q.filter(SolicitacaoAlteracaoCadastral.status == "APROVADO").count()
+    total_recusadas = base_q.filter(SolicitacaoAlteracaoCadastral.status == "RECUSADO").count()
+
+    q = base_q
+    if status_filtro in ("PENDENTE", "APROVADO", "RECUSADO"):
+        q = q.filter(SolicitacaoAlteracaoCadastral.status == status_filtro)
+
+    lista_raw = q.order_by(SolicitacaoAlteracaoCadastral.data_solicitacao.desc()).all()
+    solicitacoes = []
+    for s in lista_raw:
+        nome_f = (s.funcionario.nome or "").lower() if s.funcionario else ""
+        cpf_f = (s.funcionario.cpf or "") if s.funcionario else ""
+        if busca and (busca not in nome_f and busca not in cpf_f.lower() and busca not in s.protocolo.lower()):
+            continue
+        solicitacoes.append({
+            "obj": s,
+            "categoria_label": app_servidor_service.CATEGORIAS_ALTERACAO.get(s.categoria, {}).get("label", s.categoria),
+            "itens": app_servidor_service.formatar_diff_solicitacao(s.dados_anteriores_json, s.dados_solicitados_json),
+        })
+
+    # Contas ativas do SERVIDOR 360 dentro do escopo do usuário
+    funcs_escopo = security.scope_query(Funcionario.query, Funcionario, current_user)
+    contas_ativas = (
+        ServidorContaApp.query.join(Funcionario, ServidorContaApp.funcionario_id == Funcionario.id)
+        .filter(
+            ServidorContaApp.primeiro_acesso_concluido.is_(True),
+            Funcionario.id.in_(funcs_escopo.with_entities(Funcionario.id)),
+        )
+        .order_by(ServidorContaApp.ultimo_login_em.desc())
+        .limit(50)
+        .all()
+    )
+
+    url_app_publico = url_for("app_servidor_acesso", _external=True)
+    qr_app_publico = app_servidor_service.gerar_qr_code_data_uri(url_app_publico)
+
+    return render_template(
+        "admin_solicitacoes_dados.html",
+        solicitacoes=solicitacoes,
+        contas_ativas=contas_ativas,
+        status_filtro=status_filtro,
+        busca=busca,
+        total_pendentes=total_pendentes,
+        total_aprovadas=total_aprovadas,
+        total_recusadas=total_recusadas,
+        url_app_publico=url_app_publico,
+        qr_app_publico=qr_app_publico,
+    )
+
+
+@app.route("/admin/solicitacoes-dados/<int:sol_id>/decidir", methods=["POST"])
+@login_required
+@security.require_permission("decide_solicitacoes_dados")
+def admin_solicitacao_dados_decidir(sol_id):
+    sol = SolicitacaoAlteracaoCadastral.query.get_or_404(sol_id)
+    if not security.can_access_record(current_user, sol):
+        registrar_violacao_acesso(f"Decisão solicitação cadastral ID={sol_id}")
+        abort(403)
+
+    if sol.status != "PENDENTE":
+        flash("Esta solicitação já foi analisada anteriormente.", "warning")
+        return redirect(url_for("admin_solicitacoes_dados"))
+
+    acao = (request.form.get("acao") or "").strip().upper()
+    motivo_recusa = (request.form.get("motivo_recusa") or "").strip()
+    func_obj = db.session.get(Funcionario, sol.funcionario_id)
+    if not func_obj:
+        flash("Servidor vinculado não encontrado.", "error")
+        return redirect(url_for("admin_solicitacoes_dados"))
+
+    agora = datetime.utcnow()
+    if acao == "APROVAR":
+        try:
+            solicitados = json.loads(sol.dados_solicitados_json or "{}") or {}
+        except Exception:
+            solicitados = {}
+        antes, depois = app_servidor_service.aplicar_alteracao_no_funcionario(func_obj, solicitados)
+        sol.status = "APROVADO"
+        sol.analisado_por_id = current_user.id
+        sol.data_analise = agora
+        db.session.commit()
+
+        db.session.add(
+            LogAuditoria(
+                usuario_id=current_user.id,
+                secretaria_id=func_obj.secretaria_id,
+                nivel="INFO",
+                acao="SOLICITACAO_DADOS_APROVADA",
+                alvo=f"Protocolo {sol.protocolo} aprovado para {func_obj.nome} ({len(depois)} campo(s) atualizado(s))",
+                tabela_afetada="funcionario",
+                registro_id=func_obj.id,
+                dados_antigos=json.dumps(antes, ensure_ascii=False, default=str),
+                dados_novos=json.dumps(depois, ensure_ascii=False, default=str),
+                ip_origem=obter_ip_cliente(),
+                user_agent=(request.headers.get("User-Agent") or "")[:250],
+                rota_acessada=request.path,
+            )
+        )
+        db.session.commit()
+        flash(f"Solicitação {sol.protocolo} aprovada e ficha de {func_obj.nome} atualizada!", "success")
+
+    elif acao == "RECUSAR":
+        if not motivo_recusa:
+            flash("Informe o motivo da recusa para orientar o servidor.", "error")
+            return redirect(url_for("admin_solicitacoes_dados"))
+        sol.status = "RECUSADO"
+        sol.motivo_recusa = motivo_recusa[:1000]
+        sol.analisado_por_id = current_user.id
+        sol.data_analise = agora
+        db.session.add(
+            LogAuditoria(
+                usuario_id=current_user.id,
+                secretaria_id=func_obj.secretaria_id,
+                nivel="WARNING",
+                acao="SOLICITACAO_DADOS_RECUSADA",
+                alvo=f"Protocolo {sol.protocolo} recusado para {func_obj.nome}: {motivo_recusa[:180]}",
+                tabela_afetada="solicitacao_alteracao_cadastral",
+                registro_id=sol.id,
+                ip_origem=obter_ip_cliente(),
+                user_agent=(request.headers.get("User-Agent") or "")[:250],
+                rota_acessada=request.path,
+            )
+        )
+        db.session.commit()
+        flash(f"Solicitação {sol.protocolo} recusada com justificativa registrada.", "warning")
+    else:
+        flash("Ação inválida.", "error")
+
+    return redirect(url_for("admin_solicitacoes_dados"))
+
+
+@app.route("/admin/app-servidor/resetar-acesso/<int:func_id>", methods=["POST"])
+@login_required
+@security.require_permission("decide_solicitacoes_dados")
+def admin_app_servidor_resetar_acesso(func_id):
+    func_obj = Funcionario.query.get_or_404(func_id)
+    if not security.can_access_record(current_user, func_obj):
+        registrar_violacao_acesso(f"Reset acesso SERVIDOR 360 func_id={func_id}")
+        abort(403)
+
+    conta = ServidorContaApp.query.filter_by(funcionario_id=func_obj.id).first()
+    if conta:
+        conta.set_password(secrets.token_urlsafe(32))
+        conta.primeiro_acesso_concluido = False
+        conta.facial_verificado = False
+        conta.tentativas_falhas = 0
+        conta.bloqueado_ate = None
+        db.session.add(
+            LogAuditoria(
+                usuario_id=current_user.id,
+                secretaria_id=func_obj.secretaria_id,
+                nivel="WARNING",
+                acao="APP_SERVIDOR_RESET_ACESSO",
+                alvo=f"Acesso SERVIDOR 360 reiniciado para {func_obj.nome} (exigirá novo 1º acesso com reconhecimento facial)",
+                tabela_afetada="servidor_conta_app",
+                registro_id=conta.id,
+                ip_origem=obter_ip_cliente(),
+                user_agent=(request.headers.get("User-Agent") or "")[:250],
+                rota_acessada=request.path,
+            )
+        )
+        db.session.commit()
+        flash(
+            f"Acesso de {func_obj.nome} no SERVIDOR 360 reiniciado! O servidor já pode refazer o Primeiro Acesso com reconhecimento facial.",
+            "success",
+        )
+    else:
+        flash("Este servidor ainda não possui conta ativada no SERVIDOR 360.", "warning")
+
+    return redirect(request.referrer or url_for("admin_solicitacoes_dados"))
 
 
 # === APENAS UM BLOCO DE EXECUÇÃO NO FINAL DO ARQUIVO ===

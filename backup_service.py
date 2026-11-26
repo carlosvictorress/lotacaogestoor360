@@ -69,6 +69,8 @@ TABLE_LABELS = {
     "assinatura_sms_otp": "Gestoor Sign — Desafios OTP SMS",
     "assinatura_evento": "Gestoor Sign — Trilha de Eventos",
     "assinatura_documento_arquivo": "Gestoor Sign — PDFs Selados e Evidências",
+    "servidor_conta_app": "SERVIDOR 360 — Contas do App do Servidor",
+    "solicitacao_alteracao_cadastral": "SERVIDOR 360 — Solicitações de Alteração Cadastral",
     "log_auditoria": "Logs de Auditoria Forense",
 }
 
