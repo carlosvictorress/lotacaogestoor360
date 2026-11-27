@@ -2,222 +2,349 @@
 {% block title %}Início • SERVIDOR 360{% endblock %}
 
 {% block body %}
-<div class="flex-1 pb-24">
-    <!-- Cabeçalho Curvo do Servidor -->
-    <header class="relative overflow-hidden bg-gradient-to-br from-[#0B3D2E] via-[#104936] to-[#14532D] pt-7 pb-16 px-6 safe-top">
-        <div class="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-[#10B981]/20 blur-2xl pointer-events-none"></div>
-
-        <!-- Topo: Marca + Sair -->
-        <div class="relative z-10 flex items-center justify-between mb-5">
-            <div class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-white/10 border border-white/15">
-                <span class="text-xs font-light tracking-[0.14em] text-white">SERVIDOR</span>
-                <span class="text-xs font-extrabold text-[#FACC15]">360</span>
-            </div>
-            <a href="{{ url_for('app_servidor_sair') }}"
-               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-[11px] font-bold transition active:scale-95">
-                <i class="ph-bold ph-sign-out text-sm text-[#FACC15]"></i>
-                <span>Sair</span>
-            </a>
-        </div>
-
-        <!-- Perfil do Servidor -->
-        <div class="relative z-10 flex items-center gap-4">
+<div class="flex-1 pb-28">
+    <!-- Barra Superior Delicada e Minimalista -->
+    <header class="px-5 pt-5 pb-3 safe-top flex items-center justify-between anim-fade-up">
+        <div class="flex items-center gap-3 min-w-0">
             <div class="relative shrink-0">
                 {% if foto_uri %}
                 <img src="{{ foto_uri }}" alt="{{ funcionario.nome }}"
-                     class="w-16 h-16 rounded-2xl object-cover border-2 border-[#FACC15] shadow-lg bg-emerald-950">
+                     class="w-11 h-11 rounded-full object-cover ring-2 ring-[#0B3D2E]/15 shadow-sm">
                 {% else %}
-                <div class="w-16 h-16 rounded-2xl bg-emerald-800 border-2 border-[#FACC15] flex items-center justify-center text-white text-2xl font-extrabold">
+                <div class="w-11 h-11 rounded-full bg-[#0B3D2E] text-white font-bold text-sm flex items-center justify-center">
                     {{ (funcionario.nome or 'S')[0] }}
                 </div>
                 {% endif %}
-                <span title="Cadastro Validado pelo RH"
-                      class="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#10B981] border-2 border-[#0B3D2E] flex items-center justify-center shadow">
-                    <i class="ph-bold ph-check text-xs text-white"></i>
-                </span>
+                <span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-[#10B981] ring-2 ring-[#F5F8F6]" title="Validado pelo RH"></span>
             </div>
-            <div class="min-w-0 flex-1">
-                <p class="text-[11px] font-semibold text-emerald-200">{{ saudacao }},</p>
-                <h1 class="text-lg font-extrabold text-white leading-tight truncate">
+            <div class="min-w-0">
+                <p class="text-[11px] font-medium text-slate-400 leading-none">{{ saudacao }},</p>
+                <h1 class="text-[15px] font-extrabold text-[#0B3D2E] truncate mt-1 leading-tight">
                     {{ funcionario.nome.split(' ')[0]|title }} {{ funcionario.nome.split(' ')[-1]|title if funcionario.nome.split(' ')|length > 1 else '' }}
                 </h1>
-                <p class="text-[11px] text-emerald-100/90 truncate mt-0.5">
-                    {{ funcionario.funcao.nome if funcionario.funcao else (funcionario.lotacao or 'Servidor Municipal') }}
-                </p>
-                <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
-                    <span class="px-2 py-0.5 rounded-full bg-[#10B981]/25 border border-[#10B981]/40 text-[9px] font-extrabold uppercase tracking-wider text-emerald-100">
-                        Validado RH
-                    </span>
-                    {% if funcionario.secretaria %}
-                    <span class="px-2 py-0.5 rounded-full bg-white/10 text-[9px] font-bold text-white/90 truncate max-w-[165px]">
-                        {{ funcionario.secretaria.sigla or funcionario.secretaria.nome }}
-                    </span>
-                    {% endif %}
-                </div>
             </div>
         </div>
 
-        <svg class="absolute bottom-0 left-0 w-full h-10 text-[#F3F7F5]" viewBox="0 0 1440 120" preserveAspectRatio="none">
-            <path fill="currentColor" d="M0,115 C420,105 980,55 1440,0 L1440,120 L0,120 Z"></path>
-        </svg>
+        <div class="flex items-center gap-2 shrink-0">
+            <a href="{{ url_for('app_servidor_dados_pdf') }}" title="Exportar Documentação em PDF"
+               class="w-9 h-9 rounded-full bg-white border border-emerald-950/10 text-[#0B3D2E] flex items-center justify-center shadow-sm hover:border-emerald-400 active:scale-95 transition">
+                <i class="ph-bold ph-file-pdf text-base"></i>
+            </a>
+            <a href="{{ url_for('app_servidor_sair') }}" title="Sair do aplicativo"
+               class="w-9 h-9 rounded-full bg-white border border-emerald-950/10 text-slate-500 hover:text-rose-600 flex items-center justify-center shadow-sm active:scale-95 transition">
+                <i class="ph-bold ph-sign-out text-base"></i>
+            </a>
+        </div>
     </header>
 
-    <main class="px-5 -mt-3 space-y-4">
-        <!-- Mini Resumo Rápido -->
-        <section class="grid grid-cols-3 gap-2.5 anim-fade-up">
-            <a href="{{ url_for('app_servidor_contratos') }}" class="app-card app-card-interactive p-3 text-center">
-                <p class="text-xl font-extrabold text-[#0B3D2E]">{{ contratos_assinados_qtd }}</p>
-                <p class="text-[10px] font-bold text-slate-500 mt-0.5">Contrato(s) Assinado(s)</p>
+    <main class="px-5 space-y-5">
+        <!-- 1. CARTÃO FUNCIONAL DIGITAL 3D INTERATIVO (TOQUE PARA VIRAR E VER QR CODE) -->
+        <section class="flip-scene anim-scale-in">
+            <div id="carteiraFlipCard" class="flip-card" onclick="virarCarteiraDigital()" role="button" tabindex="0" aria-label="Toque para virar sua carteira funcional digital">
+                <!-- FRENTE DO CARTÃO -->
+                <div class="flip-face bg-gradient-to-br from-[#0B3D2E] via-[#0F4937] to-[#14532D] p-5 text-white shadow-xl border border-white/10 flex flex-col justify-between">
+                    <!-- Detalhes geométricos sutis -->
+                    <div class="absolute -top-12 -right-10 w-40 h-40 rounded-full bg-[#10B981]/20 blur-2xl pointer-events-none"></div>
+                    <div class="absolute -bottom-10 left-8 w-28 h-28 rounded-full bg-[#FACC15]/10 blur-2xl pointer-events-none"></div>
+
+                    <div class="relative z-10 flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[11px] font-light tracking-[0.18em] text-white/90">SERVIDOR</span>
+                            <span class="text-[11px] font-extrabold text-[#FACC15]">360</span>
+                        </div>
+                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-400/15 border border-emerald-300/30 text-[9.5px] font-bold text-emerald-100">
+                            <i class="ph-fill ph-seal-check text-[#FACC15] text-xs"></i>
+                            Validado RH
+                        </span>
+                    </div>
+
+                    <div class="relative z-10 flex items-center gap-3.5 my-2">
+                        {% if foto_uri %}
+                        <img src="{{ foto_uri }}" alt="Foto 3x4"
+                             class="w-14 h-[68px] rounded-xl object-cover border border-[#FACC15]/70 shadow-md shrink-0 bg-emerald-950">
+                        {% endif %}
+                        <div class="min-w-0 flex-1">
+                            <p class="text-sm font-extrabold tracking-tight leading-snug line-clamp-2">{{ funcionario.nome }}</p>
+                            <p class="text-[11px] font-semibold text-[#FACC15] truncate mt-0.5">
+                                {{ funcionario.funcao.nome if funcionario.funcao else (funcionario.lotacao or 'Servidor Municipal') }}
+                            </p>
+                            <p class="text-[10px] text-emerald-200/85 truncate mt-0.5">
+                                {{ funcionario.secretaria.nome if funcionario.secretaria else (municipio.nome if municipio else 'Prefeitura Municipal') }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="relative z-10 flex items-center justify-between pt-2.5 border-t border-white/10 text-[10px]">
+                        <div class="flex items-center gap-3 text-emerald-100/90">
+                            <span>Mat.: <strong class="text-white">{{ funcionario.num_vinculo or ('#' ~ funcionario.id) }}</strong></span>
+                            <span>•</span>
+                            <span>{{ funcionario.tipo_vinculo or 'Servidor' }}</span>
+                        </div>
+                        <span class="inline-flex items-center gap-1 text-[#FACC15] font-bold">
+                            <i class="ph-bold ph-qr-code text-xs"></i>
+                            <span>Virar</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- VERSO DO CARTÃO (QR CODE + AÇÕES DIRETAS) -->
+                <div class="flip-face flip-back bg-white p-4 border border-emerald-950/10 shadow-xl flex items-center gap-4">
+                    <div class="p-2 rounded-2xl bg-[#F5F8F6] border border-emerald-950/10 shrink-0">
+                        <img src="{{ qr_carteira }}" alt="QR Code Validação" class="w-28 h-28">
+                    </div>
+                    <div class="flex-1 min-w-0 space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[9.5px] font-extrabold uppercase tracking-wider text-emerald-700">Identidade Digital</span>
+                            <span class="text-[10px] font-bold text-slate-400 inline-flex items-center gap-0.5">
+                                <i class="ph ph-arrows-clockwise"></i> Voltar
+                            </span>
+                        </div>
+                        <p class="text-[11px] font-bold text-[#0B3D2E] truncate">
+                            {{ funcionario.local_trabalho.nome if funcionario.local_trabalho else (funcionario.lotacao or 'Unidade não informada') }}
+                        </p>
+                        <p class="text-[10px] text-slate-500">CPF: <strong class="text-slate-700">{{ cpf_formatado }}</strong></p>
+                        <div class="flex items-center gap-1.5 pt-1.5" onclick="event.stopPropagation()">
+                            <a href="{{ url_for('app_servidor_dados_pdf') }}"
+                               class="px-2.5 py-1.5 rounded-lg bg-[#0B3D2E] text-white text-[10px] font-bold inline-flex items-center gap-1 active:scale-95 transition">
+                                <i class="ph-bold ph-file-pdf text-[#FACC15]"></i> PDF
+                            </a>
+                            <a href="{{ url_validar }}" target="_blank"
+                               class="px-2.5 py-1.5 rounded-lg bg-emerald-50 text-[#0B3D2E] text-[10px] font-bold inline-flex items-center gap-1 active:scale-95 transition">
+                                <i class="ph-bold ph-shield-check"></i> Validar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. TRILHO RÁPIDO INTERATIVO (AÇÕES DE 1 TOQUE) -->
+        <section class="flex gap-2.5 overflow-x-auto no-scrollbar py-0.5 anim-fade-up delay-1">
+            <a href="{{ url_for('app_servidor_dados_pdf') }}"
+               class="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white border border-emerald-950/10 shadow-sm text-xs font-bold text-[#0B3D2E] hover:border-emerald-400 active:scale-95 transition">
+                <span class="w-6 h-6 rounded-lg bg-emerald-50 text-[#0B3D2E] flex items-center justify-center">
+                    <i class="ph-bold ph-file-pdf text-sm"></i>
+                </span>
+                <span>Exportar Ficha PDF</span>
             </a>
-            <a href="{{ url_for('app_servidor_solicitacoes') }}" class="app-card app-card-interactive p-3 text-center">
-                <p class="text-xl font-extrabold text-amber-600">{{ solicitacoes_pendentes_qtd }}</p>
-                <p class="text-[10px] font-bold text-slate-500 mt-0.5">Alterações Pendentes</p>
+
+            {% if contrato_assinado_recente %}
+            <a href="{{ url_for('app_servidor_contrato_download', contrato_id=contrato_assinado_recente.id, tipo='assinado') }}"
+               class="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white border border-emerald-950/10 shadow-sm text-xs font-bold text-[#0B3D2E] hover:border-emerald-400 active:scale-95 transition">
+                <span class="w-6 h-6 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
+                    <i class="ph-bold ph-download-simple text-sm"></i>
+                </span>
+                <span>Baixar Contrato</span>
             </a>
-            <a href="{{ url_for('app_servidor_atestados') }}" class="app-card app-card-interactive p-3 text-center">
-                <p class="text-xl font-extrabold text-emerald-600">{{ atestados_pendentes_qtd }}</p>
-                <p class="text-[10px] font-bold text-slate-500 mt-0.5">Atestados em Análise</p>
+            {% endif %}
+
+            <button type="button" onclick="copiarTextoApp('{{ cpf_formatado }}', 'CPF copiado!')"
+                    class="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white border border-emerald-950/10 shadow-sm text-xs font-bold text-[#0B3D2E] hover:border-emerald-400 active:scale-95 transition">
+                <span class="w-6 h-6 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center">
+                    <i class="ph-bold ph-copy text-sm"></i>
+                </span>
+                <span>Copiar CPF</span>
+            </button>
+
+            <a href="{{ url_for('app_servidor_solicitacoes') }}"
+               class="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white border border-emerald-950/10 shadow-sm text-xs font-bold text-[#0B3D2E] hover:border-emerald-400 active:scale-95 transition">
+                <span class="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+                    <i class="ph-bold ph-pencil-simple text-sm"></i>
+                </span>
+                <span>Atualizar Dado</span>
             </a>
         </section>
 
-        <!-- Card Destaque: Carteira Funcional Digital -->
-        <button type="button" onclick="document.getElementById('modalCarteiraDigital').classList.remove('hidden')"
-                class="w-full text-left anim-fade-up delay-1 rounded-2xl p-4 bg-gradient-to-r from-[#0B3D2E] via-[#114B38] to-[#14532D] text-white shadow-xl flex items-center gap-3.5 active:scale-[0.98] transition">
-            <div class="w-12 h-12 rounded-2xl bg-[#FACC15] text-[#0B3D2E] flex items-center justify-center shrink-0 shadow">
-                <i class="ph-fill ph-qr-code text-2xl"></i>
+        <!-- 3. BENTO GRID INTERATIVO 2x2 (DELICADO E DIRETO) -->
+        <section class="space-y-2.5">
+            <div class="flex items-center justify-between px-0.5 anim-fade-up delay-2">
+                <h2 class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
+                    Meu Espaço Funcional
+                </h2>
+                <span class="text-[10px] font-semibold text-emerald-700">{{ municipio.nome if municipio else 'Prefeitura' }}</span>
             </div>
-            <div class="flex-1 min-w-0">
-                <p class="text-[10px] font-extrabold uppercase tracking-wider text-[#FACC15]">Identidade Funcional</p>
-                <h2 class="text-sm font-extrabold text-white">Carteira Digital do Servidor</h2>
-                <p class="text-[11px] text-emerald-200 mt-0.5">Exibir QR Code oficial de verificação pública</p>
-            </div>
-            <i class="ph-bold ph-caret-right text-lg text-[#FACC15]"></i>
-        </button>
 
-        <!-- Serviços Principais -->
-        <div class="space-y-3 pt-1">
-            <p class="text-[11px] font-extrabold uppercase tracking-wider text-[#0B3D2E]/65 px-1 anim-fade-up delay-1">
-                Serviços de Utilidade Pública
-            </p>
+            <div class="grid grid-cols-2 gap-3">
+                <!-- Card Bento 1: Documentação Completa -->
+                <a href="{{ url_for('app_servidor_dados') }}"
+                   class="app-card app-card-interactive p-4 flex flex-col justify-between min-h-[142px] anim-fade-up delay-2 group">
+                    <div class="flex items-start justify-between">
+                        <div class="w-10 h-10 rounded-2xl bg-emerald-50 text-[#0B3D2E] flex items-center justify-center group-hover:bg-[#0B3D2E] group-hover:text-[#FACC15] transition-colors">
+                            <i class="ph-duotone ph-identification-card text-xl"></i>
+                        </div>
+                        <span class="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                            {{ completude.percentual }}%
+                        </span>
+                    </div>
+                    <div class="mt-3">
+                        <h3 class="text-[13.5px] font-extrabold text-[#0B3D2E] leading-snug">Documentação</h3>
+                        <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Ficha completa, GED e PDF</p>
+                        <div class="h-1.5 w-full rounded-full bg-slate-100 mt-2.5 overflow-hidden">
+                            <div class="h-full rounded-full bg-gradient-to-r from-[#0B3D2E] to-[#10B981]" style="width: {{ completude.percentual }}%"></div>
+                        </div>
+                    </div>
+                </a>
 
-            <a href="{{ url_for('app_servidor_dados') }}"
-               class="app-card app-card-interactive anim-fade-up delay-2 p-4 flex items-center gap-3.5">
-                <div class="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 text-[#0B3D2E] flex items-center justify-center shrink-0">
-                    <i class="ph-fill ph-identification-badge text-2xl"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <h3 class="text-sm font-extrabold text-[#0B3D2E]">Meus Dados Cadastrais</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Ficha completa, lotação, banco e dossiê ({{ ged_qtd }})</p>
-                </div>
-                <i class="ph ph-caret-right text-slate-400 card-arrow"></i>
-            </a>
-
-            <a href="{{ url_for('app_servidor_contratos') }}"
-               class="app-card app-card-interactive anim-fade-up delay-3 p-4 flex items-center gap-3.5">
-                <div class="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200/80 text-amber-800 flex items-center justify-center shrink-0">
-                    <i class="ph-fill ph-file-pdf text-2xl"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2">
-                        <h3 class="text-sm font-extrabold text-[#0B3D2E]">Cópia do Contrato Assinado</h3>
+                <!-- Card Bento 2: Contratos -->
+                <a href="{{ url_for('app_servidor_contratos') }}"
+                   class="app-card app-card-interactive p-4 flex flex-col justify-between min-h-[142px] anim-fade-up delay-3 group">
+                    <div class="flex items-start justify-between">
+                        <div class="w-10 h-10 rounded-2xl bg-amber-50 text-amber-800 flex items-center justify-center group-hover:bg-[#0B3D2E] group-hover:text-[#FACC15] transition-colors">
+                            <i class="ph-duotone ph-file-text text-xl"></i>
+                        </div>
                         {% if contratos_assinados_qtd > 0 %}
-                        <span class="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9px] font-extrabold uppercase">Disponível</span>
+                        <span class="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
+                            {{ contratos_assinados_qtd }} assinado
+                        </span>
+                        {% else %}
+                        <span class="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                            {{ contratos_total_qtd }}
+                        </span>
                         {% endif %}
                     </div>
-                    <p class="text-xs text-slate-500 mt-0.5">PDF assinado eletronicamente e relatório de evidências</p>
-                </div>
-                <i class="ph ph-caret-right text-slate-400 card-arrow"></i>
-            </a>
+                    <div class="mt-3">
+                        <h3 class="text-[13.5px] font-extrabold text-[#0B3D2E] leading-snug">Meu Contrato</h3>
+                        <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">2ª via assinada e selo digital</p>
+                        <span class="inline-flex items-center gap-1 text-[10.5px] font-bold text-[#0B3D2E] mt-2">
+                            Acessar <i class="ph-bold ph-arrow-right text-xs card-arrow"></i>
+                        </span>
+                    </div>
+                </a>
 
-            <a href="{{ url_for('app_servidor_solicitacoes') }}"
-               class="app-card app-card-interactive anim-fade-up delay-4 p-4 flex items-center gap-3.5">
-                <div class="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-                    <i class="ph-fill ph-note-pencil text-2xl"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <h3 class="text-sm font-extrabold text-[#0B3D2E]">Solicitar Alteração de Dados</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Atualize telefone, endereço, banco ou documentos via RH</p>
-                </div>
-                <i class="ph ph-caret-right text-slate-400 card-arrow"></i>
-            </a>
+                <!-- Card Bento 3: Alterar Dados -->
+                <a href="{{ url_for('app_servidor_solicitacoes') }}"
+                   class="app-card app-card-interactive p-4 flex flex-col justify-between min-h-[142px] anim-fade-up delay-4 group">
+                    <div class="flex items-start justify-between">
+                        <div class="w-10 h-10 rounded-2xl bg-teal-50 text-teal-800 flex items-center justify-center group-hover:bg-[#0B3D2E] group-hover:text-[#FACC15] transition-colors">
+                            <i class="ph-duotone ph-pencil-simple-line text-xl"></i>
+                        </div>
+                        {% if solicitacoes_pendentes_qtd > 0 %}
+                        <span class="text-[10px] font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">
+                            {{ solicitacoes_pendentes_qtd }} aberta(s)
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="mt-3">
+                        <h3 class="text-[13.5px] font-extrabold text-[#0B3D2E] leading-snug">Alterar Dados</h3>
+                        <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Atualizar cadastro via RH</p>
+                        <span class="inline-flex items-center gap-1 text-[10.5px] font-bold text-[#0B3D2E] mt-2">
+                            Solicitar <i class="ph-bold ph-arrow-right text-xs card-arrow"></i>
+                        </span>
+                    </div>
+                </a>
 
-            <a href="{{ url_for('app_servidor_atestados') }}"
-               class="app-card app-card-interactive anim-fade-up delay-5 p-4 flex items-center gap-3.5">
-                <div class="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                    <i class="ph-fill ph-first-aid-kit text-2xl"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <h3 class="text-sm font-extrabold text-[#0B3D2E]">Atestados e Justificativas</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Enviar atestado médico e acompanhar parecer do RH</p>
-                </div>
-                <i class="ph ph-caret-right text-slate-400 card-arrow"></i>
-            </a>
-        </div>
+                <!-- Card Bento 4: Atestados -->
+                <a href="{{ url_for('app_servidor_atestados') }}"
+                   class="app-card app-card-interactive p-4 flex flex-col justify-between min-h-[142px] anim-fade-up delay-5 group">
+                    <div class="flex items-start justify-between">
+                        <div class="w-10 h-10 rounded-2xl bg-rose-50 text-rose-700 flex items-center justify-center group-hover:bg-[#0B3D2E] group-hover:text-[#FACC15] transition-colors">
+                            <i class="ph-duotone ph-first-aid-kit text-xl"></i>
+                        </div>
+                        {% if atestados_pendentes_qtd > 0 %}
+                        <span class="text-[10px] font-extrabold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">
+                            {{ atestados_pendentes_qtd }} análise
+                        </span>
+                        {% endif %}
+                    </div>
+                    <div class="mt-3">
+                        <h3 class="text-[13.5px] font-extrabold text-[#0B3D2E] leading-snug">Atestados</h3>
+                        <p class="text-[11px] text-slate-500 mt-0.5 leading-snug">Justificativas e protocolos</p>
+                        <span class="inline-flex items-center gap-1 text-[10.5px] font-bold text-[#0B3D2E] mt-2">
+                            Enviar <i class="ph-bold ph-arrow-right text-xs card-arrow"></i>
+                        </span>
+                    </div>
+                </a>
+            </div>
+        </section>
 
-        <!-- Banner de Instalação PWA se aberto no navegador -->
-        <button type="button" id="pwaInstallCard" onclick="acionarInstalacaoPWA()"
-                class="hidden w-full text-left app-card p-3.5 border-emerald-200 bg-emerald-50/70 flex items-center gap-3 active:scale-[0.98] transition">
-            <div class="w-9 h-9 rounded-xl bg-[#0B3D2E] text-[#FACC15] flex items-center justify-center shrink-0">
-                <i class="ph-bold ph-download-simple text-lg"></i>
+        <!-- 4. CARD DELICADO DE COMPLETUDE (SÓ SE FALTAR ALGUM CAMPO) -->
+        {% if completude.percentual < 100 and completude.faltantes %}
+        <a href="{{ url_for('app_servidor_solicitacoes') }}"
+           class="app-card app-card-interactive p-4 flex items-center gap-3.5 bg-gradient-to-r from-white to-amber-50/60 border-amber-200/70 anim-fade-up delay-5">
+            <div class="w-10 h-10 rounded-2xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                <i class="ph-fill ph-sparkle text-lg"></i>
             </div>
             <div class="flex-1 min-w-0">
-                <p class="text-xs font-extrabold text-[#0B3D2E]">Instalar SERVIDOR 360 na tela inicial</p>
-                <p class="text-[11px] text-slate-600">Acesse com 1 toque sem abrir o navegador</p>
+                <p class="text-xs font-extrabold text-[#0B3D2E]">Deixe sua ficha 100% completa</p>
+                <p class="text-[11px] text-slate-500 truncate mt-0.5">
+                    Pendente: {{ completude.faltantes|join(', ') }}
+                </p>
             </div>
+            <i class="ph ph-caret-right text-slate-400 card-arrow shrink-0"></i>
+        </a>
+        {% endif %}
+
+        <!-- 5. ATIVIDADES RECENTES (SOLICITAÇÕES E ATESTADOS) -->
+        {% if ultimas_solicitacoes or ultimos_atestados %}
+        <section class="space-y-2.5 anim-fade-up delay-5">
+            <h2 class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-slate-400 px-0.5">
+                Acompanhamento Recente
+            </h2>
+            <div class="app-card divide-y divide-slate-100 overflow-hidden">
+                {% for s in ultimas_solicitacoes %}
+                <a href="{{ url_for('app_servidor_solicitacoes') }}" class="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="w-8 h-8 rounded-xl bg-emerald-50 text-[#0B3D2E] flex items-center justify-center shrink-0">
+                            <i class="ph-bold ph-pencil-simple-line text-sm"></i>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-[#0B3D2E] truncate">Alteração • {{ s.protocolo }}</p>
+                            <p class="text-[10.5px] text-slate-400">{{ s.data_solicitacao.strftime('%d/%m/%Y') if s.data_solicitacao else '' }}</p>
+                        </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase shrink-0
+                        {% if s.status == 'APROVADO' %}bg-emerald-100 text-emerald-800
+                        {% elif s.status == 'RECUSADO' %}bg-rose-100 text-rose-700
+                        {% else %}bg-amber-100 text-amber-800{% endif %}">
+                        {{ s.status }}
+                    </span>
+                </a>
+                {% endfor %}
+
+                {% for j in ultimos_atestados %}
+                <a href="{{ url_for('app_servidor_atestados') }}" class="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition">
+                    <div class="flex items-center gap-3 min-w-0">
+                        <span class="w-8 h-8 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center shrink-0">
+                            <i class="ph-bold ph-first-aid text-sm"></i>
+                        </span>
+                        <div class="min-w-0">
+                            <p class="text-xs font-bold text-[#0B3D2E] truncate">Atestado • {{ j.protocolo }}</p>
+                            <p class="text-[10.5px] text-slate-400">{{ j.dias_solicitados }} dia(s) • {{ j.data_solicitacao.strftime('%d/%m/%Y') if j.data_solicitacao else '' }}</p>
+                        </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full text-[9.5px] font-extrabold uppercase shrink-0
+                        {% if j.status == 'APROVADO' %}bg-emerald-100 text-emerald-800
+                        {% elif j.status == 'REJEITADO' %}bg-rose-100 text-rose-700
+                        {% else %}bg-amber-100 text-amber-800{% endif %}">
+                        {{ j.status }}
+                    </span>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Banner Discreto de Instalação PWA (se ainda estiver no navegador) -->
+        <button type="button" id="pwaInstallCard" onclick="acionarInstalacaoPWA()"
+                class="hidden w-full text-left app-card p-3.5 border-emerald-200 bg-white flex items-center gap-3 active:scale-[0.98] transition">
+            <div class="w-9 h-9 rounded-xl bg-[#0B3D2E] text-[#FACC15] flex items-center justify-center shrink-0">
+                <i class="ph-bold ph-device-mobile text-base"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <p class="text-xs font-extrabold text-[#0B3D2E]">Instalar SERVIDOR 360</p>
+                <p class="text-[10.5px] text-slate-500">Fixe o ícone na tela inicial do seu celular</p>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-emerald-50 text-[#0B3D2E] text-[10px] font-extrabold">Instalar</span>
         </button>
     </main>
 </div>
+{% endblock %}
 
-<!-- Modal Carteira Funcional Digital -->
-<div id="modalCarteiraDigital" class="hidden fixed inset-0 z-50 bg-black/65 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="w-full max-w-sm rounded-3xl overflow-hidden bg-white shadow-2xl anim-scale-in">
-        <div class="bg-gradient-to-br from-[#0B3D2E] to-[#14532D] p-5 text-white relative">
-            <button type="button" onclick="document.getElementById('modalCarteiraDigital').classList.add('hidden')"
-                    class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/15 flex items-center justify-center text-white">
-                <i class="ph-bold ph-x text-sm"></i>
-            </button>
-            <div class="flex items-center gap-2 mb-3">
-                <span class="px-2.5 py-0.5 rounded-full bg-[#FACC15] text-[#0B3D2E] text-[10px] font-extrabold uppercase">SERVIDOR 360</span>
-                <span class="text-[10px] font-semibold text-emerald-200 uppercase">Carteira Funcional Digital</span>
-            </div>
-            <div class="flex items-center gap-3.5">
-                {% if foto_uri %}
-                <img src="{{ foto_uri }}" alt="Foto 3x4" class="w-16 h-20 rounded-xl object-cover border-2 border-[#FACC15] shadow-md">
-                {% endif %}
-                <div class="min-w-0">
-                    <h3 class="text-sm font-extrabold leading-snug">{{ funcionario.nome }}</h3>
-                    <p class="text-[11px] text-[#FACC15] font-bold mt-0.5">{{ funcionario.funcao.nome if funcionario.funcao else (funcionario.lotacao or 'Servidor') }}</p>
-                    <p class="text-[10px] text-emerald-200 mt-0.5">{{ funcionario.secretaria.nome if funcionario.secretaria else '' }}</p>
-                </div>
-            </div>
-        </div>
-        <div class="p-5 text-center space-y-3">
-            <div class="grid grid-cols-2 gap-2 text-left text-[11px] bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                <div>
-                    <p class="text-[9px] font-bold uppercase text-slate-400">Vínculo</p>
-                    <p class="font-extrabold text-[#0B3D2E]">{{ funcionario.tipo_vinculo or '—' }}</p>
-                </div>
-                <div>
-                    <p class="text-[9px] font-bold uppercase text-slate-400">Matrícula / ID</p>
-                    <p class="font-extrabold text-[#0B3D2E]">{{ funcionario.num_vinculo or ('#' ~ funcionario.id) }}</p>
-                </div>
-                <div class="col-span-2">
-                    <p class="text-[9px] font-bold uppercase text-slate-400">Unidade de Lotação</p>
-                    <p class="font-bold text-slate-700">{{ funcionario.local_trabalho.nome if funcionario.local_trabalho else (funcionario.lotacao or '—') }}</p>
-                </div>
-            </div>
-
-            <div class="inline-block p-2.5 bg-white rounded-2xl border-2 border-emerald-100 shadow-sm">
-                <img src="{{ qr_carteira }}" alt="QR Code Validação" class="w-36 h-36 mx-auto">
-            </div>
-            <p class="text-[10px] text-slate-500 leading-relaxed">
-                Aponte a câmera para validar a autenticidade cadastral no portal oficial do município.
-            </p>
-            <a href="{{ url_validar }}" target="_blank"
-               class="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-[#0B3D2E] hover:underline">
-                <i class="ph-bold ph-arrow-square-out"></i>
-                Abrir página pública de validação
-            </a>
-        </div>
-    </div>
-</div>
+{% block extra_scripts %}
+<script>
+    function virarCarteiraDigital() {
+        const card = document.getElementById('carteiraFlipCard');
+        if (card) card.classList.toggle('is-flipped');
+    }
+</script>
 {% endblock %}

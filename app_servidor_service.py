@@ -567,3 +567,432 @@ def garantir_icones_pwa(static_dir: str) -> Dict[str, str]:
             img.save(full, format="PNG", optimize=True)
         paths[filename] = full
     return paths
+
+
+def calcular_idade(dt_nasc: Optional[date]) -> Optional[int]:
+    if not dt_nasc:
+        return None
+    hoje = now_br().date()
+    return hoje.year - dt_nasc.year - ((hoje.month, hoje.day) < (dt_nasc.month, dt_nasc.day))
+
+
+def calcular_completude_cadastral(funcionario: Any) -> Dict[str, Any]:
+    """Calcula percentual de preenchimento da documentação do servidor."""
+    campos_chave = [
+        ("cpf", "CPF"),
+        ("rg", "RG"),
+        ("data_nasc", "Data de nascimento"),
+        ("mae", "Nome da mãe"),
+        ("estado_civil", "Estado civil"),
+        ("escolaridade", "Escolaridade"),
+        ("telefone", "Telefone"),
+        ("email", "E-mail"),
+        ("endereco", "Endereço"),
+        ("bairro", "Bairro"),
+        ("cep", "CEP"),
+        ("pis", "PIS/PASEP"),
+        ("titulo_eleitor", "Título de eleitor"),
+        ("banco", "Banco"),
+        ("agencia", "Agência"),
+        ("conta", "Conta bancária"),
+    ]
+    preenchidos = 0
+    faltantes = []
+    for attr, rotulo in campos_chave:
+        val = getattr(funcionario, attr, None)
+        if val is not None and str(val).strip() != "":
+            preenchidos += 1
+        else:
+            faltantes.append(rotulo)
+    total = len(campos_chave)
+    pct = int(round((preenchidos / total) * 100)) if total else 100
+    return {
+        "percentual": pct,
+        "preenchidos": preenchidos,
+        "total": total,
+        "faltantes": faltantes[:5],
+    }
+
+
+def _fmt_val(val: Any, default: str = "Não informado") -> str:
+    if val is None:
+        return default
+    if isinstance(val, bool):
+        return "Sim" if val else "Não"
+    if isinstance(val, datetime):
+        return val.strftime("%d/%m/%Y %H:%M")
+    if isinstance(val, date):
+        return val.strftime("%d/%m/%Y")
+    s = str(val).strip()
+    return s if s else default
+
+
+def _fmt_moeda(valor: Optional[float]) -> str:
+    try:
+        v = float(valor or 0.0)
+    except (TypeError, ValueError):
+        return "Não informado"
+    if v <= 0:
+        return "Não informado"
+    txt = f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    return f"R$ {txt}"
+
+
+def _decodificar_imagem_b64_para_bytes(data_uri: Optional[str]) -> Optional[bytes]:
+    if not data_uri or not isinstance(data_uri, str):
+        return None
+    raw_str = data_uri.strip()
+    if "," in raw_str and raw_str.startswith("data:image"):
+        raw_str = raw_str.split(",", 1)[1]
+    try:
+        raw = base64.b64decode(raw_str)
+        # Valida e normaliza via Pillow para PNG seguro no ReportLab
+        im = Image.open(io.BytesIO(raw)).convert("RGB")
+        buf = io.BytesIO()
+        im.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
+def gerar_pdf_documentacao_servidor(
+    funcionario: Any,
+    municipio: Any = None,
+    documentos_ged: Optional[List[Any]] = None,
+    historico_exercicios: Optional[List[Any]] = None,
+    historico_movimentacao: Optional[List[Any]] = None,
+    url_validar: str = "",
+    logo_path: Optional[str] = None,
+) -> bytes:
+    """
+    Gera o PDF oficial e completo da Ficha Cadastral e Documentação do Servidor
+    (ReportLab), contendo foto 3x4, QR Code de validação e 100% dos dados cadastrados.
+    """
+    import hashlib
+    from xml.sax.saxutils import escape
+
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (
+        HRFlowable,
+        Image as RLImage,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+
+    c_dark = colors.HexColor("#0B3D2E")
+    c_mid = colors.HexColor("#14532D")
+    c_accent = colors.HexColor("#FACC15")
+    c_soft = colors.HexColor("#F2F7F4")
+    c_border = colors.HexColor("#D4E2DA")
+    c_text = colors.HexColor("#122620")
+    c_muted = colors.HexColor("#5B7068")
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=13 * mm,
+        rightMargin=13 * mm,
+        topMargin=12 * mm,
+        bottomMargin=14 * mm,
+        title=f"Documentacao_{normalizar_cpf(funcionario.cpf) or funcionario.id}",
+        author="SERVIDOR 360 — Gestoor360",
+    )
+
+    styles = getSampleStyleSheet()
+    st_mun = ParagraphStyle("mun", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=11, leading=13, textColor=colors.white)
+    st_sub = ParagraphStyle("sub", parent=styles["Normal"], fontName="Helvetica", fontSize=7.8, leading=10, textColor=colors.HexColor("#D1FAE5"))
+    st_badge = ParagraphStyle("bdg", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=c_dark, alignment=TA_CENTER)
+    st_sec = ParagraphStyle("sec", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=9.2, leading=12, textColor=c_dark, spaceBefore=6, spaceAfter=3)
+    st_lbl = ParagraphStyle("lbl", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=7.2, leading=9, textColor=c_muted)
+    st_val = ParagraphStyle("val", parent=styles["Normal"], fontName="Helvetica", fontSize=8.4, leading=10.5, textColor=c_text)
+    st_name = ParagraphStyle("nm", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=11.5, leading=14, textColor=c_dark)
+    st_small = ParagraphStyle("sm", parent=styles["Normal"], fontName="Helvetica", fontSize=7.3, leading=9.5, textColor=c_muted)
+    st_foot = ParagraphStyle("ft", parent=styles["Normal"], fontName="Helvetica", fontSize=7, leading=9, textColor=c_muted, alignment=TA_CENTER)
+
+    story: List[Any] = []
+    largura_util = A4[0] - 26 * mm
+
+    # --- 1. CABEÇALHO INSTITUCIONAL ---
+    mun_nome = getattr(municipio, "nome", None) or "Prefeitura Municipal"
+    mun_cnpj = getattr(municipio, "cnpj", None) or ""
+    mun_end = getattr(municipio, "endereco", None) or ""
+    emissao_str = now_br().strftime("%d/%m/%Y às %H:%M")
+
+    logo_flow = ""
+    if logo_path and os.path.exists(logo_path):
+        try:
+            logo_flow = RLImage(logo_path, width=15 * mm, height=15 * mm, kind="proportional")
+        except Exception:
+            logo_flow = ""
+
+    header_txt = Paragraph(
+        f"<b>{escape(mun_nome.upper())}</b><br/>"
+        f"<font size='7.8' color='#D1FAE5'>SERVIDOR 360 • FICHA CADASTRAL E DOCUMENTAÇÃO COMPLETA DO SERVIDOR</font><br/>"
+        f"<font size='7' color='#A7F3D0'>{escape(('CNPJ: ' + mun_cnpj + ' • ') if mun_cnpj else '')}Emitido em {escape(emissao_str)} (Horário de Brasília)</font>",
+        st_mun,
+    )
+    badge_tbl = Table([[Paragraph("DOC. OFICIAL<br/>SERVIDOR 360", st_badge)]], colWidths=[28 * mm])
+    badge_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), c_accent),
+        ("ROUNDEDCORNERS", [4, 4, 4, 4]),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+
+    hdr_cols = [18 * mm, largura_util - 48 * mm, 30 * mm] if logo_flow else [largura_util - 30 * mm, 30 * mm]
+    hdr_row = [logo_flow, header_txt, badge_tbl] if logo_flow else [header_txt, badge_tbl]
+    hdr_tbl = Table([hdr_row], colWidths=hdr_cols)
+    hdr_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), c_dark),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story.append(hdr_tbl)
+    story.append(HRFlowable(width="100%", thickness=2.2, color=c_accent, spaceBefore=0, spaceAfter=6))
+
+    # --- 2. CARTÃO DE IDENTIDADE COM FOTO 3x4 + QR CODE ---
+    foto_uri, _ = extrair_foto_referencia(funcionario)
+    foto_bytes = _decodificar_imagem_b64_para_bytes(foto_uri)
+    foto_el: Any
+    if foto_bytes:
+        foto_el = RLImage(io.BytesIO(foto_bytes), width=23 * mm, height=28 * mm, kind="proportional")
+    else:
+        foto_el = Paragraph("<b>SEM FOTO</b>", st_small)
+
+    qr_el: Any = ""
+    if url_validar:
+        qr_uri = gerar_qr_code_data_uri(url_validar)
+        qr_bytes = _decodificar_imagem_b64_para_bytes(qr_uri)
+        if qr_bytes:
+            qr_el = RLImage(io.BytesIO(qr_bytes), width=24 * mm, height=24 * mm)
+
+    sec_nome = funcionario.secretaria.nome if getattr(funcionario, "secretaria", None) else "—"
+    cargo_nome = funcionario.funcao.nome if getattr(funcionario, "funcao", None) else (funcionario.lotacao or "—")
+    local_nome = funcionario.local_trabalho.nome if getattr(funcionario, "local_trabalho", None) else (funcionario.lotacao or "—")
+    idade = calcular_idade(funcionario.data_nasc)
+    idade_txt = f" ({idade} anos)" if idade is not None else ""
+
+    resumo_el = Paragraph(
+        f"<b>{escape(_fmt_val(funcionario.nome))}</b><br/>"
+        f"<font size='8.5' color='#14532D'><b>{escape(cargo_nome)}</b> • {escape(_fmt_val(funcionario.tipo_vinculo, 'Vínculo não informado'))}</font><br/>"
+        f"<font size='7.8' color='#334155'>CPF: <b>{escape(formatar_cpf(funcionario.cpf))}</b> &nbsp;|&nbsp; Matrícula/Vínculo: <b>{escape(_fmt_val(funcionario.num_vinculo, f'#{funcionario.id}'))}</b></font><br/>"
+        f"<font size='7.6' color='#475569'>Secretaria: {escape(sec_nome)}<br/>Unidade: {escape(local_nome)}</font><br/>"
+        f"<font size='7.5' color='#047857'><b>SITUAÇÃO CADASTRAL: ATIVO • VALIDADO PELO RH</b></font>",
+        st_name,
+    )
+
+    id_tbl = Table(
+        [[foto_el, resumo_el, qr_el]],
+        colWidths=[27 * mm, largura_util - 55 * mm, 28 * mm],
+    )
+    id_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), c_soft),
+        ("BOX", (0, 0), (-1, -1), 0.7, c_border),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (0, 0), "CENTER"),
+        ("ALIGN", (2, 0), (2, 0), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(id_tbl)
+    story.append(Spacer(1, 4 * mm))
+
+    def _add_section(titulo: str, pares: List[Tuple[str, Any]]):
+        story.append(Paragraph(escape(titulo.upper()), st_sec))
+        rows = []
+        # Organiza em grade de 2 pares por linha (4 colunas: label/val | label/val -> melhor: 2 células empilhadas por linha!)
+        for idx in range(0, len(pares), 2):
+            chunk = pares[idx : idx + 2]
+            linha = []
+            for rotulo, valor in chunk:
+                cell = Paragraph(
+                    f"<font size='6.8' color='#5B7068'><b>{escape(rotulo.upper())}</b></font><br/>"
+                    f"<font size='8.4' color='#122620'>{escape(_fmt_val(valor))}</font>",
+                    st_val,
+                )
+                linha.append(cell)
+            if len(linha) == 1:
+                linha.append(Paragraph("", st_val))
+            rows.append(linha)
+
+        t = Table(rows, colWidths=[largura_util / 2.0, largura_util / 2.0], repeatRows=0)
+        style_cmds = [
+            ("GRID", (0, 0), (-1, -1), 0.45, c_border),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]
+        for r_i in range(len(rows)):
+            if r_i % 2 == 1:
+                style_cmds.append(("BACKGROUND", (0, r_i), (-1, r_i), colors.HexColor("#FAFDFB")))
+        t.setStyle(TableStyle(style_cmds))
+        story.append(t)
+        story.append(Spacer(1, 2.5 * mm))
+
+    # --- SEÇÃO 1: DADOS PESSOAIS ---
+    _add_section("1. Dados Pessoais e Identificação", [
+        ("Nome Completo", funcionario.nome),
+        ("CPF", formatar_cpf(funcionario.cpf)),
+        ("Data de Nascimento", (_fmt_val(funcionario.data_nasc) + idade_txt) if funcionario.data_nasc else "Não informado"),
+        ("Gênero / Sexo", funcionario.genero),
+        ("RG", funcionario.rg),
+        ("Órgão Emissor / Expedição", f"{_fmt_val(funcionario.orgao_emissor_rg, '—')} • {_fmt_val(funcionario.data_expedicao_rg, '—')}"),
+        ("Estado Civil", funcionario.estado_civil),
+        ("Nacionalidade", funcionario.nacionalidade),
+        ("Nome da Mãe", funcionario.mae),
+        ("Nome do Pai", funcionario.pai),
+        ("Escolaridade", funcionario.escolaridade),
+        ("Formação / Especialidade", funcionario.especialidade),
+        ("Tipo Sanguíneo", funcionario.tipo_sanguineo),
+        ("Qtd. de Dependentes", funcionario.qtd_dependentes if funcionario.qtd_dependentes is not None else 0),
+        ("Pessoa com Deficiência (PCD)", "Sim" if funcionario.is_pcd else "Não"),
+        ("Tipo de Deficiência", funcionario.tipo_deficiencia if funcionario.is_pcd else "Não aplicável"),
+    ])
+
+    # --- SEÇÃO 2: DOCUMENTAÇÃO OFICIAL & E-SOCIAL ---
+    _add_section("2. Documentação Oficial e e-Social", [
+        ("PIS / PASEP", funcionario.pis),
+        ("CTPS", funcionario.ctps),
+        ("Título de Eleitor", funcionario.titulo_eleitor),
+        ("Zona / Seção Eleitoral", f"Zona: {_fmt_val(funcionario.zona_eleitoral, '—')} • Seção: {_fmt_val(funcionario.secao_eleitoral, '—')}"),
+        ("CNH", funcionario.cnh),
+        ("Código de Validação Cadastral", funcionario.token_validacao),
+    ])
+
+    # --- SEÇÃO 3: ENDEREÇO E CONTATOS ---
+    _add_section("3. Endereço Residencial e Contatos", [
+        ("Telefone / WhatsApp", funcionario.telefone),
+        ("E-mail", funcionario.email),
+        ("CEP", funcionario.cep),
+        ("Logradouro / Endereço", funcionario.endereco),
+        ("Bairro", funcionario.bairro),
+        ("Cidade / UF", f"{_fmt_val(funcionario.cidade, '—')} / {_fmt_val(funcionario.uf, '—')}"),
+        ("Zona de Moradia", funcionario.zona_moradia or "URBANA"),
+        ("Povoado / Comunidade", funcionario.povoado_comunidade),
+        ("Contato de Emergência (Nome)", funcionario.contato_emergencia_nome),
+        ("Contato de Emergência (Telefone)", funcionario.contato_emergencia_tel),
+    ])
+
+    # --- SEÇÃO 4: VÍNCULO FUNCIONAL & PORTARIA ---
+    pares_vinculo = [
+        ("Secretaria", sec_nome),
+        ("Unidade / Local de Trabalho", local_nome),
+        ("Cargo / Função", cargo_nome),
+        ("Tipo de Vínculo", funcionario.tipo_vinculo),
+        ("Matrícula / Nº Vínculo", funcionario.num_vinculo or f"#{funcionario.id}"),
+        ("Classe / Nível", funcionario.classe),
+        ("Jornada de Trabalho", funcionario.jornada_trabalho),
+        ("Exercício Atual", funcionario.ano_exercicio_atual or 2026),
+        ("Data de Início", funcionario.dt_inicio),
+        ("Data de Término Previsto", funcionario.dt_termino or "Indeterminado"),
+        ("Remuneração Base", funcionario.remuneracao or _fmt_moeda(funcionario.remuneracao_valor)),
+        ("Gratificação", _fmt_moeda(funcionario.gratificacao_valor)),
+        ("Nº da Portaria", funcionario.numero_portaria),
+        ("Data da Portaria", funcionario.data_portaria),
+        ("Referência Contracheque", funcionario.contracheque),
+        ("Data do Cadastro no RH", funcionario.data_criacao),
+    ]
+    if getattr(funcionario, "crianca_assistida", None):
+        pares_vinculo.append(("Apoio Pedagógico (Criança Assistida)", funcionario.crianca_assistida))
+    _add_section("4. Vínculo Funcional, Lotação e Portaria", pares_vinculo)
+
+    # --- SEÇÃO 5: DADOS BANCÁRIOS ---
+    _add_section("5. Dados Bancários", [
+        ("Banco", funcionario.banco),
+        ("Tipo de Conta", funcionario.tipo_conta),
+        ("Agência", funcionario.agencia),
+        ("Número da Conta", funcionario.conta),
+    ])
+
+    # --- SEÇÃO 6: HISTÓRICO DE EXERCÍCIOS (se houver) ---
+    if historico_exercicios:
+        story.append(Paragraph("6. HISTÓRICO DE EXERCÍCIOS FUNCIONAIS", st_sec))
+        h_rows = [[
+            Paragraph("<b>Ano</b>", st_lbl),
+            Paragraph("<b>Cargo / Função</b>", st_lbl),
+            Paragraph("<b>Unidade</b>", st_lbl),
+            Paragraph("<b>Vínculo / Portaria</b>", st_lbl),
+            Paragraph("<b>Status</b>", st_lbl),
+        ]]
+        for h in historico_exercicios:
+            h_rows.append([
+                Paragraph(escape(_fmt_val(h.ano_exercicio)), st_val),
+                Paragraph(escape(_fmt_val(h.funcao_nome, "—")), st_val),
+                Paragraph(escape(_fmt_val(h.local_trabalho_nome, "—")), st_val),
+                Paragraph(escape(f"{_fmt_val(h.tipo_vinculo, '—')} / {_fmt_val(h.numero_portaria, '—')}"), st_val),
+                Paragraph(escape(_fmt_val(h.status, "—")), st_val),
+            ])
+        ht = Table(h_rows, colWidths=[14 * mm, 48 * mm, 52 * mm, 46 * mm, largura_util - 160 * mm])
+        ht.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), c_soft),
+            ("GRID", (0, 0), (-1, -1), 0.45, c_border),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+        ]))
+        story.append(ht)
+        story.append(Spacer(1, 2.5 * mm))
+
+    # --- SEÇÃO 7: DOSSIÊ DIGITAL (GED) ---
+    if documentos_ged:
+        story.append(Paragraph("DOSSIÊ DIGITAL DE DOCUMENTOS ARQUIVADOS (GED)", st_sec))
+        g_rows = [[
+            Paragraph("<b>Tipo de Documento</b>", st_lbl),
+            Paragraph("<b>Arquivo</b>", st_lbl),
+            Paragraph("<b>Data de Envio</b>", st_lbl),
+            Paragraph("<b>Validação RH</b>", st_lbl),
+        ]]
+        for d in documentos_ged:
+            g_rows.append([
+                Paragraph(escape((d.tipo_documento or "—").replace("_", " ")), st_val),
+                Paragraph(escape(_fmt_val(d.nome_arquivo, "—")), st_val),
+                Paragraph(escape(_fmt_val(d.data_upload, "—")), st_val),
+                Paragraph("Validado" if d.validado else "Arquivado", st_val),
+            ])
+        gt = Table(g_rows, colWidths=[48 * mm, 76 * mm, 32 * mm, largura_util - 156 * mm])
+        gt.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), c_soft),
+            ("GRID", (0, 0), (-1, -1), 0.45, c_border),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+        ]))
+        story.append(gt)
+        story.append(Spacer(1, 3 * mm))
+
+    # --- RODAPÉ DE AUTENTICIDADE ---
+    selo_hash = hashlib.sha256(
+        f"{funcionario.id}|{funcionario.cpf}|{funcionario.token_validacao}|{emissao_str}".encode("utf-8")
+    ).hexdigest()[:24].upper()
+
+    story.append(Spacer(1, 2 * mm))
+    story.append(HRFlowable(width="100%", thickness=0.8, color=c_border, spaceBefore=2, spaceAfter=4))
+    story.append(Paragraph(
+        f"Documento eletrônico gerado pelo aplicativo oficial <b>SERVIDOR 360</b> ({escape(mun_nome)}).<br/>"
+        f"Código de Validação: <b>{escape(_fmt_val(funcionario.token_validacao))}</b> &nbsp;|&nbsp; "
+        f"Protocolo de Emissão: <b>{selo_hash}</b><br/>"
+        f"{escape('Verifique a autenticidade em: ' + url_validar) if url_validar else ''}"
+        f"{('<br/>' + escape(mun_end)) if mun_end else ''}",
+        st_foot,
+    ))
+
+    doc.build(story)
+    return buf.getvalue()
+

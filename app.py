@@ -9655,6 +9655,13 @@ def app_servidor_inicio():
         funcionario_id=func_obj.id, status_assinatura="ASSINADO_ELETRONICAMENTE"
     ).count()
     contratos_total_qtd = ContratoGerado.query.filter_by(funcionario_id=func_obj.id).count()
+    contrato_assinado_recente = (
+        ContratoGerado.query.filter_by(
+            funcionario_id=func_obj.id, status_assinatura="ASSINADO_ELETRONICAMENTE"
+        )
+        .order_by(ContratoGerado.data_geracao.desc())
+        .first()
+    )
     solicitacoes_pendentes_qtd = SolicitacaoAlteracaoCadastral.query.filter_by(
         funcionario_id=func_obj.id, status="PENDENTE"
     ).count()
@@ -9663,8 +9670,22 @@ def app_servidor_inicio():
     ).count()
     ged_qtd = DocumentoServidor.query.filter_by(funcionario_id=func_obj.id).count()
 
+    ultimas_solicitacoes = (
+        SolicitacaoAlteracaoCadastral.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(SolicitacaoAlteracaoCadastral.data_solicitacao.desc())
+        .limit(2)
+        .all()
+    )
+    ultimos_atestados = (
+        JustificativaFalta.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(JustificativaFalta.data_solicitacao.desc())
+        .limit(2)
+        .all()
+    )
+
     url_validar = url_for("validar_documento", codigo=func_obj.token_validacao, _external=True)
     qr_carteira = app_servidor_service.gerar_qr_code_data_uri(url_validar)
+    completude = app_servidor_service.calcular_completude_cadastral(func_obj)
 
     return render_template(
         "app_servidor_home.html",
@@ -9674,11 +9695,16 @@ def app_servidor_inicio():
         municipio=mun,
         saudacao=app_servidor_service.saudacao_horario(),
         foto_uri=foto_uri,
+        cpf_formatado=app_servidor_service.formatar_cpf(func_obj.cpf),
         contratos_assinados_qtd=contratos_assinados_qtd,
         contratos_total_qtd=contratos_total_qtd,
+        contrato_assinado_recente=contrato_assinado_recente,
         solicitacoes_pendentes_qtd=solicitacoes_pendentes_qtd,
         atestados_pendentes_qtd=atestados_pendentes_qtd,
         ged_qtd=ged_qtd,
+        ultimas_solicitacoes=ultimas_solicitacoes,
+        ultimos_atestados=ultimos_atestados,
+        completude=completude,
         qr_carteira=qr_carteira,
         url_validar=url_validar,
     )
@@ -9697,6 +9723,19 @@ def app_servidor_dados():
         .order_by(DocumentoServidor.data_upload.desc())
         .all()
     )
+    historico_exercicios = (
+        HistoricoVinculoExercicio.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(HistoricoVinculoExercicio.ano_exercicio.desc(), HistoricoVinculoExercicio.id.desc())
+        .all()
+    )
+    historico_movimentacao = (
+        HistoricoLotacao.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(HistoricoLotacao.data_mudanca.desc())
+        .all()
+    )
+    completude = app_servidor_service.calcular_completude_cadastral(func_obj)
+    idade = app_servidor_service.calcular_idade(func_obj.data_nasc)
+    url_validar = url_for("validar_documento", codigo=func_obj.token_validacao, _external=True)
 
     return render_template(
         "app_servidor_dados.html",
@@ -9706,9 +9745,61 @@ def app_servidor_dados():
         municipio=mun,
         foto_uri=foto_uri,
         documentos_ged=documentos_ged,
+        historico_exercicios=historico_exercicios,
+        historico_movimentacao=historico_movimentacao,
+        completude=completude,
+        idade=idade,
+        url_validar=url_validar,
         cpf_formatado=app_servidor_service.formatar_cpf(func_obj.cpf),
         conta_mascarada=app_servidor_service.mascarar_valor_sensivel(func_obj.conta, 3),
         agencia_mascarada=app_servidor_service.mascarar_valor_sensivel(func_obj.agencia, 2),
+        remuneracao_fmt=func_obj.remuneracao or app_servidor_service._fmt_moeda(func_obj.remuneracao_valor),
+        gratificacao_fmt=app_servidor_service._fmt_moeda(func_obj.gratificacao_valor),
+    )
+
+
+@app.route("/app-servidor/dados/pdf")
+def app_servidor_dados_pdf():
+    func_obj, _ = _obter_servidor_app_autenticado()
+    if not func_obj:
+        return redirect(url_for("app_servidor_acesso"))
+
+    mun = _obter_municipio_app(func_obj)
+    documentos_ged = (
+        DocumentoServidor.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(DocumentoServidor.data_upload.desc())
+        .all()
+    )
+    historico_exercicios = (
+        HistoricoVinculoExercicio.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(HistoricoVinculoExercicio.ano_exercicio.desc(), HistoricoVinculoExercicio.id.desc())
+        .all()
+    )
+    historico_movimentacao = (
+        HistoricoLotacao.query.filter_by(funcionario_id=func_obj.id)
+        .order_by(HistoricoLotacao.data_mudanca.desc())
+        .all()
+    )
+    url_validar = url_for("validar_documento", codigo=func_obj.token_validacao, _external=True)
+    logo_path = os.path.join(app.root_path, "static", "logo.png")
+
+    pdf_bytes = app_servidor_service.gerar_pdf_documentacao_servidor(
+        funcionario=func_obj,
+        municipio=mun,
+        documentos_ged=documentos_ged,
+        historico_exercicios=historico_exercicios,
+        historico_movimentacao=historico_movimentacao,
+        url_validar=url_validar,
+        logo_path=logo_path if os.path.exists(logo_path) else None,
+    )
+
+    nome_slug = re.sub(r"[^A-Za-z0-9]+", "_", (func_obj.nome or "servidor").strip()).strip("_")[:40]
+    filename = f"SERVIDOR360_Documentacao_{nome_slug}.pdf"
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=filename,
     )
 
 

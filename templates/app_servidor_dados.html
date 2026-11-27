@@ -1,221 +1,581 @@
 {% extends "app_servidor_base.html" %}
-{% block title %}Meus Dados • SERVIDOR 360{% endblock %}
+{% block title %}Documentação Completa • SERVIDOR 360{% endblock %}
 
 {% block body %}
-<div class="flex-1 pb-24">
-    <!-- Header Compacto -->
-    <header class="relative overflow-hidden bg-gradient-to-br from-[#0B3D2E] via-[#104936] to-[#14532D] pt-7 pb-14 px-6 safe-top">
-        <div class="relative z-10 flex items-center justify-between">
+<div class="flex-1 pb-28">
+    <!-- Cabeçalho Delicado com Exportação PDF Direta -->
+    <header class="px-5 pt-5 pb-3 safe-top anim-fade-up">
+        <div class="flex items-center justify-between gap-3">
             <div>
-                <p class="text-[10px] font-extrabold uppercase tracking-widest text-[#FACC15]">Ficha Oficial do RH</p>
-                <h1 class="text-xl font-extrabold text-white mt-0.5">Meus Dados Cadastrais</h1>
+                <p class="text-[10px] font-extrabold uppercase tracking-[0.16em] text-emerald-700">Registro Oficial no RH</p>
+                <h1 class="text-lg font-extrabold text-[#0B3D2E] leading-tight mt-0.5">Minha Documentação</h1>
             </div>
-            <a href="{{ url_for('app_servidor_solicitacoes') }}"
-               class="px-3 py-1.5 rounded-xl bg-[#FACC15] text-[#0B3D2E] text-[11px] font-extrabold shadow flex items-center gap-1 active:scale-95 transition">
-                <i class="ph-bold ph-pencil-simple"></i>
-                <span>Corrigir</span>
+            <a href="{{ url_for('app_servidor_dados_pdf') }}"
+               class="px-3.5 py-2 rounded-xl bg-[#0B3D2E] hover:bg-[#14532D] text-white text-[11px] font-extrabold shadow-md flex items-center gap-1.5 active:scale-95 transition shrink-0">
+                <i class="ph-bold ph-file-pdf text-sm text-[#FACC15]"></i>
+                <span>Exportar PDF</span>
             </a>
         </div>
-        <svg class="absolute bottom-0 left-0 w-full h-9 text-[#F3F7F5]" viewBox="0 0 1440 120" preserveAspectRatio="none">
-            <path fill="currentColor" d="M0,115 C420,105 980,55 1440,0 L1440,120 L0,120 Z"></path>
-        </svg>
-    </header>
 
-    <main class="px-5 -mt-2 space-y-4">
-        <!-- Abas Minimalistas -->
-        <div class="flex gap-2 overflow-x-auto no-scrollbar pb-1 anim-fade-up">
-            <button type="button" onclick="mostrarSecaoDados('vinculo', this)" class="tab-dados-btn px-3.5 py-2 rounded-full text-xs font-extrabold whitespace-nowrap bg-[#0B3D2E] text-white shadow">Vínculo</button>
-            <button type="button" onclick="mostrarSecaoDados('pessoal', this)" class="tab-dados-btn px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white text-slate-600 border border-slate-200">Pessoais</button>
-            <button type="button" onclick="mostrarSecaoDados('contato', this)" class="tab-dados-btn px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white text-slate-600 border border-slate-200">Endereço</button>
-            <button type="button" onclick="mostrarSecaoDados('banco', this)" class="tab-dados-btn px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white text-slate-600 border border-slate-200">Bancários</button>
-            <button type="button" onclick="mostrarSecaoDados('docs', this)" class="tab-dados-btn px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white text-slate-600 border border-slate-200">Documentos & GED</button>
+        <!-- Barra de Busca Instantânea nos Dados -->
+        <div class="relative mt-3.5">
+            <i class="ph ph-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-base"></i>
+            <input type="search" id="buscaDocInput" oninput="filtrarDocumentacao(this.value)"
+                   placeholder="Buscar dado (ex.: PIS, portaria, banco, título, mãe...)"
+                   class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-white border border-emerald-950/10 text-xs font-medium text-slate-700 placeholder:text-slate-400 shadow-sm focus:border-[#10B981] focus:ring-2 focus:ring-[#10B981]/20 outline-none transition">
         </div>
 
-        <!-- 1. VÍNCULO E LOTAÇÃO -->
-        <section id="sec-vinculo" class="sec-dados app-card p-5 space-y-3.5 anim-fade-up">
-            <div class="flex items-center justify-between pb-2.5 border-b border-slate-100">
-                <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2">
-                    <i class="ph-fill ph-briefcase text-emerald-600 text-lg"></i> Vínculo e Lotação
-                </h2>
-                <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-extrabold uppercase">Ativo • Validado</span>
+        <!-- Pílulas rápidas + Controle Expandir/Recolher -->
+        <div class="flex items-center justify-between mt-3 px-0.5">
+            <div class="flex items-center gap-2 text-[11px] font-semibold text-slate-500">
+                <span class="inline-flex items-center gap-1 text-emerald-700 font-extrabold">
+                    <i class="ph-fill ph-check-circle text-xs"></i> {{ completude.percentual }}% preenchido
+                </span>
+                <span>•</span>
+                <span>{{ documentos_ged|length }} arquivo(s) GED</span>
             </div>
-            <div class="grid grid-cols-1 gap-3 text-xs">
-                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Secretaria</span><strong class="text-slate-800">{{ funcionario.secretaria.nome if funcionario.secretaria else '—' }}</strong></div>
-                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Unidade / Local de Trabalho</span><strong class="text-slate-800">{{ funcionario.local_trabalho.nome if funcionario.local_trabalho else (funcionario.lotacao or '—') }}</strong></div>
-                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Cargo / Função</span><strong class="text-slate-800">{{ funcionario.funcao.nome if funcionario.funcao else '—' }}</strong></div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Tipo de Vínculo</span><strong class="text-slate-800">{{ funcionario.tipo_vinculo or '—' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Matrícula / Vínculo</span><strong class="text-slate-800">{{ funcionario.num_vinculo or ('#' ~ funcionario.id) }}</strong></div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Jornada</span><strong class="text-slate-800">{{ funcionario.jornada_trabalho or '—' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Exercício Atual</span><strong class="text-slate-800">{{ funcionario.ano_exercicio_atual or '2026' }}</strong></div>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Data de Início</span><strong class="text-slate-800">{{ funcionario.dt_inicio.strftime('%d/%m/%Y') if funcionario.dt_inicio else '—' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Término Previsto</span><strong class="text-slate-800">{{ funcionario.dt_termino.strftime('%d/%m/%Y') if funcionario.dt_termino else 'Indeterminado' }}</strong></div>
-                </div>
-                {% if funcionario.remuneracao %}
-                <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-between">
+            <button type="button" id="btnToggleAllAcc" onclick="alternarTodasSecoes()"
+                    class="text-[11px] font-extrabold text-[#0B3D2E] hover:underline">
+                Expandir tudo
+            </button>
+        </div>
+    </header>
+
+    <main class="px-5 space-y-3" id="docSectionsWrap">
+        <!-- ==================== 1. IDENTIFICAÇÃO PESSOAL ==================== -->
+        <section class="doc-card app-card overflow-hidden anim-fade-up acc-open" data-section="pessoal">
+            <button type="button" onclick="toggleSecaoDoc(this)"
+                    class="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50/70 transition">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-emerald-50 text-[#0B3D2E] flex items-center justify-center shrink-0">
+                        <i class="ph-duotone ph-user-circle text-lg"></i>
+                    </span>
                     <div>
-                        <span class="text-[10px] font-bold uppercase text-emerald-700 block">Remuneração Base Cadastrada</span>
-                        <strong class="text-sm font-extrabold text-[#0B3D2E]">{{ funcionario.remuneracao }}</strong>
+                        <h2 class="text-[13px] font-extrabold text-[#0B3D2E]">Dados Pessoais e Identificação</h2>
+                        <p class="text-[10.5px] text-slate-400">CPF, RG, nascimento, filiação, escolaridade, saúde</p>
                     </div>
-                    <i class="ph-fill ph-currency-circle-dollar text-2xl text-emerald-600"></i>
+                </div>
+                <i class="ph-bold ph-caret-down text-slate-400 acc-caret"></i>
+            </button>
+            <div class="acc-body px-4 pb-4 pt-1 border-t border-slate-100/80 divide-y divide-slate-100">
+                <div class="doc-row py-2.5 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Nome Completo</span>
+                        <span class="text-xs font-bold text-slate-800">{{ funcionario.nome }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 flex items-center justify-between gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">CPF</span>
+                        <span class="text-xs font-extrabold text-[#0B3D2E] font-mono">{{ cpf_formatado }}</span>
+                    </div>
+                    <button type="button" onclick="copiarTextoApp('{{ cpf_formatado }}', 'CPF copiado!')"
+                            class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-emerald-100 text-[#0B3D2E] text-[10px] font-bold inline-flex items-center gap-1">
+                        <i class="ph ph-copy"></i> Copiar
+                    </button>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">RG</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.rg or 'Não informado' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Órgão / Expedição</span>
+                        <span class="text-xs font-semibold text-slate-800">
+                            {{ funcionario.orgao_emissor_rg or '—' }}
+                            {% if funcionario.data_expedicao_rg %}• {{ funcionario.data_expedicao_rg.strftime('%d/%m/%Y') }}{% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Data de Nascimento</span>
+                        <span class="text-xs font-semibold text-slate-800">
+                            {{ funcionario.data_nasc.strftime('%d/%m/%Y') if funcionario.data_nasc else 'Não informado' }}
+                            {% if idade is not none %}<span class="text-slate-400 font-normal">({{ idade }} anos)</span>{% endif %}
+                        </span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Gênero</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.genero or 'Não informado' }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Estado Civil</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.estado_civil or 'Não informado' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Nacionalidade</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.nacionalidade or 'Não informado' }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Nome da Mãe</span>
+                    <span class="text-xs font-semibold text-slate-800">{{ funcionario.mae or 'Não informado' }}</span>
+                </div>
+                <div class="doc-row py-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Nome do Pai</span>
+                    <span class="text-xs font-semibold text-slate-800">{{ funcionario.pai or 'Não informado' }}</span>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Escolaridade</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.escolaridade or 'Não informado' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Especialidade / Formação</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.especialidade or 'Não informado' }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-3 gap-2">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Tipo Sang.</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.tipo_sanguineo or '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Dependentes</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.qtd_dependentes if funcionario.qtd_dependentes is not none else 0 }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">PCD</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ 'Sim' if funcionario.is_pcd else 'Não' }}</span>
+                    </div>
+                </div>
+                {% if funcionario.is_pcd and funcionario.tipo_deficiencia %}
+                <div class="doc-row py-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Tipo de Deficiência</span>
+                    <span class="text-xs font-semibold text-slate-800">{{ funcionario.tipo_deficiencia }}</span>
                 </div>
                 {% endif %}
             </div>
         </section>
 
-        <!-- 2. DADOS PESSOAIS -->
-        <section id="sec-pessoal" class="sec-dados hidden app-card p-5 space-y-3.5 anim-fade-up">
-            <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2 pb-2.5 border-b border-slate-100">
-                <i class="ph-fill ph-user-circle text-emerald-600 text-lg"></i> Dados Pessoais
-            </h2>
-            <div class="grid grid-cols-1 gap-3 text-xs">
-                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Nome Completo</span><strong class="text-slate-800">{{ funcionario.nome }}</strong></div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">CPF</span><strong class="text-slate-800">{{ cpf_formatado }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Nascimento</span><strong class="text-slate-800">{{ funcionario.data_nasc.strftime('%d/%m/%Y') if funcionario.data_nasc else '—' }}</strong></div>
+        <!-- ==================== 2. DOCUMENTAÇÃO OFICIAL & E-SOCIAL ==================== -->
+        <section class="doc-card app-card overflow-hidden anim-fade-up delay-1 acc-open" data-section="esocial">
+            <button type="button" onclick="toggleSecaoDoc(this)"
+                    class="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50/70 transition">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center shrink-0">
+                        <i class="ph-duotone ph-identification-badge text-lg"></i>
+                    </span>
+                    <div>
+                        <h2 class="text-[13px] font-extrabold text-[#0B3D2E]">Documentação Oficial & e-Social</h2>
+                        <p class="text-[10.5px] text-slate-400">PIS/PASEP, CTPS, Título de Eleitor, CNH, Código</p>
+                    </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">RG / Órgão</span><strong class="text-slate-800">{{ funcionario.rg or '—' }} {{ funcionario.orgao_emissor_rg or '' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Estado Civil</span><strong class="text-slate-800">{{ funcionario.estado_civil or '—' }}</strong></div>
+                <i class="ph-bold ph-caret-down text-slate-400 acc-caret"></i>
+            </button>
+            <div class="acc-body px-4 pb-4 pt-1 border-t border-slate-100/80 divide-y divide-slate-100">
+                <div class="doc-row py-2.5 flex items-center justify-between gap-2">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">PIS / PASEP</span>
+                        <span class="text-xs font-bold text-slate-800 font-mono">{{ funcionario.pis or 'Não informado' }}</span>
+                    </div>
+                    {% if funcionario.pis %}
+                    <button type="button" onclick="copiarTextoApp('{{ funcionario.pis }}', 'PIS/PASEP copiado!')"
+                            class="px-2.5 py-1 rounded-lg bg-slate-100 text-[#0B3D2E] text-[10px] font-bold">Copiar</button>
+                    {% endif %}
                 </div>
-                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Nome da Mãe</span><strong class="text-slate-800">{{ funcionario.mae or '—' }}</strong></div>
-                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Nome do Pai</span><strong class="text-slate-800">{{ funcionario.pai or '—' }}</strong></div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Escolaridade</span><strong class="text-slate-800">{{ funcionario.escolaridade or '—' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Especialidade</span><strong class="text-slate-800">{{ funcionario.especialidade or '—' }}</strong></div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">CTPS</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.ctps or 'Não informado' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">CNH</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.cnh or 'Não informado' }}</span>
+                    </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Tipo Sanguíneo</span><strong class="text-slate-800">{{ funcionario.tipo_sanguineo or '—' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Dependentes</span><strong class="text-slate-800">{{ funcionario.qtd_dependentes or 0 }}</strong></div>
+                <div class="doc-row py-2.5 flex items-center justify-between gap-2">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Título de Eleitor</span>
+                        <span class="text-xs font-semibold text-slate-800 font-mono">{{ funcionario.titulo_eleitor or 'Não informado' }}</span>
+                    </div>
+                    {% if funcionario.titulo_eleitor %}
+                    <button type="button" onclick="copiarTextoApp('{{ funcionario.titulo_eleitor }}', 'Título copiado!')"
+                            class="px-2.5 py-1 rounded-lg bg-slate-100 text-[#0B3D2E] text-[10px] font-bold">Copiar</button>
+                    {% endif %}
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Zona Eleitoral</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.zona_eleitoral or '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Seção Eleitoral</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.secao_eleitoral or '—' }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Código de Validação Cadastral</span>
+                        <span class="text-[11px] font-mono font-bold text-emerald-800 break-all">{{ funcionario.token_validacao }}</span>
+                    </div>
+                    <button type="button" onclick="copiarTextoApp('{{ funcionario.token_validacao }}', 'Código copiado!')"
+                            class="px-2.5 py-1 rounded-lg bg-emerald-50 text-[#0B3D2E] text-[10px] font-bold shrink-0">Copiar</button>
                 </div>
             </div>
         </section>
 
-        <!-- 3. ENDEREÇO E CONTATO -->
-        <section id="sec-contato" class="sec-dados hidden app-card p-5 space-y-3.5 anim-fade-up">
-            <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2 pb-2.5 border-b border-slate-100">
-                <i class="ph-fill ph-map-pin text-emerald-600 text-lg"></i> Endereço e Contato
-            </h2>
-            <div class="grid grid-cols-1 gap-3 text-xs">
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Telefone / WhatsApp</span><strong class="text-slate-800">{{ funcionario.telefone or '—' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">CEP</span><strong class="text-slate-800">{{ funcionario.cep or '—' }}</strong></div>
+        <!-- ==================== 3. VÍNCULO FUNCIONAL, LOTAÇÃO E PORTARIA ==================== -->
+        <section class="doc-card app-card overflow-hidden anim-fade-up delay-2" data-section="vinculo">
+            <button type="button" onclick="toggleSecaoDoc(this)"
+                    class="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50/70 transition">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-800 flex items-center justify-center shrink-0">
+                        <i class="ph-duotone ph-briefcase text-lg"></i>
+                    </span>
+                    <div>
+                        <h2 class="text-[13px] font-extrabold text-[#0B3D2E]">Vínculo Funcional, Lotação & Portaria</h2>
+                        <p class="text-[10.5px] text-slate-400">Cargo, secretaria, jornada, portaria e remuneração</p>
+                    </div>
                 </div>
-                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">E-mail</span><strong class="text-slate-800 break-all">{{ funcionario.email or '—' }}</strong></div>
-                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Logradouro</span><strong class="text-slate-800">{{ funcionario.endereco or '—' }}</strong></div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Bairro</span><strong class="text-slate-800">{{ funcionario.bairro or '—' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Cidade / UF</span><strong class="text-slate-800">{{ funcionario.cidade or '—' }} / {{ funcionario.uf or '—' }}</strong></div>
+                <i class="ph-bold ph-caret-down text-slate-400 acc-caret"></i>
+            </button>
+            <div class="acc-body hidden px-4 pb-4 pt-1 border-t border-slate-100/80 divide-y divide-slate-100">
+                <div class="doc-row py-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Secretaria</span>
+                    <span class="text-xs font-bold text-[#0B3D2E]">{{ funcionario.secretaria.nome if funcionario.secretaria else '—' }}</span>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Zona</span><strong class="text-slate-800">{{ funcionario.zona_moradia or 'URBANA' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Povoado / Comunidade</span><strong class="text-slate-800">{{ funcionario.povoado_comunidade or '—' }}</strong></div>
+                <div class="doc-row py-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Unidade / Local de Trabalho</span>
+                    <span class="text-xs font-semibold text-slate-800">{{ funcionario.local_trabalho.nome if funcionario.local_trabalho else (funcionario.lotacao or '—') }}</span>
                 </div>
-                <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Cargo / Função</span>
+                        <span class="text-xs font-bold text-slate-800">{{ funcionario.funcao.nome if funcionario.funcao else '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Tipo de Vínculo</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.tipo_vinculo or '—' }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Matrícula / Nº Vínculo</span>
+                        <span class="text-xs font-bold text-slate-800">{{ funcionario.num_vinculo or ('#' ~ funcionario.id) }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Classe / Nível</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.classe or '—' }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Jornada de Trabalho</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.jornada_trabalho or '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Exercício Atual</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.ano_exercicio_atual or 2026 }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Data de Início</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.dt_inicio.strftime('%d/%m/%Y') if funcionario.dt_inicio else '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Término Previsto</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.dt_termino.strftime('%d/%m/%Y') if funcionario.dt_termino else 'Indeterminado' }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Nº da Portaria</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.numero_portaria or '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Data da Portaria</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.data_portaria.strftime('%d/%m/%Y') if funcionario.data_portaria else '—' }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Remuneração Base</span>
+                        <span class="text-xs font-extrabold text-[#0B3D2E]">{{ remuneracao_fmt }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Gratificação</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ gratificacao_fmt }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Ref. Contracheque</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.contracheque or '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Cadastrado em</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.data_criacao.strftime('%d/%m/%Y') if funcionario.data_criacao else '—' }}</span>
+                    </div>
+                </div>
+                {% if funcionario.crianca_assistida %}
+                <div class="doc-row py-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Apoio Pedagógico (Criança Assistida)</span>
+                    <span class="text-xs font-semibold text-slate-800">{{ funcionario.crianca_assistida }}</span>
+                </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- ==================== 4. ENDEREÇO E CONTATOS ==================== -->
+        <section class="doc-card app-card overflow-hidden anim-fade-up delay-3" data-section="endereco">
+            <button type="button" onclick="toggleSecaoDoc(this)"
+                    class="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50/70 transition">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-teal-50 text-teal-800 flex items-center justify-center shrink-0">
+                        <i class="ph-duotone ph-map-pin text-lg"></i>
+                    </span>
+                    <div>
+                        <h2 class="text-[13px] font-extrabold text-[#0B3D2E]">Endereço Residencial & Contatos</h2>
+                        <p class="text-[10.5px] text-slate-400">Telefone, e-mail, CEP, zona e emergência</p>
+                    </div>
+                </div>
+                <i class="ph-bold ph-caret-down text-slate-400 acc-caret"></i>
+            </button>
+            <div class="acc-body hidden px-4 pb-4 pt-1 border-t border-slate-100/80 divide-y divide-slate-100">
+                <div class="doc-row py-2.5 flex items-center justify-between gap-2">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Telefone / WhatsApp</span>
+                        <span class="text-xs font-bold text-slate-800">{{ funcionario.telefone or 'Não informado' }}</span>
+                    </div>
+                    {% if funcionario.telefone %}
+                    <button type="button" onclick="copiarTextoApp('{{ funcionario.telefone }}', 'Telefone copiado!')"
+                            class="px-2.5 py-1 rounded-lg bg-slate-100 text-[#0B3D2E] text-[10px] font-bold">Copiar</button>
+                    {% endif %}
+                </div>
+                <div class="doc-row py-2.5 flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">E-mail</span>
+                        <span class="text-xs font-semibold text-slate-800 break-all">{{ funcionario.email or 'Não informado' }}</span>
+                    </div>
+                    {% if funcionario.email %}
+                    <button type="button" onclick="copiarTextoApp('{{ funcionario.email }}', 'E-mail copiado!')"
+                            class="px-2.5 py-1 rounded-lg bg-slate-100 text-[#0B3D2E] text-[10px] font-bold shrink-0">Copiar</button>
+                    {% endif %}
+                </div>
+                <div class="doc-row py-2.5">
+                    <span class="text-[10px] font-bold uppercase text-slate-400 block">Logradouro / Endereço</span>
+                    <span class="text-xs font-semibold text-slate-800">{{ funcionario.endereco or 'Não informado' }}</span>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Bairro</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.bairro or '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">CEP</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.cep or '—' }}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5 grid grid-cols-2 gap-3">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Cidade / UF</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.cidade or '—' }} / {{ funcionario.uf or '—' }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Zona / Comunidade</span>
+                        <span class="text-xs font-semibold text-slate-800">{{ funcionario.zona_moradia or 'URBANA' }}{% if funcionario.povoado_comunidade %} • {{ funcionario.povoado_comunidade }}{% endif %}</span>
+                    </div>
+                </div>
+                <div class="doc-row py-2.5">
                     <span class="text-[10px] font-bold uppercase text-slate-400 block">Contato de Emergência</span>
-                    <strong class="text-slate-800">{{ funcionario.contato_emergencia_nome or 'Não informado' }}</strong>
-                    {% if funcionario.contato_emergencia_tel %}<span class="text-slate-500 block">{{ funcionario.contato_emergencia_tel }}</span>{% endif %}
+                    <span class="text-xs font-semibold text-slate-800">
+                        {{ funcionario.contato_emergencia_nome or 'Não informado' }}
+                        {% if funcionario.contato_emergencia_tel %} • {{ funcionario.contato_emergencia_tel }}{% endif %}
+                    </span>
                 </div>
             </div>
         </section>
 
-        <!-- 4. DADOS BANCÁRIOS (COM MÁSCARA LGPD) -->
-        <section id="sec-banco" class="sec-dados hidden app-card p-5 space-y-3.5 anim-fade-up">
-            <div class="flex items-center justify-between pb-2.5 border-b border-slate-100">
-                <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2">
-                    <i class="ph-fill ph-bank text-emerald-600 text-lg"></i> Dados Bancários
-                </h2>
-                <button type="button" onclick="alternarMascaraBanco()" id="btnRevelarBanco"
-                        class="px-2.5 py-1 rounded-lg bg-slate-100 text-[11px] font-bold text-[#0B3D2E] flex items-center gap-1">
-                    <i class="ph ph-eye"></i><span>Revelar</span>
-                </button>
-            </div>
-            <div class="grid grid-cols-1 gap-3 text-xs">
-                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Banco</span><strong class="text-slate-800">{{ funcionario.banco or 'Não informado' }}</strong></div>
-                <div class="grid grid-cols-2 gap-3">
+        <!-- ==================== 5. DADOS BANCÁRIOS ==================== -->
+        <section class="doc-card app-card overflow-hidden anim-fade-up delay-4" data-section="bancario">
+            <button type="button" onclick="toggleSecaoDoc(this)"
+                    class="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50/70 transition">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-slate-100 text-[#0B3D2E] flex items-center justify-center shrink-0">
+                        <i class="ph-duotone ph-bank text-lg"></i>
+                    </span>
                     <div>
-                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Agência</span>
-                        <strong id="valAgencia" data-mask="{{ agencia_mascarada }}" data-real="{{ funcionario.agencia or '—' }}" class="text-slate-800">{{ agencia_mascarada }}</strong>
-                    </div>
-                    <div>
-                        <span class="text-[10px] font-bold uppercase text-slate-400 block">Conta</span>
-                        <strong id="valConta" data-mask="{{ conta_mascarada }}" data-real="{{ funcionario.conta or '—' }}" class="text-slate-800">{{ conta_mascarada }}</strong>
+                        <h2 class="text-[13px] font-extrabold text-[#0B3D2E]">Dados Bancários</h2>
+                        <p class="text-[10.5px] text-slate-400">Banco, agência, conta e tipo (protegidos)</p>
                     </div>
                 </div>
-                <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Tipo de Conta</span><strong class="text-slate-800">{{ funcionario.tipo_conta or '—' }}</strong></div>
-            </div>
-        </section>
-
-        <!-- 5. DOCUMENTOS & DOSSIÊ GED -->
-        <section id="sec-docs" class="sec-dados hidden space-y-4 anim-fade-up">
-            <div class="app-card p-5 space-y-3">
-                <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2 pb-2 border-b border-slate-100">
-                    <i class="ph-fill ph-files text-emerald-600 text-lg"></i> Documentação Oficial & e-Social
-                </h2>
-                <div class="grid grid-cols-2 gap-3 text-xs">
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">PIS / PASEP</span><strong class="text-slate-800">{{ funcionario.pis or '—' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">CTPS</span><strong class="text-slate-800">{{ funcionario.ctps or '—' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">Título de Eleitor</span><strong class="text-slate-800">{{ funcionario.titulo_eleitor or '—' }}</strong></div>
-                    <div><span class="text-[10px] font-bold uppercase text-slate-400 block">CNH</span><strong class="text-slate-800">{{ funcionario.cnh or '—' }}</strong></div>
+                <i class="ph-bold ph-caret-down text-slate-400 acc-caret"></i>
+            </button>
+            <div class="acc-body hidden px-4 pb-4 pt-1 border-t border-slate-100/80 space-y-3">
+                <div class="flex justify-end pt-2">
+                    <button type="button" onclick="alternarMascaraBanco()" id="btnRevelarBanco"
+                            class="px-2.5 py-1 rounded-lg bg-emerald-50 text-[10.5px] font-bold text-[#0B3D2E] inline-flex items-center gap-1">
+                        <i class="ph ph-eye"></i><span>Revelar números</span>
+                    </button>
                 </div>
-            </div>
-
-            <div class="app-card p-5 space-y-3">
-                <h2 class="text-sm font-extrabold text-[#0B3D2E] flex items-center gap-2">
-                    <i class="ph-fill ph-folder-open text-amber-600 text-lg"></i> Meu Dossiê Digital (GED)
-                </h2>
-                {% if documentos_ged %}
-                    <div class="space-y-2.5">
-                        {% for doc in documentos_ged %}
-                        <div class="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between gap-3">
-                            <div class="min-w-0">
-                                <p class="text-xs font-extrabold text-[#0B3D2E] truncate">{{ doc.tipo_documento|replace('_', ' ') }}</p>
-                                <p class="text-[10px] text-slate-500 truncate">{{ doc.nome_arquivo }} • {{ doc.data_upload.strftime('%d/%m/%Y') if doc.data_upload else '' }}</p>
-                            </div>
-                            <a href="{{ url_for('app_servidor_ged_download', doc_id=doc.id) }}"
-                               class="px-3 py-1.5 rounded-lg bg-[#0B3D2E] text-white text-[10px] font-extrabold shrink-0 active:scale-95 transition">
-                                Baixar
-                            </a>
+                <div class="divide-y divide-slate-100">
+                    <div class="doc-row py-2 grid grid-cols-2 gap-3">
+                        <div>
+                            <span class="text-[10px] font-bold uppercase text-slate-400 block">Banco</span>
+                            <span class="text-xs font-bold text-slate-800">{{ funcionario.banco or 'Não informado' }}</span>
                         </div>
-                        {% endfor %}
+                        <div>
+                            <span class="text-[10px] font-bold uppercase text-slate-400 block">Tipo de Conta</span>
+                            <span class="text-xs font-semibold text-slate-800">{{ funcionario.tipo_conta or '—' }}</span>
+                        </div>
                     </div>
+                    <div class="doc-row py-2 grid grid-cols-2 gap-3">
+                        <div>
+                            <span class="text-[10px] font-bold uppercase text-slate-400 block">Agência</span>
+                            <span id="valAgencia" data-mask="{{ agencia_mascarada }}" data-real="{{ funcionario.agencia or '—' }}" class="text-xs font-bold font-mono text-slate-800">{{ agencia_mascarada }}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold uppercase text-slate-400 block">Conta</span>
+                            <span id="valConta" data-mask="{{ conta_mascarada }}" data-real="{{ funcionario.conta or '—' }}" class="text-xs font-bold font-mono text-slate-800">{{ conta_mascarada }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== 6. HISTÓRICO FUNCIONAL & MOVIMENTAÇÕES ==================== -->
+        {% if historico_exercicios or historico_movimentacao %}
+        <section class="doc-card app-card overflow-hidden anim-fade-up delay-5" data-section="historico">
+            <button type="button" onclick="toggleSecaoDoc(this)"
+                    class="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50/70 transition">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-800 flex items-center justify-center shrink-0">
+                        <i class="ph-duotone ph-clock-counter-clockwise text-lg"></i>
+                    </span>
+                    <div>
+                        <h2 class="text-[13px] font-extrabold text-[#0B3D2E]">Histórico de Exercícios e Lotações</h2>
+                        <p class="text-[10.5px] text-slate-400">{{ historico_exercicios|length }} exercício(s) • {{ historico_movimentacao|length }} movimentação(ões)</p>
+                    </div>
+                </div>
+                <i class="ph-bold ph-caret-down text-slate-400 acc-caret"></i>
+            </button>
+            <div class="acc-body hidden px-4 pb-4 pt-2 border-t border-slate-100/80 space-y-2.5">
+                {% for h in historico_exercicios %}
+                <div class="doc-row p-3 rounded-xl bg-[#F5F8F6] border border-emerald-950/5 text-xs">
+                    <div class="flex items-center justify-between">
+                        <strong class="text-[#0B3D2E]">Exercício {{ h.ano_exercicio }}</strong>
+                        <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[9.5px] font-extrabold uppercase">{{ h.status or 'ATIVO' }}</span>
+                    </div>
+                    <p class="text-[11px] font-semibold text-slate-700 mt-1">{{ h.funcao_nome or '—' }} • {{ h.local_trabalho_nome or '—' }}</p>
+                    {% if h.numero_portaria %}<p class="text-[10px] text-slate-500 mt-0.5">Portaria: {{ h.numero_portaria }}</p>{% endif %}
+                </div>
+                {% endfor %}
+
+                {% for m in historico_movimentacao %}
+                <div class="doc-row p-3 rounded-xl bg-slate-50 border border-slate-100 text-[11px]">
+                    <p class="font-bold text-slate-700">Movimentação em {{ m.data_mudanca.strftime('%d/%m/%Y') if m.data_mudanca else '—' }}</p>
+                    <p class="text-slate-500 mt-0.5">Anterior: {{ m.antiga_secretaria or '—' }} • {{ m.antigo_local or '—' }} ({{ m.antiga_funcao or '—' }})</p>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- ==================== 7. DOSSIÊ DIGITAL (GED) ==================== -->
+        <section class="doc-card app-card overflow-hidden anim-fade-up delay-5" data-section="ged">
+            <button type="button" onclick="toggleSecaoDoc(this)"
+                    class="w-full px-4 py-3.5 flex items-center justify-between text-left hover:bg-slate-50/70 transition">
+                <div class="flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-xl bg-amber-50 text-amber-800 flex items-center justify-center shrink-0">
+                        <i class="ph-duotone ph-folder-open text-lg"></i>
+                    </span>
+                    <div>
+                        <h2 class="text-[13px] font-extrabold text-[#0B3D2E]">Dossiê Digital de Arquivos (GED)</h2>
+                        <p class="text-[10.5px] text-slate-400">{{ documentos_ged|length }} documento(s) anexado(s) no RH</p>
+                    </div>
+                </div>
+                <i class="ph-bold ph-caret-down text-slate-400 acc-caret"></i>
+            </button>
+            <div class="acc-body hidden px-4 pb-4 pt-2 border-t border-slate-100/80 space-y-2.5">
+                {% if documentos_ged %}
+                    {% for doc in documentos_ged %}
+                    <div class="doc-row p-3 rounded-xl bg-[#F5F8F6] border border-emerald-950/5 flex items-center justify-between gap-3">
+                        <div class="min-w-0">
+                            <div class="flex items-center gap-1.5">
+                                <p class="text-xs font-extrabold text-[#0B3D2E] truncate">{{ doc.tipo_documento|replace('_', ' ') }}</p>
+                                {% if doc.validado %}
+                                <i class="ph-fill ph-seal-check text-emerald-600 text-xs shrink-0" title="Validado pelo RH"></i>
+                                {% endif %}
+                            </div>
+                            <p class="text-[10px] text-slate-500 truncate mt-0.5">{{ doc.nome_arquivo }} • {{ doc.data_upload.strftime('%d/%m/%Y') if doc.data_upload else '' }}</p>
+                        </div>
+                        <a href="{{ url_for('app_servidor_ged_download', doc_id=doc.id) }}"
+                           class="px-3 py-1.5 rounded-lg bg-[#0B3D2E] text-white text-[10px] font-extrabold shrink-0 active:scale-95 transition">
+                            Baixar
+                        </a>
+                    </div>
+                    {% endfor %}
                 {% else %}
-                    <p class="text-xs text-slate-500">Nenhum documento arquivado no dossiê GED até o momento.</p>
+                    <p class="text-xs text-slate-500 py-2">Nenhum arquivo anexado no dossiê GED até o momento.</p>
                 {% endif %}
             </div>
         </section>
 
-        <!-- Chamada para Solicitar Correção -->
-        <a href="{{ url_for('app_servidor_solicitacoes') }}"
-           class="app-card app-card-interactive p-4 flex items-center gap-3 border-emerald-200/70 bg-emerald-50/40">
-            <div class="w-10 h-10 rounded-xl bg-[#0B3D2E] text-[#FACC15] flex items-center justify-center shrink-0">
-                <i class="ph-bold ph-pencil-simple-line text-lg"></i>
-            </div>
-            <div class="flex-1 min-w-0">
-                <p class="text-xs font-extrabold text-[#0B3D2E]">Encontrou algum dado desatualizado?</p>
-                <p class="text-[11px] text-slate-600">Solicite a alteração diretamente ao RH pelo aplicativo</p>
-            </div>
-            <i class="ph ph-caret-right text-slate-400 card-arrow"></i>
-        </a>
+        <!-- Barra Final de Ações Diretas -->
+        <div class="grid grid-cols-2 gap-2.5 pt-2">
+            <a href="{{ url_for('app_servidor_dados_pdf') }}"
+               class="py-3 px-3 rounded-2xl bg-[#0B3D2E] text-white text-xs font-extrabold shadow-md flex items-center justify-center gap-1.5 active:scale-[0.98] transition">
+                <i class="ph-bold ph-file-pdf text-base text-[#FACC15]"></i>
+                <span>Baixar PDF</span>
+            </a>
+            <a href="{{ url_for('app_servidor_solicitacoes') }}"
+               class="py-3 px-3 rounded-2xl bg-white border border-emerald-950/15 text-[#0B3D2E] text-xs font-extrabold shadow-sm flex items-center justify-center gap-1.5 active:scale-[0.98] transition">
+                <i class="ph-bold ph-pencil-simple text-base text-emerald-600"></i>
+                <span>Solicitar Correção</span>
+            </a>
+        </div>
     </main>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
-    function mostrarSecaoDados(id, btn) {
-        document.querySelectorAll('.sec-dados').forEach(s => s.classList.add('hidden'));
-        const target = document.getElementById('sec-' + id);
-        if (target) target.classList.remove('hidden');
+    function toggleSecaoDoc(btn) {
+        const card = btn.closest('.doc-card');
+        const body = card.querySelector('.acc-body');
+        const abrindo = body.classList.contains('hidden');
+        body.classList.toggle('hidden', !abrindo);
+        card.classList.toggle('acc-open', abrindo);
+    }
 
-        document.querySelectorAll('.tab-dados-btn').forEach(b => {
-            b.className = 'tab-dados-btn px-3.5 py-2 rounded-full text-xs font-bold whitespace-nowrap bg-white text-slate-600 border border-slate-200';
+    let tudoExpandido = false;
+    function alternarTodasSecoes() {
+        tudoExpandido = !tudoExpandido;
+        document.querySelectorAll('.doc-card').forEach(card => {
+            const body = card.querySelector('.acc-body');
+            body.classList.toggle('hidden', !tudoExpandido);
+            card.classList.toggle('acc-open', tudoExpandido);
         });
-        btn.className = 'tab-dados-btn px-3.5 py-2 rounded-full text-xs font-extrabold whitespace-nowrap bg-[#0B3D2E] text-white shadow';
+        document.getElementById('btnToggleAllAcc').textContent = tudoExpandido ? 'Recolher tudo' : 'Expandir tudo';
+    }
+
+    function filtrarDocumentacao(termoRaw) {
+        const termo = (termoRaw || '').trim().toLowerCase();
+        document.querySelectorAll('.doc-card').forEach(card => {
+            const body = card.querySelector('.acc-body');
+            const rows = card.querySelectorAll('.doc-row');
+            if (!termo) {
+                card.classList.remove('hidden');
+                rows.forEach(r => r.classList.remove('hidden'));
+                return;
+            }
+            let matchCount = 0;
+            rows.forEach(r => {
+                const hit = r.textContent.toLowerCase().includes(termo);
+                r.classList.toggle('hidden', !hit);
+                if (hit) matchCount++;
+            });
+            card.classList.toggle('hidden', matchCount === 0);
+            if (matchCount > 0) {
+                body.classList.remove('hidden');
+                card.classList.add('acc-open');
+            }
+        });
     }
 
     let bancoRevelado = false;
@@ -227,8 +587,8 @@
         });
         const btn = document.getElementById('btnRevelarBanco');
         btn.innerHTML = bancoRevelado
-            ? '<i class="ph ph-eye-slash"></i><span>Ocultar</span>'
-            : '<i class="ph ph-eye"></i><span>Revelar</span>';
+            ? '<i class="ph ph-eye-slash"></i><span>Ocultar números</span>'
+            : '<i class="ph ph-eye"></i><span>Revelar números</span>';
     }
 </script>
 {% endblock %}

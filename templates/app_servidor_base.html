@@ -28,7 +28,7 @@
             --g360-mid: #14532D;
             --g360-green: #10B981;
             --g360-yellow: #FACC15;
-            --g360-bg: #F3F7F5;
+            --g360-bg: #F5F8F6;
         }
 
         * {
@@ -38,9 +38,10 @@
 
         html, body {
             font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: #E7EFEA;
-            color: #0F2921;
+            background-color: #E8F0EB;
+            color: #102A22;
             overscroll-behavior-y: contain;
+            -webkit-font-smoothing: antialiased;
         }
 
         .pwa-shell {
@@ -51,7 +52,7 @@
             position: relative;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 25px 60px -15px rgba(11, 61, 46, 0.22);
+            box-shadow: 0 28px 65px -18px rgba(11, 61, 46, 0.20);
             overflow-x: hidden;
         }
 
@@ -65,57 +66,80 @@
 
         /* Animações suaves de aplicativo nativo */
         @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(16px); }
+            from { opacity: 0; transform: translateY(14px); }
             to { opacity: 1; transform: translateY(0); }
         }
         @keyframes scaleIn {
-            from { opacity: 0; transform: scale(0.95); }
+            from { opacity: 0; transform: scale(0.96); }
             to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes floatSubtle {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-3px); }
-        }
-        @keyframes shimmerSlow {
-            0% { background-position: -200% 0; }
-            100% { background-position: 200% 0; }
         }
 
         .anim-fade-up {
             opacity: 0;
-            animation: fadeUp 0.48s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            animation: fadeUp 0.44s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
         .anim-scale-in {
             opacity: 0;
-            animation: scaleIn 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+            animation: scaleIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         }
-        .delay-1 { animation-delay: 0.06s; }
-        .delay-2 { animation-delay: 0.12s; }
-        .delay-3 { animation-delay: 0.18s; }
-        .delay-4 { animation-delay: 0.24s; }
-        .delay-5 { animation-delay: 0.30s; }
+        .delay-1 { animation-delay: 0.05s; }
+        .delay-2 { animation-delay: 0.10s; }
+        .delay-3 { animation-delay: 0.15s; }
+        .delay-4 { animation-delay: 0.20s; }
+        .delay-5 { animation-delay: 0.25s; }
 
+        /* Cards delicados e táteis */
         .app-card {
             background: #FFFFFF;
-            border: 1px solid rgba(11, 61, 46, 0.07);
+            border: 1px solid rgba(11, 61, 46, 0.065);
             border-radius: 1.25rem;
-            box-shadow: 0 8px 24px -10px rgba(11, 61, 46, 0.10);
-            transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+            box-shadow: 0 4px 20px -8px rgba(11, 61, 46, 0.08);
+            transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.22s ease, border-color 0.22s ease, background-color 0.22s ease;
+        }
+        .app-card-interactive {
+            cursor: pointer;
         }
         .app-card-interactive:hover {
             transform: translateY(-2px);
-            box-shadow: 0 14px 28px -12px rgba(11, 61, 46, 0.18);
-            border-color: rgba(16, 185, 129, 0.35);
+            box-shadow: 0 12px 28px -12px rgba(11, 61, 46, 0.16);
+            border-color: rgba(16, 185, 129, 0.32);
         }
         .app-card-interactive:active {
-            transform: scale(0.98);
+            transform: scale(0.975);
         }
         .app-card-interactive .card-arrow {
             transition: transform 0.22s ease, color 0.22s ease;
         }
         .app-card-interactive:hover .card-arrow {
-            transform: translateX(4px);
+            transform: translateX(3px);
             color: #0B3D2E;
+        }
+
+        /* Cartão Funcional 3D Flip Interativo */
+        .flip-scene {
+            perspective: 1200px;
+        }
+        .flip-card {
+            position: relative;
+            width: 100%;
+            min-height: 204px;
+            transform-style: preserve-3d;
+            transition: transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+            cursor: pointer;
+        }
+        .flip-card.is-flipped {
+            transform: rotateY(180deg);
+        }
+        .flip-face {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            border-radius: 1.5rem;
+            overflow: hidden;
+        }
+        .flip-back {
+            transform: rotateY(180deg);
         }
 
         .brand-pill {
@@ -124,12 +148,13 @@
         }
 
         .safe-top {
-            padding-top: max(1rem, env(safe-area-inset-top));
+            padding-top: max(0.85rem, env(safe-area-inset-top));
         }
         .safe-bottom {
-            padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+            padding-bottom: max(0.65rem, env(safe-area-inset-bottom));
         }
 
+        /* Bottom Bar flutuante delicada */
         .bottom-nav-wrap {
             position: fixed;
             bottom: 0;
@@ -138,14 +163,31 @@
             width: 100%;
             max-width: 460px;
             z-index: 40;
-            background: rgba(255, 255, 255, 0.94);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border-top: 1px solid rgba(11, 61, 46, 0.08);
-            box-shadow: 0 -8px 24px -12px rgba(11, 61, 46, 0.14);
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-top: 6px;
+            background: linear-gradient(to top, rgba(245, 248, 246, 0.98) 65%, rgba(245, 248, 246, 0));
+        }
+        .bottom-nav-inner {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border: 1px solid rgba(11, 61, 46, 0.08);
+            border-radius: 1.35rem;
+            box-shadow: 0 10px 30px -10px rgba(11, 61, 46, 0.18);
         }
 
-        /* Oculta scrollbar em trilhos horizontais */
+        /* Accordion suave */
+        .acc-body {
+            transition: max-height 0.28s ease, opacity 0.24s ease;
+        }
+        .acc-caret {
+            transition: transform 0.24s ease;
+        }
+        .acc-open .acc-caret {
+            transform: rotate(180deg);
+        }
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -179,51 +221,47 @@
             {% endif %}
         {% endwith %}
 
+        <!-- Micro Toast de Cópia / Feedback Rápido -->
+        <div id="microToast" class="hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-full bg-[#0B3D2E] text-white text-xs font-bold shadow-xl flex items-center gap-2 border border-white/10">
+            <i class="ph-fill ph-check-circle text-[#FACC15] text-sm"></i>
+            <span id="microToastText">Copiado!</span>
+        </div>
+
         <!-- Conteúdo Principal da Tela -->
         {% block body %}{% endblock %}
 
-        <!-- Navegação Inferior Nativa (quando autenticado) -->
+        <!-- Navegação Inferior Flutuante Nativa (quando autenticado) -->
         {% if active_tab is defined %}
         <nav class="bottom-nav-wrap safe-bottom" aria-label="Navegação principal do aplicativo">
-            <div class="grid grid-cols-5 px-2 pt-2 pb-1">
+            <div class="bottom-nav-inner grid grid-cols-5 px-1.5 py-1.5">
                 <a href="{{ url_for('app_servidor_inicio') }}"
-                   class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all {% if active_tab == 'inicio' %}text-[#0B3D2E] font-extrabold{% else %}text-slate-400 hover:text-slate-600 font-medium{% endif %}">
-                    <span class="w-10 h-7 rounded-full flex items-center justify-center transition-all {% if active_tab == 'inicio' %}bg-emerald-100 text-[#0B3D2E]{% endif %}">
-                        <i class="{% if active_tab == 'inicio' %}ph-fill{% else %}ph{% endif %} ph-house text-xl"></i>
-                    </span>
-                    <span class="text-[10px] tracking-tight">Início</span>
+                   class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-2xl transition-all {% if active_tab == 'inicio' %}bg-[#0B3D2E] text-white font-bold shadow-sm{% else %}text-slate-400 hover:text-[#0B3D2E] font-medium{% endif %}">
+                    <i class="{% if active_tab == 'inicio' %}ph-fill text-[#FACC15]{% else %}ph{% endif %} ph-house text-[19px]"></i>
+                    <span class="text-[9.5px] tracking-tight">Início</span>
                 </a>
 
                 <a href="{{ url_for('app_servidor_dados') }}"
-                   class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all {% if active_tab == 'dados' %}text-[#0B3D2E] font-extrabold{% else %}text-slate-400 hover:text-slate-600 font-medium{% endif %}">
-                    <span class="w-10 h-7 rounded-full flex items-center justify-center transition-all {% if active_tab == 'dados' %}bg-emerald-100 text-[#0B3D2E]{% endif %}">
-                        <i class="{% if active_tab == 'dados' %}ph-fill{% else %}ph{% endif %} ph-identification-card text-xl"></i>
-                    </span>
-                    <span class="text-[10px] tracking-tight">Dados</span>
+                   class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-2xl transition-all {% if active_tab == 'dados' %}bg-[#0B3D2E] text-white font-bold shadow-sm{% else %}text-slate-400 hover:text-[#0B3D2E] font-medium{% endif %}">
+                    <i class="{% if active_tab == 'dados' %}ph-fill text-[#FACC15]{% else %}ph{% endif %} ph-identification-card text-[19px]"></i>
+                    <span class="text-[9.5px] tracking-tight">Docs</span>
                 </a>
 
                 <a href="{{ url_for('app_servidor_contratos') }}"
-                   class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all {% if active_tab == 'contratos' %}text-[#0B3D2E] font-extrabold{% else %}text-slate-400 hover:text-slate-600 font-medium{% endif %}">
-                    <span class="w-10 h-7 rounded-full flex items-center justify-center transition-all {% if active_tab == 'contratos' %}bg-emerald-100 text-[#0B3D2E]{% endif %}">
-                        <i class="{% if active_tab == 'contratos' %}ph-fill{% else %}ph{% endif %} ph-file-text text-xl"></i>
-                    </span>
-                    <span class="text-[10px] tracking-tight">Contrato</span>
+                   class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-2xl transition-all {% if active_tab == 'contratos' %}bg-[#0B3D2E] text-white font-bold shadow-sm{% else %}text-slate-400 hover:text-[#0B3D2E] font-medium{% endif %}">
+                    <i class="{% if active_tab == 'contratos' %}ph-fill text-[#FACC15]{% else %}ph{% endif %} ph-file-text text-[19px]"></i>
+                    <span class="text-[9.5px] tracking-tight">Contrato</span>
                 </a>
 
                 <a href="{{ url_for('app_servidor_solicitacoes') }}"
-                   class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all {% if active_tab == 'solicitacoes' %}text-[#0B3D2E] font-extrabold{% else %}text-slate-400 hover:text-slate-600 font-medium{% endif %}">
-                    <span class="w-10 h-7 rounded-full flex items-center justify-center transition-all {% if active_tab == 'solicitacoes' %}bg-emerald-100 text-[#0B3D2E]{% endif %}">
-                        <i class="{% if active_tab == 'solicitacoes' %}ph-fill{% else %}ph{% endif %} ph-pencil-simple-line text-xl"></i>
-                    </span>
-                    <span class="text-[10px] tracking-tight">Alterar</span>
+                   class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-2xl transition-all {% if active_tab == 'solicitacoes' %}bg-[#0B3D2E] text-white font-bold shadow-sm{% else %}text-slate-400 hover:text-[#0B3D2E] font-medium{% endif %}">
+                    <i class="{% if active_tab == 'solicitacoes' %}ph-fill text-[#FACC15]{% else %}ph{% endif %} ph-pencil-simple-line text-[19px]"></i>
+                    <span class="text-[9.5px] tracking-tight">Alterar</span>
                 </a>
 
                 <a href="{{ url_for('app_servidor_atestados') }}"
-                   class="flex flex-col items-center justify-center gap-1 py-1 rounded-xl transition-all {% if active_tab == 'atestados' %}text-[#0B3D2E] font-extrabold{% else %}text-slate-400 hover:text-slate-600 font-medium{% endif %}">
-                    <span class="w-10 h-7 rounded-full flex items-center justify-center transition-all {% if active_tab == 'atestados' %}bg-emerald-100 text-[#0B3D2E]{% endif %}">
-                        <i class="{% if active_tab == 'atestados' %}ph-fill{% else %}ph{% endif %} ph-first-aid text-xl"></i>
-                    </span>
-                    <span class="text-[10px] tracking-tight">Atestados</span>
+                   class="flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-2xl transition-all {% if active_tab == 'atestados' %}bg-[#0B3D2E] text-white font-bold shadow-sm{% else %}text-slate-400 hover:text-[#0B3D2E] font-medium{% endif %}">
+                    <i class="{% if active_tab == 'atestados' %}ph-fill text-[#FACC15]{% else %}ph{% endif %} ph-first-aid text-[19px]"></i>
+                    <span class="text-[9.5px] tracking-tight">Atestados</span>
                 </a>
             </div>
         </nav>
@@ -263,7 +301,6 @@
     </div>
 
     <script>
-        // Registro do Service Worker do PWA SERVIDOR 360
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/app-servidor/sw.js', { scope: '/app-servidor/' })
@@ -271,7 +308,6 @@
             });
         }
 
-        // Controle inteligente do botão de instalação PWA (Android + iOS)
         let deferredInstallPrompt = null;
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -292,7 +328,6 @@
             if (!isStandalone && isIOS) {
                 mostrarCartaoInstalacao();
             }
-            // Auto-fechar toasts de sucesso após 5s
             setTimeout(() => {
                 const c = document.getElementById('pwaFlashContainer');
                 if (c) {
@@ -319,7 +354,29 @@
             }
         }
 
-        // Máscara padrão de CPF reutilizável
+        let microToastTimer = null;
+        function copiarTextoApp(texto, label = 'Copiado!') {
+            if (!texto || texto === '—' || texto === 'Não informado') return;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(texto).catch(() => {});
+            } else {
+                const ta = document.createElement('textarea');
+                ta.value = texto;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                ta.remove();
+            }
+            const t = document.getElementById('microToast');
+            const tx = document.getElementById('microToastText');
+            if (t && tx) {
+                tx.textContent = label;
+                t.classList.remove('hidden');
+                clearTimeout(microToastTimer);
+                microToastTimer = setTimeout(() => t.classList.add('hidden'), 1900);
+            }
+        }
+
         function aplicarMascaraCPF(el) {
             if (!el) return;
             el.addEventListener('input', (e) => {
